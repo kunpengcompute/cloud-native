@@ -3,8 +3,9 @@ package dynamic
 import (
 	"context"
 	"fmt"
-	informer "k8s-mpam-controller/pkg/infomer"
 	"time"
+
+	informer "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/infomer"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 )

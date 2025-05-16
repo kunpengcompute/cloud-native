@@ -2,10 +2,11 @@ package dynamic
 
 import (
 	"fmt"
-	"k8s-mpam-controller/pkg/collector"
-	"k8s-mpam-controller/pkg/typedef"
-	"k8s-mpam-controller/pkg/util"
 	"time"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/collector"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/typedef"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 
 	"k8s.io/klog"
 )

@@ -1,7 +1,7 @@
 package typedef
 
 import (
-	"k8s-mpam-controller/pkg/util"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 
 	"k8s.io/klog"
 )

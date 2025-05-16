@@ -16,7 +16,8 @@ package informer
 
 import (
 	"fmt"
-	"k8s-mpam-controller/pkg/typedef"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/typedef"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog"

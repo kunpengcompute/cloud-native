@@ -2,11 +2,12 @@ package dynamic
 
 import (
 	"fmt"
-	"k8s-mpam-controller/pkg/util"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 
 	"k8s.io/klog"
 )

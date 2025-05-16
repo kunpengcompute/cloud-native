@@ -15,7 +15,7 @@
 package typedef
 
 import (
-	"k8s-mpam-controller/pkg/util"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 
 	corev1 "k8s.io/api/core/v1"
 )

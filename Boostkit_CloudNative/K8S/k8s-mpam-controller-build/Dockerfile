@@ -6,11 +6,11 @@ ENV CGO_ENABLE=1
 ENV GOBIN="/go/bin"
 
 WORKDIR /go/src/k8s-mpam-controller
-COPY . /go/src/k8s-mpam-controller
+COPY .. /go/src/k8s-mpam-controller
 
 # use "go get" instead of "go mod" to bypass client-go dependence issue
 # use build.sh to bypass error: "The command '/bin/sh -c go get -d -v ./...' returned a non-zero code: 1"
-RUN ./build.sh
+RUN ./k8s-mpam-controller-build/build.sh
 
 # Create k8s-mpam-controller image
 FROM openeuler-22.03-lts-sp3:latest
