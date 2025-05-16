@@ -15,4 +15,4 @@ RUN ./hack/build-mpam.sh
 # Create k8s-mpam-controller image
 FROM openeuler-22.03-lts-sp3:latest
 
-COPY --from=builder /go/bin/agent /usr/bin/
+COPY --from=builder /go/bin/k8s-mpam-controller /usr/bin/agent
