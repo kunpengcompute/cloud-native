@@ -4,7 +4,7 @@ all:
 
 # To build in docker envrionment you can run following cmd directly
 docker:
-	sudo docker build --force-rm -t k8s-mpam-controller:0.1 .
+	sudo docker build --force-rm -f ./Dockerfile.mpam -t k8s-mpam-controller:0.1 .
 
 clean:
 	rm -f `go env GOPATH`/bin/agent `go env GOPATH`/bin/server
