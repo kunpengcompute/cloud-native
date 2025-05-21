@@ -3,9 +3,10 @@ package informer
 import (
 	"context"
 	"fmt"
-	"k8s-mpam-controller/pkg/typedef"
 	"os"
 	"time"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/typedef"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"

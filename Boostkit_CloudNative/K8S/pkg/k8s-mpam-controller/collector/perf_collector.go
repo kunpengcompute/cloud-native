@@ -9,7 +9,7 @@ import (
 	"time"
 	"unsafe"
 
-	"k8s-mpam-controller/pkg/util"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"

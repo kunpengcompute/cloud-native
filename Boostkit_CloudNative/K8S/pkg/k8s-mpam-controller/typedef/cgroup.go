@@ -2,9 +2,10 @@ package typedef
 
 import (
 	"fmt"
-	"k8s-mpam-controller/pkg/util"
 	"path/filepath"
 	"strings"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 )
 
 const (

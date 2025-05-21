@@ -1,8 +1,9 @@
 package informer
 
 import (
-	"k8s-mpam-controller/pkg/typedef"
 	"sync"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/typedef"
 
 	"k8s.io/klog"
 )

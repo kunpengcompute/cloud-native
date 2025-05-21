@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s-mpam-controller/pkg/util"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 )
 
 // ConfigPath is mpam config file path

@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s-mpam-controller/pkg/typedef"
-	"k8s-mpam-controller/pkg/util"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/typedef"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 
 	"k8s.io/klog"
 )

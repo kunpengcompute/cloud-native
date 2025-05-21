@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"k8s-mpam-controller/pkg/agent"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/agent"
 )
 
 func main() {
