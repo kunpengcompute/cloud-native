@@ -133,7 +133,7 @@ func (c *DynCache) GetConfig() interface{} {
 // Run implement service run function
 func (c *DynCache) Run(ctx context.Context) {
 	const ReSyncTime = 10
-	go wait.Until(c.syncCacheLimit, ReSyncTime*time.Second, ctx.Done())
+	go wait.Until(c.syncCacheLimitAndCPUQOS, ReSyncTime*time.Second, ctx.Done())
 	wait.Until(c.startDynamic, time.Millisecond*time.Duration(c.config.AdjustInterval), ctx.Done())
 }
 

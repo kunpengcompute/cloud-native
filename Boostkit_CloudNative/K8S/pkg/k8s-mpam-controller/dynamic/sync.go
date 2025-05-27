@@ -31,10 +31,15 @@ var validLevel = map[string]bool{
 }
 
 // SyncCacheLimit will continuously set cache limit with corresponding offline pods
-func (c *DynCache) syncCacheLimit() {
+func (c *DynCache) syncCacheLimitAndCPUQOS() {
 	for _, p := range c.listOfflinePods() {
 		if err := c.writeTasksToResctrl(p); err != nil {
 			klog.Errorf("failed to set cache limit for pod %v: %v", p.Name, err)
+			continue
+		}
+
+		if err := c.writeCPUQOS(p); err != nil {
+			klog.Errorf("failed to set cpu qos for pod %v: %v", p.Name, err)
 			continue
 		}
 	}
@@ -78,4 +83,31 @@ func (c *DynCache) listOfflinePods() map[string]*typedef.PodInfo {
 	return c.podmanager.ListPodsWithOptions(func(pi *typedef.PodInfo) bool {
 		return pi.Offline()
 	})
+}
+
+func (c *DynCache) writeCPUQOS(pod *typedef.PodInfo) error {
+	if !util.PathExist(typedef.AbsoluteCgroupPath("cpu", pod.Path, "")) {
+		// just return since pod maybe deleted
+		return nil
+	}
+
+	for _, container := range pod.IDContainersMap {
+		cgroupKey := &typedef.Key{SubSys: "cpu", FileName: "cpu.qos_level"}
+		key := container.GetCgroupAttr(cgroupKey)
+		if key.Err != nil {
+			return fmt.Errorf("get container: %v cpu qos level failed, err: %v", container.Name, key.Err)
+		}
+
+		// 当前容器已经设置cpu.qos_level值为-1，无需再进行设置
+		if key.Value == "-1" {
+			continue
+		}
+
+		if err := container.SetCgroupAttr(cgroupKey, "-1"); err != nil {
+			return fmt.Errorf("set container: %v cpu qos level failed, err: %v", container.Name, err)
+		}
+		klog.Infof("set container: %v cpu qos level to -1", container.Name)
+	}
+
+	return nil
 }

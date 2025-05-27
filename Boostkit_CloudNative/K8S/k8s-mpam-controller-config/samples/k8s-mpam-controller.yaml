@@ -41,6 +41,32 @@ subjects:
   name: mpam-controller-agent
   namespace: default
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mpam-config
+data:
+  config.json: |
+    {
+      "mpamConfig":{
+        "adjustInterval": 5000,
+        "perfDuration": 3000,
+        "l3Percent": {
+          "low": 10,
+          "high": 50
+        },
+        "memBandPercent": {
+          "low": 10,
+          "high": 30
+        },
+        "cacheMiss": {
+          "minMiss": 10,
+          "maxMiss": 30
+        }
+      }
+    }
+
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -77,6 +103,8 @@ spec:
           mountPath: /etc/hostname
         - name: sysfs
           mountPath: /sys/fs/cgroup/
+        - name: config-volume
+          mountPath: /var/lib/mpam-config
       volumes:
       - name: resctrl
         hostPath:
@@ -87,3 +115,9 @@ spec:
       - name: sysfs
         hostPath:
           path: /sys/fs/cgroup/
+      - name: config-volume
+        configMap:
+          name: mpam-config
+          items: 
+            - key: config.json
+              path: config.json
