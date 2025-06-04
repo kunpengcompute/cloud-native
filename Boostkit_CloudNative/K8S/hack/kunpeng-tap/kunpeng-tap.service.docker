@@ -1,0 +1,13 @@
+[Unit]
+Description=Kunpeng Topology-Affinity Plugin Service
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/kunpeng-tap --runtime-proxy-endpoint="/var/run/kunpeng/tap-runtime-proxy.sock" \
+    --container-runtime-service-endpoint="/var/run/docker.sock" --container-runtime-mode="Docker" \
+    --resource-policy="topology-aware"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
