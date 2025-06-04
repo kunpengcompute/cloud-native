@@ -42,4 +42,27 @@
 *.idb
 *.pdb
 
+# Binaries for programs and plugins
+*.exe~
+bin/
+**/bin/
+Dockerfile.cross
 
+# Test binary, built with `go test -c`
+*.test
+
+# Go workspace file
+go.work
+
+# Kubernetes Generated files - skip generated files, except for vendored files
+!vendor/**/zz_generated.*
+
+# Editor and IDE paraphernalia
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+node_modules
+package*

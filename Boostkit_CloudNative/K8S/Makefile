@@ -1,10 +1,193 @@
-all:
-	go get -d -v ./...
-	CGO_CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2 -O2" go install -buildmode=pie -ldflags "-s -linkmode 'external' -extldflags '-Wl,-z,now'" ./cmd/*
+# K8S Projects Makefile
+# This Makefile manages k8s-mpam-controller and kunpeng-tap projects
 
-# To build in docker envrionment you can run following cmd directly
-docker:
-	sudo docker build --force-rm -f ./Dockerfile.mpam -t k8s-mpam-controller:0.1 .
+# Project configuration
+VERSION ?= 0.1.0
+BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
+GIT_COMMIT := $(shell git rev-parse HEAD)
 
-clean:
-	rm -f `go env GOPATH`/bin/agent `go env GOPATH`/bin/server
+# Build directories
+BUILD_DIR := bin
+GOPATH_BIN := $(shell go env GOPATH)/bin
+
+# Setting SHELL to bash allows bash commands to be executed by recipes.
+SHELL = /usr/bin/env bash -o pipefail
+.SHELLFLAGS = -ec
+
+.PHONY: all
+all: mpam-build kunpeng-tap-build
+
+##@ General
+
+.PHONY: help
+help: ## Display this help.
+	@echo "K8S Projects Build System"
+	@echo ""
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ K8S MPAM Controller
+
+.PHONY: mpam-build
+mpam-build: ## Build k8s-mpam-controller project.
+	$(MAKE) -f Makefile.mpam build
+
+.PHONY: mpam-build-local
+mpam-build-local: ## Build k8s-mpam-controller locally.
+	$(MAKE) -f Makefile.mpam build-local
+
+.PHONY: mpam-clean
+mpam-clean: ## Clean k8s-mpam-controller build artifacts.
+	$(MAKE) -f Makefile.mpam clean
+
+.PHONY: mpam-docker
+mpam-docker: ## Build k8s-mpam-controller docker image.
+	$(MAKE) -f Makefile.mpam docker-build
+
+.PHONY: mpam-docker-push
+mpam-docker-push: ## Push k8s-mpam-controller docker image.
+	$(MAKE) -f Makefile.mpam docker-push
+
+.PHONY: mpam-docker-run
+mpam-docker-run: ## Run k8s-mpam-controller docker container.
+	$(MAKE) -f Makefile.mpam docker-run
+
+.PHONY: mpam-install
+mpam-install: ## Install k8s-mpam-controller to system.
+	$(MAKE) -f Makefile.mpam install
+
+.PHONY: mpam-uninstall
+mpam-uninstall: ## Uninstall k8s-mpam-controller from system.
+	$(MAKE) -f Makefile.mpam uninstall
+
+.PHONY: mpam-run
+mpam-run: ## Run k8s-mpam-controller locally.
+	$(MAKE) -f Makefile.mpam run
+
+.PHONY: mpam-fmt
+mpam-fmt: ## Format k8s-mpam-controller code.
+	$(MAKE) -f Makefile.mpam fmt
+
+.PHONY: mpam-vet
+mpam-vet: ## Run go vet for k8s-mpam-controller.
+	$(MAKE) -f Makefile.mpam vet
+
+.PHONY: mpam-test
+mpam-test: ## Test k8s-mpam-controller.
+	$(MAKE) -f Makefile.mpam test
+
+.PHONY: mpam-tidy
+mpam-tidy: ## Tidy k8s-mpam-controller go modules.
+	$(MAKE) -f Makefile.mpam tidy
+
+##@ Kunpeng TAP
+
+.PHONY: kunpeng-tap-build
+kunpeng-tap-build: ## Build kunpeng-tap project.
+	$(MAKE) -f Makefile.kunpeng-tap build
+
+.PHONY: kunpeng-tap-build-manager
+kunpeng-tap-build-manager: ## Build kunpeng-tap manager.
+	$(MAKE) -f Makefile.kunpeng-tap build-manager
+
+.PHONY: kunpeng-tap-build-proxy
+kunpeng-tap-build-proxy: ## Build kunpeng-tap proxy.
+	$(MAKE) -f Makefile.kunpeng-tap build-proxy
+
+.PHONY: kunpeng-tap-test
+kunpeng-tap-test: ## Test kunpeng-tap project.
+	$(MAKE) -f Makefile.kunpeng-tap test
+
+.PHONY: kunpeng-tap-clean
+kunpeng-tap-clean: ## Clean kunpeng-tap build artifacts.
+	$(MAKE) -f Makefile.kunpeng-tap clean
+
+.PHONY: kunpeng-tap-fmt
+kunpeng-tap-fmt: ## Format kunpeng-tap code.
+	$(MAKE) -f Makefile.kunpeng-tap fmt
+
+.PHONY: kunpeng-tap-vet
+kunpeng-tap-vet: ## Run go vet for kunpeng-tap.
+	$(MAKE) -f Makefile.kunpeng-tap vet
+
+.PHONY: kunpeng-tap-tidy
+kunpeng-tap-tidy: ## Tidy kunpeng-tap go modules.
+	$(MAKE) -f Makefile.kunpeng-tap tidy
+
+.PHONY: kunpeng-tap-run-manager
+kunpeng-tap-run-manager: ## Run kunpeng-tap manager.
+	$(MAKE) -f Makefile.kunpeng-tap run-manager
+
+.PHONY: kunpeng-tap-run-proxy
+kunpeng-tap-run-proxy: ## Run kunpeng-tap proxy.
+	$(MAKE) -f Makefile.kunpeng-tap run-proxy
+
+##@ Kunpeng TAP Service Management
+
+.PHONY: kunpeng-tap-install-service
+kunpeng-tap-install-service: ## Install kunpeng-tap service (default: docker).
+	$(MAKE) -f Makefile.kunpeng-tap install-service
+
+.PHONY: kunpeng-tap-install-service-docker
+kunpeng-tap-install-service-docker: ## Install kunpeng-tap service for Docker runtime.
+	$(MAKE) -f Makefile.kunpeng-tap install-service-docker
+
+.PHONY: kunpeng-tap-install-service-containerd
+kunpeng-tap-install-service-containerd: ## Install kunpeng-tap service for Containerd runtime.
+	$(MAKE) -f Makefile.kunpeng-tap install-service-containerd
+
+.PHONY: kunpeng-tap-start-service
+kunpeng-tap-start-service: ## Start kunpeng-tap service.
+	$(MAKE) -f Makefile.kunpeng-tap start-service
+
+.PHONY: kunpeng-tap-stop-service
+kunpeng-tap-stop-service: ## Stop kunpeng-tap service.
+	$(MAKE) -f Makefile.kunpeng-tap stop-service
+
+.PHONY: kunpeng-tap-restart-service
+kunpeng-tap-restart-service: ## Restart kunpeng-tap service.
+	$(MAKE) -f Makefile.kunpeng-tap restart-service
+
+.PHONY: kunpeng-tap-status-service
+kunpeng-tap-status-service: ## Show kunpeng-tap service status.
+	$(MAKE) -f Makefile.kunpeng-tap status-service
+
+.PHONY: kunpeng-tap-uninstall-service
+kunpeng-tap-uninstall-service: ## Uninstall kunpeng-tap service.
+	$(MAKE) -f Makefile.kunpeng-tap uninstall-service
+
+##@ Kunpeng TAP Docker
+
+.PHONY: kunpeng-tap-docker-build
+kunpeng-tap-docker-build: ## Build kunpeng-tap docker image.
+	$(MAKE) -f Makefile.kunpeng-tap docker-build
+
+.PHONY: kunpeng-tap-docker-push
+kunpeng-tap-docker-push: ## Push kunpeng-tap docker image.
+	$(MAKE) -f Makefile.kunpeng-tap docker-push
+
+.PHONY: kunpeng-tap-docker-buildx
+kunpeng-tap-docker-buildx: ## Build and push kunpeng-tap docker image for cross-platform.
+	$(MAKE) -f Makefile.kunpeng-tap docker-buildx
+
+##@ Combined Operations
+
+.PHONY: build
+build: mpam-build kunpeng-tap-build ## Build all projects.
+
+.PHONY: clean
+clean: mpam-clean kunpeng-tap-clean ## Clean all projects.
+
+.PHONY: docker
+docker: mpam-docker kunpeng-tap-docker-build ## Build all docker images.
+
+.PHONY: fmt
+fmt: mpam-fmt kunpeng-tap-fmt ## Format code for all projects.
+
+.PHONY: vet
+vet: mpam-vet kunpeng-tap-vet ## Run go vet for all projects.
+
+.PHONY: test
+test: mpam-test kunpeng-tap-test ## Run tests for all projects.
+
+.PHONY: tidy
+tidy: mpam-tidy kunpeng-tap-tidy ## Tidy go modules for all projects.

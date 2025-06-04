@@ -1,0 +1,189 @@
+# Makefile for kunpeng-tap components
+
+# Image URL to use all building/pushing image targets
+IMG ?= kunpeng-tap:latest
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_K8S_VERSION = 1.31.0
+
+# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
+ifeq (,$(shell go env GOBIN))
+GOBIN=$(shell go env GOPATH)/bin
+else
+GOBIN=$(shell go env GOBIN)
+endif
+
+# CONTAINER_TOOL defines the container tool to be used for building images.
+CONTAINER_TOOL ?= docker
+
+BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
+GitCommit=$(shell git rev-parse HEAD)
+Version="0.1.0"
+
+# Setting SHELL to bash allows bash commands to be executed by recipes.
+SHELL = /usr/bin/env bash -o pipefail
+.SHELLFLAGS = -ec
+
+# Binary names
+MANAGER_BINARY=kunpeng-tap-manager
+PROXY_BINARY=kunpeng-tap-proxy
+
+# Build directories
+BUILD_DIR=bin
+MANAGER_SRC=./cmd/kunpeng-tap/manager
+PROXY_SRC=./cmd/kunpeng-tap/proxy
+
+# Build flags
+LDFLAGS=-ldflags "-s -w -X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.Version=$(Version) -X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.Built=$(BUILD_TIME) -X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.GitCommit=$(GitCommit)"
+
+.PHONY: all
+all: build
+
+##@ General
+
+.PHONY: help
+help: ## Display this help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ Development
+
+.PHONY: fmt
+fmt: ## Run go fmt against code.
+	go fmt ./cmd/kunpeng-tap/... ./pkg/kunpeng-tap/... ./test/kunpeng-tap/...
+
+.PHONY: vet
+vet: ## Run go vet against code.
+	go vet ./cmd/kunpeng-tap/... ./pkg/kunpeng-tap/... ./test/kunpeng-tap/...
+
+.PHONY: test
+test: fmt vet ## Run tests.
+	go test ./pkg/kunpeng-tap/... -v
+
+.PHONY: test-e2e
+test-e2e: fmt vet ## Run the e2e tests.
+	go test ./test/kunpeng-tap/e2e/ -v -ginkgo.v
+
+.PHONY: tidy
+tidy: ## Tidy go modules.
+	go mod tidy
+
+##@ Build
+
+.PHONY: build
+build: fmt vet ## Build manager and proxy binaries.
+	@echo "Building kunpeng-tap manager..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/$(MANAGER_BINARY) $(MANAGER_SRC)
+	@echo "Building kunpeng-tap proxy..."
+	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/$(PROXY_BINARY) $(PROXY_SRC)
+
+.PHONY: build-manager
+build-manager: fmt vet ## Build manager binary.
+	@echo "Building kunpeng-tap manager..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/$(MANAGER_BINARY) $(MANAGER_SRC)
+
+.PHONY: build-proxy
+build-proxy: fmt vet ## Build proxy binary.
+	@echo "Building kunpeng-tap proxy..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/$(PROXY_BINARY) $(PROXY_SRC)
+
+.PHONY: clean
+clean: ## Clean build artifacts.
+	@echo "Cleaning..."
+	go clean
+	rm -rf $(BUILD_DIR)
+	rm -f $(MANAGER_BINARY) $(PROXY_BINARY)
+
+.PHONY: run-manager
+run-manager: fmt vet ## Run manager from your host.
+	go run $(MANAGER_SRC)
+
+.PHONY: run-proxy
+run-proxy: fmt vet ## Run proxy from your host.
+	go run $(PROXY_SRC)
+
+##@ Service Management
+
+.PHONY: install-service
+install-service: install-service-docker ## Install kunpeng-tap service (default: docker).
+
+.PHONY: install-service-docker
+install-service-docker: build ## Install kunpeng-tap service for Docker runtime.
+	@echo "Installing kunpeng-tap service for Docker runtime..."
+	sudo cp $(BUILD_DIR)/$(PROXY_BINARY) /usr/local/bin/kunpeng-tap
+	sudo chmod 755 /usr/local/bin/kunpeng-tap
+	sudo cp ./hack/kunpeng-tap/kunpeng-tap.service.docker /etc/systemd/system/kunpeng-tap.service
+	sudo chmod 644 /etc/systemd/system/kunpeng-tap.service
+	sudo systemctl daemon-reload
+	sudo systemctl enable kunpeng-tap.service
+	@echo "kunpeng-tap service installed successfully for Docker runtime"
+
+.PHONY: install-service-containerd
+install-service-containerd: build ## Install kunpeng-tap service for Containerd runtime.
+	@echo "Installing kunpeng-tap service for Containerd runtime..."
+	sudo cp $(BUILD_DIR)/$(PROXY_BINARY) /usr/local/bin/kunpeng-tap
+	sudo chmod 755 /usr/local/bin/kunpeng-tap
+	sudo cp ./hack/kunpeng-tap/kunpeng-tap.service.containerd /etc/systemd/system/kunpeng-tap.service
+	sudo chmod 644 /etc/systemd/system/kunpeng-tap.service
+	sudo systemctl daemon-reload
+	sudo systemctl enable kunpeng-tap.service
+	@echo "kunpeng-tap service installed successfully for Containerd runtime"
+
+.PHONY: start-service
+start-service: ## Start kunpeng-tap service.
+	sudo systemctl start kunpeng-tap.service
+	sudo systemctl status kunpeng-tap.service
+
+.PHONY: stop-service
+stop-service: ## Stop kunpeng-tap service.
+	sudo systemctl stop kunpeng-tap.service
+
+.PHONY: restart-service
+restart-service: ## Restart kunpeng-tap service.
+	sudo systemctl restart kunpeng-tap.service
+	sudo systemctl status kunpeng-tap.service
+
+.PHONY: status-service
+status-service: ## Show kunpeng-tap service status.
+	sudo systemctl status kunpeng-tap.service
+
+.PHONY: uninstall-service
+uninstall-service: ## Uninstall kunpeng-tap service.
+	@echo "Uninstalling kunpeng-tap service..."
+	-sudo systemctl stop kunpeng-tap.service
+	-sudo systemctl disable kunpeng-tap.service
+	-sudo rm -f /etc/systemd/system/kunpeng-tap.service
+	-sudo rm -f /usr/local/bin/kunpeng-tap
+	sudo systemctl daemon-reload
+	@echo "kunpeng-tap service uninstalled successfully"
+
+##@ Docker
+
+.PHONY: docker-build
+docker-build: ## Build docker image with the proxy.
+	$(CONTAINER_TOOL) build -t ${IMG} .
+
+.PHONY: docker-push
+docker-push: ## Push docker image with the proxy.
+	$(CONTAINER_TOOL) push ${IMG}
+
+# PLATFORMS defines the target platforms for the image be built to provide support to multiple
+# architectures. (i.e. make docker-buildx IMG=myregistry/kunpeng-tap:0.0.1).
+PLATFORMS ?= linux/arm64,linux/amd64
+.PHONY: docker-buildx
+docker-buildx: ## Build and push docker image for cross-platform support
+	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
+	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+	- $(CONTAINER_TOOL) buildx create --name kunpeng-tap-builder
+	$(CONTAINER_TOOL) buildx use kunpeng-tap-builder
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx rm kunpeng-tap-builder
+	rm Dockerfile.cross
+
+##@ Dependencies
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN) 
