@@ -1,3 +1,17 @@
+// Copyright (c) Huawei Technologies Co., Ltd. 2023. All rights reserved.
+// rubik licensed under the Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//     http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
+// PURPOSE.
+// See the Mulan PSL v2 for more details.
+// Author: Xiang Li
+// Create: 2023-02-21
+// Description: This file will init cache limit directories before services running
+
+// Package dyncache is the service used for cache limit setting
 package dynamic
 
 import (
@@ -7,9 +21,9 @@ import (
 	"strconv"
 	"strings"
 
-	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
-
 	"k8s.io/klog"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 )
 
 const (
@@ -33,7 +47,7 @@ func (c *DynCache) newCacheLimitSet(groupName string, l3Per, mbPer int) *limitSe
 }
 
 func (cl *limitSet) setDir() error {
-	if err := os.Mkdir(cl.dir, 0700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(cl.dir, util.DefaultDirMode); err != nil && !os.IsExist(err) {
 		return fmt.Errorf("failed to create cache limit directory: %v", err)
 	}
 	return nil

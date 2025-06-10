@@ -2,7 +2,9 @@
 // rubik licensed under the Mulan PSL v2.
 // You can use this software according to the terms and conditions of the Mulan PSL v2.
 // You may obtain a copy of Mulan PSL v2 at:
-//     http://license.coscl.org.cn/MulanPSL2
+//
+//	http://license.coscl.org.cn/MulanPSL2
+//
 // THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
 // PURPOSE.
@@ -10,19 +12,18 @@
 // Author: Jiaqi Yang
 // Create: 2023-01-12
 // Description: This file defines PodManager passing and processing raw pod data
-
-// Package podmanager implements manager connecting informer and module manager
 package informer
 
 import (
 	"fmt"
 
-	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/typedef"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/typedef"
 )
 
+// ListOption is for filtering podInfo
 type ListOption func(pi *typedef.PodInfo) bool
 
 // PodManagerName is the unique identity of PodManager

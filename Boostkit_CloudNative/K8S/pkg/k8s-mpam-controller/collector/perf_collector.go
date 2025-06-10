@@ -1,3 +1,20 @@
+/*
+Copyright 2022 The Koordinator Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Package collector 提供采集Pod底层指标相关功能
 package collector
 
 import (
@@ -9,13 +26,14 @@ import (
 	"time"
 	"unsafe"
 
-	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
-
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 )
 
 var (
+	// EventsMap records the event that perf can collect
 	EventsMap = map[string][]string{
 		"cpi":   {"cycles", "instructions"},
 		"cmr":   {"cache-misses", "cache-references"},     // cmr means Cache Miss Ratio
@@ -32,7 +50,10 @@ func init() {
 				panic(err)
 			}
 
-			attr.Read_format = unix.PERF_FORMAT_GROUP | unix.PERF_FORMAT_TOTAL_TIME_ENABLED | unix.PERF_FORMAT_TOTAL_TIME_RUNNING | unix.PERF_FORMAT_ID
+			attr.Read_format = unix.PERF_FORMAT_GROUP |
+				unix.PERF_FORMAT_TOTAL_TIME_ENABLED |
+				unix.PERF_FORMAT_TOTAL_TIME_RUNNING |
+				unix.PERF_FORMAT_ID
 			attr.Size = uint32(unsafe.Sizeof(unix.PerfEventAttr{}))
 			attr.Bits |= unix.PerfBitInherit
 			attr.Bits |= unix.PerfBitDisabled
@@ -41,6 +62,7 @@ func init() {
 	}
 }
 
+// PerfValue is a strurt for perf collect when format is set PERF_FORMAT_ID
 type PerfValue struct {
 	Value uint64
 	ID    uint64
@@ -58,6 +80,7 @@ type perfCollector struct {
 	fds      []io.ReadCloser
 }
 
+// PerfGroupCollector records all perfcollector in all cpus
 type PerfGroupCollector struct {
 	cgroupFile     *os.File
 	cpus           []int
@@ -66,13 +89,14 @@ type PerfGroupCollector struct {
 	idEventMap     map[uint64]string // Key: event id, 通过ioctl生成
 }
 
-func NewPerfGroupCollectorSimple(cgroupPath string, metrics []string) (collector *PerfGroupCollector, err error) {
+// NewPerfGroupCollectorSimple creates a perfgroupcollector with metrics
+func NewPerfGroupCollectorSimple(cgroupPath string, metrics []string) (*PerfGroupCollector, error) {
 	cgroupFile, err := os.Open(cgroupPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file, file: %s, err: %s", cgroupPath, err)
 	}
 
-	events := []string{}
+	var events []string
 	for _, metric := range metrics {
 		if _, ok := EventsMap[metric]; ok {
 			events = append(events, EventsMap[metric]...)
@@ -90,7 +114,11 @@ func NewPerfGroupCollectorSimple(cgroupPath string, metrics []string) (collector
 	return newPerfGroupCollector(cgroupFile, cpus, events)
 }
 
-func newPerfGroupCollector(cgroupFile *os.File, cpus []int, events []string) (collector *PerfGroupCollector, err error) {
+func newPerfGroupCollector(
+	cgroupFile *os.File,
+	cpus []int,
+	events []string,
+) (collector *PerfGroupCollector, err error) {
 	if len(events) == 0 {
 		err = fmt.Errorf("events should not be empty")
 		return nil, err
@@ -112,7 +140,9 @@ func newPerfGroupCollector(cgroupFile *os.File, cpus []int, events []string) (co
 		attr := attrMap[events[0]]
 		defaultFd := -1
 		// 初始化perf group的leader
-		leaderFd, err := unix.PerfEventOpen(attr, int(cgroupFile.Fd()), cpu, defaultFd, unix.PERF_FLAG_PID_CGROUP|unix.PERF_FLAG_FD_CLOEXEC)
+		leaderFd, err := unix.PerfEventOpen(attr, int(cgroupFile.Fd()), cpu, defaultFd,
+			unix.PERF_FLAG_PID_CGROUP|unix.PERF_FLAG_FD_CLOEXEC)
+
 		if err != nil {
 			klog.Errorf("PerfEventOpen Failed, attr: %v, err: %s", attr, err)
 			return nil, err
@@ -129,7 +159,8 @@ func newPerfGroupCollector(cgroupFile *os.File, cpus []int, events []string) (co
 		// 初始化perf group中其他的事件
 		for i := 1; i < len(events); i++ {
 			attr := attrMap[events[i]]
-			fd, err := unix.PerfEventOpen(attr, int(cgroupFile.Fd()), cpu, leaderFd, unix.PERF_FLAG_PID_CGROUP|unix.PERF_FLAG_FD_CLOEXEC)
+			fd, err := unix.PerfEventOpen(attr, int(cgroupFile.Fd()), cpu, leaderFd,
+				unix.PERF_FLAG_PID_CGROUP|unix.PERF_FLAG_FD_CLOEXEC)
 			if err != nil {
 				klog.Errorf("Perf Event Open Failed, err: %s, cpu: %d, events: %s\n", err, cpu, events[i])
 				return nil, err
@@ -151,6 +182,7 @@ func newPerfGroupCollector(cgroupFile *os.File, cpus []int, events []string) (co
 	return collector, nil
 }
 
+// Start starts the perfgroupcollector
 func (p *PerfGroupCollector) Start() error {
 	for _, perfcollector := range p.perfCollectors {
 		if err := perfcollector.start(); err != nil {
@@ -160,6 +192,7 @@ func (p *PerfGroupCollector) Start() error {
 	return nil
 }
 
+// Stop stops the perfcollector
 func (p *PerfGroupCollector) Stop() error {
 	for _, perfcollector := range p.perfCollectors {
 		if err := perfcollector.stop(); err != nil {
@@ -169,6 +202,7 @@ func (p *PerfGroupCollector) Stop() error {
 	return nil
 }
 
+// Collect starts the perfcollector
 func (p *PerfGroupCollector) Collect(sampleDur time.Duration) error {
 	// 清空之前的数据
 	clear(p.resultMap)
@@ -198,6 +232,7 @@ func (p *PerfGroupCollector) Collect(sampleDur time.Duration) error {
 	return nil
 }
 
+// GetResult get the result of perf collect for pod
 func (p *PerfGroupCollector) GetResult() map[string]uint64 {
 	return p.resultMap
 }
@@ -224,7 +259,7 @@ func (p *perfCollector) collect() ([]PerfValue, error) {
 		scalingRatio = float64(header.TimeRunning) / float64(header.TimeEnabled)
 	}
 
-	res := []PerfValue{}
+	var res []PerfValue
 	for i := 0; i < int(header.Nr); i++ {
 		v := PerfValue{}
 		if err := binary.Read(reader, binary.LittleEndian, &v); err != nil {
@@ -279,6 +314,7 @@ func (p *perfCollector) close() error {
 }
 
 func getConfigAndType(event string) (*unix.PerfEventAttr, error) {
+	const UNDEFINED = 0xffff
 	attr := unix.PerfEventAttr{}
 	switch event {
 	case "cycles":
@@ -302,11 +338,11 @@ func getConfigAndType(event string) (*unix.PerfEventAttr, error) {
 		attr.Config = unix.PERF_COUNT_HW_CACHE_LL | unix.PERF_COUNT_HW_CACHE_OP_READ<<8 |
 			unix.PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16
 	default:
-		attr.Type = 0xffff
-		attr.Config = 0xffff
+		attr.Type = UNDEFINED
+		attr.Config = UNDEFINED
 	}
 
-	if attr.Config == 0xffff {
+	if attr.Config == UNDEFINED {
 		return nil, fmt.Errorf("event %s is not supported", event)
 	}
 

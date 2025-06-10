@@ -56,7 +56,7 @@ func getNumclosids() bool {
 
 	closids, err := ioutil.ReadFile(path)
 	if err != nil {
-		klog.Errorf("Failed to read num_closids (%q): %v", path, err)
+		klog.Errorf("failed to read num_closids (%q): %v", path, err)
 		klog.Warning("Please ensure mpam has been mounted")
 		return false
 	}
@@ -81,7 +81,7 @@ func getCbmmask() bool {
 
 	cbm_mask_string, err := ioutil.ReadFile(path)
 	if err != nil {
-		klog.Errorf("Failed to read ncbm_mask (%q): %v", path, err)
+		klog.Errorf("failed to read ncbm_mask (%q): %v", path, err)
 		klog.Warning("Please ensure mpam has been mounted")
 		return false
 	}
@@ -134,13 +134,13 @@ func updateResctrlGroup(dir, data string) {
 	// create resctrl group if it doesn't exist
 	if _, err := os.Lstat(dir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			klog.Errorf("Failed to create directory %v: %v", dir, err)
+			klog.Errorf("failed to create directory %v: %v", dir, err)
 			return
 		}
 	}
 
 	if err := ioutil.WriteFile(filepath.Join(dir, resctrlSchemataFile), []byte(data+"\n"), 0600); err != nil {
-		klog.Errorf("Failed to write %v to %v: %v", data, dir, err)
+		klog.Errorf("failed to write %v to %v: %v", data, dir, err)
 	}
 }
 
@@ -154,7 +154,7 @@ func getMinBandwidth() bool {
 
 	minBW, err := ioutil.ReadFile(path)
 	if err != nil {
-		klog.Errorf("Failed to read num_closids (%q): %v", path, err)
+		klog.Errorf("failed to read num_closids (%q): %v", path, err)
 		klog.Warning("Please ensure mpam has been mounted")
 		return false
 	}
@@ -224,7 +224,7 @@ func checkConfig(rcdata string) bool {
 	var perm os.FileMode = 0644
 	schemata, err := os.OpenFile(schemataFile, os.O_RDONLY, perm)
 	if err != nil {
-		klog.Errorf("Failed to open %q: %v", schemataFile, err)
+		klog.Errorf("failed to open %q: %v", schemataFile, err)
 		return false
 	}
 	defer schemata.Close()
@@ -238,7 +238,7 @@ func checkConfig(rcdata string) bool {
 		}
 	}
 	if s.Err() != nil {
-		klog.Errorf("Failed to read %q: %v", schemataFile, err)
+		klog.Errorf("failed to read %q: %v", schemataFile, err)
 		return false
 	}
 
@@ -262,7 +262,7 @@ func generateFullConf(mpamconf interface{}) []interface{} {
 	var perm os.FileMode = 0644
 	schemata, err := os.OpenFile(schemataFile, os.O_RDONLY, perm)
 	if err != nil {
-		klog.Errorf("Failed to open %q: %v", schemataFile, err)
+		klog.Errorf("failed to open %q: %v", schemataFile, err)
 		return nil
 	}
 	defer schemata.Close()
@@ -272,7 +272,7 @@ func generateFullConf(mpamconf interface{}) []interface{} {
 		mpamFullCfg = append(mpamFullCfg, s.Text())
 	}
 	if s.Err() != nil {
-		klog.Errorf("Failed to read %q: %v", schemataFile, err)
+		klog.Errorf("failed to read %q: %v", schemataFile, err)
 		return nil
 	}
 
@@ -322,7 +322,7 @@ func createFullData(rcdata, cfg string) string {
 	finalCfg := strings.Split(rcdata, ":")[0] + ":"
 	for id, numaCfg := range fullCfg {
 		finalCfg += numaCfg
-		if id != len(fullCfg) -1 {
+		if id != len(fullCfg)-1 {
 			finalCfg += ";"
 		}
 	}
@@ -342,7 +342,7 @@ func applyConfig(data *configData) {
 	for _, val := range *data {
 		conf := make(map[string]interface{})
 		if err := yaml.Unmarshal([]byte(val), &conf); err != nil {
-			klog.Errorf("Failed to unmarshal configuration data: %v", err)
+			klog.Errorf("failed to unmarshal configuration data: %v", err)
 			var yamlGroups []string
 			cleanResctrlGroup(yamlGroups)
 			return
@@ -390,8 +390,8 @@ func readPids(tasksFile string) ([]string, error) {
 
 	f, err := os.OpenFile(tasksFile, os.O_RDONLY, 0644)
 	if err != nil {
-		klog.Errorf("Failed to open %q: %v", tasksFile, err)
-		return nil, fmt.Errorf("Failed to open %q: %v", tasksFile, err)
+		klog.Errorf("failed to open %q: %v", tasksFile, err)
+		return nil, fmt.Errorf("failed to open %q: %v", tasksFile, err)
 	}
 	defer f.Close()
 
@@ -400,8 +400,8 @@ func readPids(tasksFile string) ([]string, error) {
 		pids = append(pids, s.Text())
 	}
 	if s.Err() != nil {
-		klog.Errorf("Failed to read %q: %v", tasksFile, err)
-		return nil, fmt.Errorf("Failed to read %q: %v", tasksFile, err)
+		klog.Errorf("failed to read %q: %v", tasksFile, err)
+		return nil, fmt.Errorf("failed to read %q: %v", tasksFile, err)
 	}
 
 	return pids, nil
@@ -411,7 +411,7 @@ func readPids(tasksFile string) ([]string, error) {
 func writePids(tasksFile string, pids []string) {
 	f, err := os.OpenFile(tasksFile, os.O_WRONLY, 0644)
 	if err != nil {
-		klog.Errorf("Failed to write pids to %q: %v", tasksFile, err)
+		klog.Errorf("failed to write pids to %q: %v", tasksFile, err)
 		return
 	}
 	defer f.Close()
@@ -419,7 +419,7 @@ func writePids(tasksFile string, pids []string) {
 	for _, pid := range pids {
 		if _, err := f.Write([]byte(pid)); err != nil {
 			if !errors.Is(err, syscall.ESRCH) {
-				klog.Errorf("Failed to write pid %s to %q: %v", pid, tasksFile, err)
+				klog.Errorf("failed to write pid %s to %q: %v", pid, tasksFile, err)
 				return
 			}
 		}
@@ -446,7 +446,6 @@ func assignMPAMControlGroup(dir, rcgroup string) {
 }
 
 func findPodAndAssign(dir, uid, rcgroup string) {
-	//	klog.Infof("findPodAndAssign: %s, %s, %s", dir, uid, rcgroup)
 	if fis, err := ioutil.ReadDir(dir); err == nil {
 		for _, fi := range fis {
 			if fi.IsDir() {
@@ -465,7 +464,7 @@ func findPodAndAssign(dir, uid, rcgroup string) {
 
 // assignControlGroup adds the tasks of a pod into a resctrl control group
 func assignControlGroup(uid, rcgroup string) {
-	//the newset containerd has changed cgroup path delimiter from "_" to "-", wo we try both
+	// the newset containerd has changed cgroup path delimiter from "_" to "-", wo we try both
 	id := strings.Replace(uid, "-", "_", -1)
 	findPodAndAssign(cgroupCpusetRoot, id, rcgroup)
 

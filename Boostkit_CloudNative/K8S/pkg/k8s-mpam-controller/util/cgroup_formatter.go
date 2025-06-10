@@ -1,3 +1,20 @@
+/*
+Copyright 2022 The Koordinator Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Package util 实现常用的工具函数
 package util
 
 import (
@@ -10,6 +27,7 @@ import (
 	"k8s.io/klog"
 )
 
+// CgroupDriverType presents driver type, Systemd or Cgroupfs
 type CgroupDriverType string
 
 const (
@@ -29,6 +47,7 @@ const (
 	RuntimeTypeUnknown    = "unknown"
 )
 
+// Formatter provide formatter function for cgoup path formatting
 type Formatter struct {
 	ParentDir string
 	QOSDirFn  func(qos corev1.PodQOSClass) string
@@ -37,6 +56,7 @@ type Formatter struct {
 	ContainerDirFn func(id string) (string, string, error)
 }
 
+// CgroupPathFormatter is the formatter for current cgroup driver
 var CgroupPathFormatter = GetCgroupFormatter()
 
 // GetCgroupFormatter gets a cgroup path formatter for the current cgroup driver.
@@ -121,6 +141,7 @@ var cgroupPathFormatterInCgroupfs = Formatter{
 	},
 }
 
+// GetCgroupPathFormatter gets the Formatter for current cgroup driver
 func GetCgroupPathFormatter(driver CgroupDriverType) Formatter {
 	switch driver {
 	case Systemd:
@@ -133,6 +154,7 @@ func GetCgroupPathFormatter(driver CgroupDriverType) Formatter {
 	}
 }
 
+// GetCgroupDriver gets current os cgroup driver
 func GetCgroupDriver() CgroupDriverType {
 	isSystemd := PathExist(filepath.Join("/sys/fs/cgroup/cpu", KubeRootNameSystemd))
 	if isSystemd {
