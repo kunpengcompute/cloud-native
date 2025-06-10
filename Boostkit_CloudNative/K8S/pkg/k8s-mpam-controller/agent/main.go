@@ -38,6 +38,7 @@ var direct bool
 var clientset *kubernetes.Clientset
 var support bool
 
+// Main is the main entry for k8s-mpam-controller
 func Main() {
 	var err error
 
@@ -47,7 +48,8 @@ func Main() {
 	certFile := flag.String("cert-file", "", "absolute path to the certificate file")
 	keyFile := flag.String("key-file", "", "absolute path to the private key file")
 	serverName := flag.String("cn", "", "the common name (CN) of the certificate")
-	flag.BoolVar(&direct, "direct", false, "direct mode, default false. if true, it doesn't depends on a server to relay pod information")
+	flag.BoolVar(&direct, "direct", false,
+		"direct mode, default false. if true, it doesn't depends on a server to relay pod information")
 
 	flag.Parse()
 

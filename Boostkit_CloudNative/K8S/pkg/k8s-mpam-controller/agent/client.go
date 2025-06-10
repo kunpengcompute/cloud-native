@@ -32,13 +32,13 @@ import (
 func startClient(server, caFile, certFile, keyFile, serverName string) error {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
-		return fmt.Errorf("Failed to load X509 key pair: %v", err)
+		return fmt.Errorf("failed to load X509 key pair: %v", err)
 	}
 
 	// Load CA Certificate for client certificate verification
 	caCert, err := ioutil.ReadFile(path.Clean(caFile))
 	if err != nil {
-		return fmt.Errorf("Failed to read root certificate file: %v", err)
+		return fmt.Errorf("failed to read root certificate file: %v", err)
 	}
 
 	caPool := x509.NewCertPool()
@@ -49,7 +49,7 @@ func startClient(server, caFile, certFile, keyFile, serverName string) error {
 	tlsCfg := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		ClientCAs:    caPool,
-		ServerName:   serverName, //CN: common name
+		ServerName:   serverName, // CN: common name
 	}
 
 	klog.Info("Connecting to server: " + server)
@@ -80,13 +80,13 @@ func startClient(server, caFile, certFile, keyFile, serverName string) error {
 			// JSON content: {"UID":"...","rcgroup":"..."
 			size, err := conn.Read(buf[pos:])
 			if err != nil {
-				klog.Errorf("Failed to read: %v", err)
+				klog.Errorf("failed to read: %v", err)
 				return err
 			}
 
 			size += pos
 			pos = size
-			//ensure content size part is received at least
+			// ensure content size part is received at least
 			if size <= 8 {
 				continue
 			}
@@ -113,13 +113,13 @@ func startClient(server, caFile, certFile, keyFile, serverName string) error {
 
 				klog.Infof("Received: %s", buf[pos+8:pos+8+jsize])
 				if err := json.Unmarshal(buf[pos+8:pos+8+jsize], &m); err != nil {
-					klog.Errorf("Failed to parse data: %v", buf)
+					klog.Errorf("failed to parse data: %v", buf)
 				}
 
 				uid, ok := m["UID"]
 				rcgroup, ok2 := m["rcgroup"]
 				if !ok || !ok2 {
-					return fmt.Errorf("Wrong data: %v", buf)
+					return fmt.Errorf("wrong data: %v", buf)
 				}
 
 				assignControlGroup(uid, rcgroup)

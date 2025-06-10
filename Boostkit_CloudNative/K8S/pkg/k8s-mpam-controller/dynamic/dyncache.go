@@ -1,3 +1,17 @@
+// Copyright (c) Huawei Technologies Co., Ltd. 2023. All rights reserved.
+// rubik licensed under the Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//     http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
+// PURPOSE.
+// See the Mulan PSL v2 for more details.
+// Author: Xiang Li
+// Create: 2023-02-21
+// Description: This file is cache limit service
+
+// Package dyncache is the service used for cache limit setting
 package dynamic
 
 import (
@@ -5,9 +19,9 @@ import (
 	"fmt"
 	"time"
 
-	informer "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/infomer"
-
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	informer "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/informer"
 )
 
 // default value
@@ -137,6 +151,7 @@ func (c *DynCache) Run(ctx context.Context) {
 	wait.Until(c.startDynamic, time.Millisecond*time.Duration(c.config.AdjustInterval), ctx.Done())
 }
 
+// PreStart pre-init the dyCache service
 func (c *DynCache) PreStart() error {
 	if c.podmanager == nil {
 		return fmt.Errorf("invalid pod mananger")

@@ -18,14 +18,14 @@ package agent
 import (
 	"context"
 
-	informer "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/infomer"
-
-	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/dynamic"
-
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/dynamic"
+	informer "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/informer"
 )
 
+// RunDynamic start the MPAM Dynamic Service
 func RunDynamic(client *kubernetes.Clientset, ctx context.Context) {
 	podManager := informer.NewPodManager()
 
