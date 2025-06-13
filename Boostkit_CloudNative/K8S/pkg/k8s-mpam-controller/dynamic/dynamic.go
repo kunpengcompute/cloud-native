@@ -67,6 +67,8 @@ func getPodCacheMiss(pod *typedef.PodInfo, perfDu int) int {
 		return 0
 	}
 
+	defer p.Close()
+
 	err = p.Collect(time.Duration(perfDu) * time.Millisecond)
 	if err != nil {
 		klog.Errorf("collect cacheMiss failed, err: %s", err)
