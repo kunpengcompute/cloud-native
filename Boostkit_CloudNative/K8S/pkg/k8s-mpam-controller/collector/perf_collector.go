@@ -42,12 +42,13 @@ var (
 	attrMap = make(map[string]*unix.PerfEventAttr)
 )
 
-func init() {
+// PerfeventInit init all events in EvnetsMap
+func PerfeventInit() error {
 	for _, events := range EventsMap {
 		for _, event := range events {
 			attr, err := getConfigAndType(event)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			attr.Read_format = unix.PERF_FORMAT_GROUP |
@@ -60,6 +61,8 @@ func init() {
 			attrMap[event] = attr
 		}
 	}
+
+	return nil
 }
 
 // PerfValue is a strurt for perf collect when format is set PERF_FORMAT_ID
@@ -199,6 +202,20 @@ func (p *PerfGroupCollector) Stop() error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (p *PerfGroupCollector) Close() error {
+	if err := p.cgroupFile.Close(); err != nil {
+		return nil
+	}
+
+	for _, perfcollector := range p.perfCollectors {
+		if err := perfcollector.close(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

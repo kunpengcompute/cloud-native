@@ -87,7 +87,9 @@ spec:
       - name: k8s-mpam-controller-agent
         image: k8s-mpam-controller:0.1
         securityContext:
-          privileged: true
+          capabilities:
+            add:
+            - SYS_ADMIN
         command: ["/usr/bin/agent"]
         args: ["-direct"]
         env:
