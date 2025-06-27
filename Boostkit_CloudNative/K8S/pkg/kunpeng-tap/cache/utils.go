@@ -352,13 +352,14 @@ func (cch *cache) LoadStoreContainerd(containerdClient criv1.RuntimeServiceClien
 			klog.ErrorS(err, "Failed to get pod details", "podId", pod.GetId())
 			continue
 		}
+		klog.V(3).InfoS("Get pod status", "PodStatus", podStatus)
 
 		podInfoInStatus := &SandboxInfo{}
-		klog.V(3).InfoS("Get pod info", "PodInfo", podInfoInStatus)
 		if err := json.Unmarshal([]byte(podStatus.Info["info"]), podInfoInStatus); err != nil {
 			klog.ErrorS(err, "Failed to get pod details", "podId", pod.GetId())
 			continue
 		}
+		klog.V(3).InfoS("Get pod info", "PodInfo", podInfoInStatus)
 
 		podInfo := &v1alpha1.PodSandboxHookRequest{
 			Labels:      pod.GetLabels(),
