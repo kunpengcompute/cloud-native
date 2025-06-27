@@ -25,7 +25,7 @@ SHELL = /usr/bin/env bash -o pipefail
 
 # Binary names
 MANAGER_BINARY=kunpeng-tap-manager
-PROXY_BINARY=kunpeng-tap-proxy
+PROXY_BINARY=kunpeng-tap
 
 # Build directories
 BUILD_DIR=bin
