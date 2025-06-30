@@ -28,7 +28,7 @@ kunpeng-cloud-computing/
 ## 子项目
 
 ### K8S MPAM Controller
-Kubernetes内存分区和监控控制器，提供内存资源的精细化管理。
+鲲鹏MPAM Qos插件，支持把离线业务加入到一个MPAM的动态控制组中，动态调整离线业务可用资源，降低对在线业务的干扰率。
 
 **详细文档**: [README.mpam.md](Boostkit_CloudNative/K8S/README.mpam.md)
 
@@ -41,8 +41,9 @@ Kubernetes内存分区和监控控制器，提供内存资源的精细化管理�
 
 ### 环境要求
 - Go 1.23.6 或更高版本
+- Docker（推荐20.10.14，用于容器镜像构建）
 - Linux 环境（推荐OpenEuler 20.03、22.03和24.03）
-- Docker（可选，用于容器镜像构建）
+- 硬件：Kunpeng 920系列 ARM64 服务器
 - 系统管理员权限（用于服务安装）
 
 ### 快速构建
@@ -76,12 +77,6 @@ make mpam-build
 
 # 构建Kunpeng TAP
 make kunpeng-tap-build
-
-# 仅构建TAP管理器
-make kunpeng-tap-build-manager
-
-# 仅构建TAP代理
-make kunpeng-tap-build-proxy
 ```
 
 #### 构建产物
@@ -94,21 +89,11 @@ make kunpeng-tap-build-proxy
 
 ## 命令说明
 
-### 开发命令
-```bash
-make fmt                    # 格式化所有项目代码
-make vet                    # 运行go vet检查
-make test                   # 运行所有测试
-make tidy                   # 整理go modules
-```
-
 ### 构建和清理命令
 ```bash
 make build                  # 构建所有项目
 make clean                  # 清理所有构建产物
 make docker-build           # 构建所有Docker镜像
-make dist                   # 创建发布包
-make install                # 安装所有二进制文件到系统
 ```
 
 ### MPAM Controller命令
@@ -128,18 +113,9 @@ make mpam-test              # 测试MPAM项目
 ```bash
 # 构建命令
 make kunpeng-tap-build                      # 构建TAP组件
-make kunpeng-tap-build-manager              # 仅构建TAP管理器
-make kunpeng-tap-build-proxy                # 仅构建TAP代理
 make kunpeng-tap-clean                      # 清理TAP构建产物
 
-# 开发命令
-make kunpeng-tap-fmt                        # 格式化TAP代码
-make kunpeng-tap-vet                        # 运行TAP go vet检查
-make kunpeng-tap-test                       # 测试TAP项目
-make kunpeng-tap-run-manager                # 运行TAP管理器
-make kunpeng-tap-run-proxy                  # 运行TAP代理
-
-# 服务管理命令
+# 管理命令
 make kunpeng-tap-install-service-docker     # 安装Docker版本服务
 make kunpeng-tap-install-service-containerd # 安装Containerd版本服务
 make kunpeng-tap-start-service              # 启动服务
@@ -171,7 +147,6 @@ make kunpeng-tap-uninstall-service          # 卸载TAP服务
 - 使用`make fmt`格式化代码
 - 使用`make vet`进行静态检查
 - 编写单元测试并使用`make test`验证
-- 提交前运行`make ci`确保通过CI检查
 
 ## 许可证
 
@@ -184,7 +159,6 @@ make kunpeng-tap-uninstall-service          # 卸载TAP服务
 1. 代码符合项目规范
 2. 包含适当的测试
 3. 更新相关文档
-4. 通过CI检查
 
 ## 联系方式
 
