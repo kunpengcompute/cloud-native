@@ -191,3 +191,29 @@ test: mpam-test kunpeng-tap-test ## Run tests for all projects.
 
 .PHONY: tidy
 tidy: mpam-tidy kunpeng-tap-tidy ## Tidy go modules for all projects.
+
+##@ Kunpeng TAP RPM Packaging
+
+.PHONY: kunpeng-tap-rpm-build
+kunpeng-tap-rpm-build: ## Build kunpeng-tap RPM package.
+	$(MAKE) -f Makefile.kunpeng-tap rpm-build
+
+.PHONY: kunpeng-tap-rpm-build-docker
+kunpeng-tap-rpm-build-docker: ## Build kunpeng-tap RPM package using Docker.
+	$(MAKE) -f Makefile.kunpeng-tap rpm-build-docker
+
+.PHONY: kunpeng-tap-rpm-install
+kunpeng-tap-rpm-install: ## Install kunpeng-tap RPM package.
+	$(MAKE) -f Makefile.kunpeng-tap rpm-install
+
+.PHONY: kunpeng-tap-rpm-uninstall
+kunpeng-tap-rpm-uninstall: ## Uninstall kunpeng-tap RPM package.
+	$(MAKE) -f Makefile.kunpeng-tap rpm-uninstall
+
+.PHONY: kunpeng-tap-rpm-test
+kunpeng-tap-rpm-test: ## Test kunpeng-tap RPM package.
+	$(MAKE) -f Makefile.kunpeng-tap rpm-test
+
+.PHONY: kunpeng-tap-rpm-clean
+kunpeng-tap-rpm-clean: ## Clean kunpeng-tap RPM build artifacts.
+	$(MAKE) -f Makefile.kunpeng-tap rpm-clean

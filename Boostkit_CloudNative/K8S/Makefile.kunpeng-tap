@@ -187,3 +187,40 @@ docker-buildx: ## Build and push docker image for cross-platform support
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN) 
+##@ RPM Packaging
+
+.PHONY: rpm-build
+rpm-build: build ## Build RPM package for kunpeng-tap.
+	@echo "Building RPM package for kunpeng-tap..."
+	$(MAKE) -C hack/kunpeng-tap rpm
+	@echo "RPM package built successfully"
+
+.PHONY: rpm-build-docker
+rpm-build-docker: build ## Build RPM package using Docker.
+	@echo "Building RPM package using Docker..."
+	$(MAKE) -C hack/kunpeng-tap rpm-docker
+	@echo "RPM package built successfully using Docker"
+
+.PHONY: rpm-install
+rpm-install: ## Install RPM package.
+	@echo "Installing RPM package..."
+	$(MAKE) -C hack/kunpeng-tap install-rpm
+	@echo "RPM package installed successfully"
+
+.PHONY: rpm-uninstall
+rpm-uninstall: ## Uninstall RPM package.
+	@echo "Uninstalling RPM package..."
+	$(MAKE) -C hack/kunpeng-tap uninstall-rpm
+	@echo "RPM package uninstalled successfully"
+
+.PHONY: rpm-test
+rpm-test: ## Test RPM package installation and service.
+	@echo "Testing RPM package..."
+	$(MAKE) -C hack/kunpeng-tap test-rpm
+	@echo "RPM package test completed successfully"
+
+.PHONY: rpm-clean
+rpm-clean: ## Clean RPM build artifacts.
+	@echo "Cleaning RPM build artifacts..."
+	$(MAKE) -C hack/kunpeng-tap clean
+	@echo "RPM clean completed"
