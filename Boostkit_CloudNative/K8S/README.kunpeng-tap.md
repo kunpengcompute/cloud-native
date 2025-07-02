@@ -203,7 +203,7 @@ sudo systemctl status kunpeng-tap.service
 
 ```bash
 # 查看版本信息
-./bin/kunpeng-tap-proxy --version
+./bin/kunpeng-tap --version
 ./bin/kunpeng-tap-manager --version
 ```
 
