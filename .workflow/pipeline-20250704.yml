@@ -1,0 +1,80 @@
+version: '1.0'
+name: pipeline-20250704
+displayName: pipeline-20250704
+triggers:
+  trigger: auto
+  pr:
+    branches:
+      prefix:
+        - ''
+stages:
+  - name: stage-002a2ab1
+    displayName: 构建
+    strategy: naturally
+    trigger: auto
+    executor:
+      - MisaKokoro
+      - yuncongyue
+      - fsq0089
+      - juneu
+      - youhangwang
+      - atlasaccount
+      - weijie-yin
+      - mu-huiqin
+    steps:
+      - step: build@golang
+        name: build_golang
+        displayName: Golang 构建
+        golangVersion: '1.24'
+        commands:
+          - '# 默认使用goproxy.cn'
+          - export GOPROXY=https://goproxy.cn
+          - '# 输入你的构建命令'
+          - make kunpeng-tap-build
+        artifacts:
+          - name: BUILD_ARTIFACT
+            path:
+              - ./Boostkit_CloudNative/K8S/bin
+        caches:
+          - /go/pkg/mod
+        notify: []
+        strategy:
+          retry: '0'
+      - step: sc@opensca
+        name: open_sca
+        displayName: OpenSCA 开源组件检测
+        detectPath: ./
+        notify: []
+        strategy:
+          retry: '0'
+  - name: stage-56676398
+    displayName: 单元测试
+    strategy: naturally
+    trigger: auto
+    executor: []
+    steps:
+      - step: ut@golang
+        name: unit_test_go
+        displayName: 单元测试
+        golangVersion: '1.22'
+        commands:
+          - '# 默认使用goproxy.cn用户可手动调整'
+          - export GOPROXY=https://goproxy.cn
+          - '# 默认的单元测试命令'
+          - '# 输出测试报告目录到当前工作目录，可自动上传并展示'
+          - mkdir -p golang-report
+          - '# 未使用Go Mod的用户需要打开一下注释'
+          - '# export GOFLAGS=-mod=vendor'
+          - cd Boostkit_CloudNative/K8S/
+          - go test -v -json -cover -coverprofile cover.out ./... > ../../golang-report/report.jsonl
+          - go tool cover -html=cover.out -o ../../golang-report/index.html
+        report:
+          path: golang-report
+          file: report.jsonl
+          index: index.html
+        checkpoints: []
+        caches:
+          - /go/pkg/mod
+        notify: []
+        strategy:
+          retry: '0'
