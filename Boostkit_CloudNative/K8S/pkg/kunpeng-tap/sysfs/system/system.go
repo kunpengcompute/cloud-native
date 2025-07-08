@@ -207,6 +207,24 @@ func (s *system) SetSysRoot(sysRoot string) {
 	klog.V(3).InfoS("Setting sysfs root path", "path", s.path)
 }
 
+// Helper method to populate node package information
+func (s *system) populateNodePackageInfo() error {
+	if len(s.nodes) == 0 {
+		return nil
+	}
+
+	for _, pkg := range s.packages {
+		for _, nodeID := range pkg.GetSortedNodes() {
+			if node, ok := s.nodes[nodeID]; ok {
+				node.SetPackageID(pkg.ID())
+			} else {
+				return fmt.Errorf("can't find package for ID %d", nodeID)
+			}
+		}
+	}
+	return nil
+}
+
 func (s *system) Discover() error {
 	// Discover CPUs
 	if err := s.discoverCPUs(); err != nil {
@@ -227,26 +245,9 @@ func (s *system) Discover() error {
 		// 不要因为GPU发现失败而中断整个发现过程
 	}
 
-	// 填充节点和Die信息
-	if len(s.nodes) > 0 {
-		for _, pkg := range s.packages {
-			for _, nodeID := range pkg.GetSortedNodes() {
-				if node, ok := s.nodes[nodeID]; ok {
-					node.SetPackageID(pkg.ID())
-				} else {
-					return fmt.Errorf("can't find NUMA node for ID %d", nodeID)
-				}
-			}
-			for _, dieID := range pkg.DieIDs() {
-				for _, nodeID := range pkg.DieNodeIDs(dieID) {
-					if node, ok := s.nodes[nodeID]; ok {
-						node.SetDieID(dieID)
-					} else {
-						return fmt.Errorf("can't find NUMA node for ID %d", nodeID)
-					}
-				}
-			}
-		}
+	// 填充节点信息
+	if err := s.populateNodePackageInfo(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -275,6 +276,36 @@ func (s *system) discoverCPUs() error {
 	return nil
 }
 
+// Helper method to read CPU topology information
+func (s *system) readCPUTopology(cpu *cpu, path string) {
+	if _, err := readSysfsEntry(path, "topology/physical_package_id", &cpu.pkg); err != nil {
+		klog.V(3).InfoS("Can't get physical_package_id", "error", err)
+		cpu.pkg = -1
+	}
+	if _, err := readSysfsEntry(path, "topology/die_id", &cpu.die); err != nil {
+		klog.V(3).InfoS("Can't get die_id", "error", err)
+		cpu.die = -1
+	}
+	if _, err := readSysfsEntry(path, "topology/core_id", &cpu.core); err != nil {
+		klog.V(3).InfoS("Can't get core_id", "error", err)
+		cpu.core = -1
+	}
+	if _, err := readSysfsEntry(path, "topology/thread_siblings_list", &cpu.threads, ","); err != nil {
+		klog.V(3).InfoS("Can't get thread_siblings_list", "error", err)
+		cpu.threads = cpuset.New(cpu.id)
+	}
+}
+
+// Helper method to update threads per core count
+func (s *system) updateThreadsPerCore(cpu *cpu) {
+	if s.threadsPerCore < 1 {
+		s.threadsPerCore = 1
+	}
+	if cpu.threads.Size() > s.threadsPerCore {
+		s.threadsPerCore = cpu.threads.Size()
+	}
+}
+
 func (s *system) discoverCPU(path string) error {
 	cpu := &cpu{path: path, id: getEnumeratedID(path), online: true}
 	cpu.isolated = s.isolated.Contains(cpu.id)
@@ -282,23 +313,9 @@ func (s *system) discoverCPU(path string) error {
 	if online, err := readSysfsEntry(path, "online", nil); err == nil {
 		cpu.online = (online != "" && online[0] != '0')
 	}
+
 	if cpu.online {
-		if _, err := readSysfsEntry(path, "topology/physical_package_id", &cpu.pkg); err != nil {
-			klog.V(3).InfoS("Can't get physical_package_id", "error", err)
-			cpu.pkg = -1
-		}
-		if _, err := readSysfsEntry(path, "topology/die_id", &cpu.die); err != nil {
-			klog.V(3).InfoS("Can't get die_id", "error", err)
-			cpu.die = -1
-		}
-		if _, err := readSysfsEntry(path, "topology/core_id", &cpu.core); err != nil {
-			klog.V(3).InfoS("Can't get core_id", "error", err)
-			cpu.core = -1
-		}
-		if _, err := readSysfsEntry(path, "topology/thread_siblings_list", &cpu.threads, ","); err != nil {
-			klog.V(3).InfoS("Can't get thread_siblings_list", "error", err)
-			cpu.threads = cpuset.New(cpu.id)
-		}
+		s.readCPUTopology(cpu, path)
 	} else {
 		s.offline = s.offline.Union(cpuset.New(cpu.id))
 	}
@@ -309,12 +326,7 @@ func (s *system) discoverCPU(path string) error {
 		return fmt.Errorf("exactly one node per cpu allowed")
 	}
 
-	if s.threadsPerCore < 1 {
-		s.threadsPerCore = 1
-	}
-	if cpu.threads.Size() > s.threadsPerCore {
-		s.threadsPerCore = cpu.threads.Size()
-	}
+	s.updateThreadsPerCore(cpu)
 
 	s.cpus[cpu.id] = cpu
 
@@ -353,66 +365,92 @@ func (s *system) discoverNodes() error {
 	return nil
 }
 
-// discoverNodeMemory discovers memory information for NUMA nodes
-func (s *system) discoverNodeMemory() error {
-	// Find nodes with memory
+// Helper method to discover and set nodes with memory
+func (s *system) discoverNodesWithMemory() error {
 	memoryNodeIDs, err := readSysfsEntry(s.path, filepath.Join(sysfsNumaNodePath, "has_memory"), nil)
 	if err != nil {
 		klog.ErrorS(err, "Failed to discover nodes with memory")
+		return nil // Don't fail the entire discovery process
 	}
 
-	if memoryNodeIDs != "" {
-		memoryNodes, err := cpuset.Parse(memoryNodeIDs)
-		if err != nil {
-			klog.ErrorS(err, "Failed to parse nodes with memory", "nodes", memoryNodeIDs)
-		} else {
-			for _, node := range s.nodes {
-				if memoryNodes.Contains(int(node.ID())) {
-					node.SetMemory(true)
-				}
-			}
+	if memoryNodeIDs == "" {
+		return nil
+	}
+
+	memoryNodes, err := cpuset.Parse(memoryNodeIDs)
+	if err != nil {
+		klog.ErrorS(err, "Failed to parse nodes with memory", "nodes", memoryNodeIDs)
+		return nil
+	}
+
+	for _, node := range s.nodes {
+		if memoryNodes.Contains(int(node.ID())) {
+			node.SetMemory(true)
 		}
 	}
+	return nil
+}
 
-	// Find nodes with normal memory
+// Helper method to discover and set nodes with normal memory
+func (s *system) discoverNodesWithNormalMemory() error {
 	normalMemNodeIDs, err := readSysfsEntry(s.path, filepath.Join(sysfsNumaNodePath, "has_normal_memory"), nil)
 	if err != nil {
 		klog.ErrorS(err, "Failed to discover nodes with normal memory")
+		return nil
 	}
 
-	if normalMemNodeIDs != "" {
-		normalMemNodes, err := cpuset.Parse(normalMemNodeIDs)
-		if err != nil {
-			klog.ErrorS(err, "Failed to parse nodes with normal memory", "nodes", normalMemNodeIDs)
-		} else {
-			for _, node := range s.nodes {
-				if normalMemNodes.Contains(int(node.ID())) {
-					node.SetNormalMemory(true)
-					node.SetMemoryType(MemoryTypeDRAM)
-				}
-			}
+	if normalMemNodeIDs == "" {
+		return nil
+	}
+
+	normalMemNodes, err := cpuset.Parse(normalMemNodeIDs)
+	if err != nil {
+		klog.ErrorS(err, "Failed to parse nodes with normal memory", "nodes", normalMemNodeIDs)
+		return nil
+	}
+
+	for _, node := range s.nodes {
+		if normalMemNodes.Contains(int(node.ID())) {
+			node.SetNormalMemory(true)
+			node.SetMemoryType(MemoryTypeDRAM)
 		}
+	}
+	return nil
+}
+
+// Helper method to read memory information for nodes
+func (s *system) readNodeMemoryInfo() {
+	for _, node := range s.nodes {
+		if !node.HasMemory() {
+			klog.InfoS("Node %d doesn't have memory", node.ID())
+			continue
+		}
+		memInfo, err := node.MemoryInfo()
+		if err != nil {
+			klog.ErrorS(err, "Failed to read memory info for node", "nodeID", node.ID())
+		} else {
+			klog.V(3).InfoS("Node memory info",
+				"nodeID", node.ID(),
+				"memTotal", memInfo.MemTotal,
+				"memFree", memInfo.MemFree)
+		}
+	}
+}
+
+// discoverNodeMemory discovers memory information for NUMA nodes
+func (s *system) discoverNodeMemory() error {
+	// Find nodes with memory
+	if err := s.discoverNodesWithMemory(); err != nil {
+		return err
+	}
+
+	// Find nodes with normal memory
+	if err := s.discoverNodesWithNormalMemory(); err != nil {
+		return err
 	}
 
 	// Set all nodes with memory to have DRAM memory type and read memory info
-	for id, node := range s.nodes {
-		if node.HasMemory() {
-			if !node.HasNormalMemory() {
-				klog.InfoS("Node %d has memory but no normal memory", id)
-			}
-
-			// Read memory information for this node
-			memInfo, err := node.MemoryInfo()
-			if err != nil {
-				klog.ErrorS(err, "Failed to read memory info for node", "nodeID", id)
-			} else {
-				klog.V(3).InfoS("Node memory info",
-					"nodeID", id,
-					"memTotal", memInfo.MemTotal,
-					"memFree", memInfo.MemFree)
-			}
-		}
-	}
+	s.readNodeMemoryInfo()
 
 	return nil
 }
@@ -469,6 +507,11 @@ func (s *system) discoverPackages() error {
 
 		// 将 Node 添加到对应的 Die
 		pkg.AddNodeToDie(dieID, nodeID)
+
+		// Set die information directly on the node during discovery
+		if node, ok := s.nodes[nodeID]; ok {
+			node.SetDieID(dieID)
+		}
 	}
 
 	return nil
@@ -524,7 +567,7 @@ func (s *system) validateSocketNodes() error {
 				continue
 			}
 			if shared := nodes1.Intersection(nodes2); !shared.IsEmpty() {
-				klog.ErrorS(nil, "Invalid hardware topology",
+				klog.ErrorS(nil, "Invalid hardware topology with NUMA nodes",
 					"error", "shared NUMA nodes between sockets",
 					"socket1", id1,
 					"socket2", id2,

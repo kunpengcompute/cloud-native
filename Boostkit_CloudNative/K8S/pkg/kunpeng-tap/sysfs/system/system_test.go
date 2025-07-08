@@ -634,6 +634,40 @@ var _ = Describe("System", func() {
 			Expect(pkg.DieCPUSet(0).List()).To(Equal([]int{0, 1}))
 			Expect(pkg.DieNodeIDs(0)).To(Equal([]ID{0}))
 		})
+
+		It("should set die information on nodes during package discovery", func() {
+			// 准备测试数据
+			sys.cpus[0] = &cpu{
+				id:      0,
+				pkg:     0,
+				die:     0,
+				node:    0,
+				core:    0,
+				online:  true,
+				threads: cpuset.New(0),
+			}
+			sys.cpus[1] = &cpu{
+				id:      1,
+				pkg:     0,
+				die:     1,
+				node:    1,
+				core:    1,
+				online:  true,
+				threads: cpuset.New(1),
+			}
+
+			// 创建 test nodes
+			sys.nodes = make(map[ID]Node)
+			sys.nodes[0] = &node{id: 0}
+			sys.nodes[1] = &node{id: 1}
+
+			err := sys.discoverPackages()
+			Expect(err).NotTo(HaveOccurred())
+
+			// 验证 die 信息已正确设置到节点上
+			Expect(sys.nodes[0].DieID()).To(Equal(ID(0)))
+			Expect(sys.nodes[1].DieID()).To(Equal(ID(1)))
+		})
 	})
 
 	Context("Discover", func() {

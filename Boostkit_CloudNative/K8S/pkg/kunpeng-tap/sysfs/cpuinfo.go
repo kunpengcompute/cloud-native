@@ -393,33 +393,51 @@ func parseCpusetCpus(cpuset string) []int {
 	return cpus
 }
 
+// Helper function to find min and max CPU IDs
+func findMinMaxCpus(cpus []int) (int, int) {
+	if len(cpus) == 0 {
+		return -1, -1
+	}
+	minCpu, maxCpu := cpus[0], cpus[0]
+	for _, cpu := range cpus {
+		if cpu < minCpu {
+			minCpu = cpu
+		}
+		if cpu > maxCpu {
+			maxCpu = cpu
+		}
+	}
+	return minCpu, maxCpu
+}
+
+// Helper function to check if both CPUs are in the same NUMA node
+func areCpusInNode(node []ProcessorInfo, minCpu, maxCpu int) bool {
+	foundMin, foundMax := false, false
+	for _, cpu := range node {
+		if cpu.CPUID == int32(minCpu) {
+			foundMin = true
+		}
+		if cpu.CPUID == int32(maxCpu) {
+			foundMax = true
+		}
+		if foundMin && foundMax {
+			return true
+		}
+	}
+	return false
+}
+
 func GetNumaNodeFromCpuSet(cpuInfo *LocalCPUInfo, cpuSet string) int32 {
 	cpus := parseCpusetCpus(cpuSet)
 	if len(cpus) == 0 {
 		return -1
 	}
 
-	minCpu, maxCpu := cpus[0], cpus[0]
-	for _, cpu := range cpus {
-		switch {
-		case cpu < minCpu:
-			minCpu = cpu
-		case cpu > maxCpu:
-			maxCpu = cpu
-		}
-	}
+	minCpu, maxCpu := findMinMaxCpus(cpus)
 
-	for i, node := range cpuInfo.TotalInfo.NodeToCPU {
-		for _, cpu := range node {
-			if cpu.CPUID == int32(minCpu) {
-				minCpu = -1
-			}
-			if cpu.CPUID == int32(maxCpu) {
-				maxCpu = -1
-			}
-		}
-		if minCpu == -1 && maxCpu == -1 {
-			return i
+	for nodeID, node := range cpuInfo.TotalInfo.NodeToCPU {
+		if areCpusInNode(node, minCpu, maxCpu) {
+			return nodeID
 		}
 	}
 

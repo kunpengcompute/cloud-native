@@ -28,6 +28,8 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
+const unsupportedValueTypeError = "unsupported value type: %T"
+
 // Get the trailing enumeration part of a name.
 func getEnumeratedID(name string) ID {
 	id := 0
@@ -105,100 +107,180 @@ func getSeparator(defaultVal string, args []string) (string, error) {
 	return "", fmt.Errorf("invalid separator (%v), 1 expected, %d given", args, len(args))
 }
 
+// Helper function to parse signed integer types
+func parseSignedInt(str string, bitSize int, target interface{}) error {
+	v, err := strconv.ParseInt(str, 0, bitSize)
+	if err != nil {
+		return fmt.Errorf("failed to parse value of int%d %q: %w", bitSize, str, err)
+	}
+
+	switch t := target.(type) {
+	case *int:
+		*t = int(v)
+	case *int8:
+		*t = int8(v)
+	case *int16:
+		*t = int16(v)
+	case *int32:
+		*t = int32(v)
+	case *int64:
+		*t = v
+	default:
+		return fmt.Errorf(unsupportedValueTypeError, target)
+	}
+	return nil
+}
+
+// Helper function to parse unsigned integer types
+func parseUnsignedInt(str string, bitSize int, target interface{}) error {
+	v, err := strconv.ParseUint(str, 0, bitSize)
+	if err != nil {
+		return fmt.Errorf("failed to parse value of uint%d %q: %w", bitSize, str, err)
+	}
+
+	switch t := target.(type) {
+	case *uint:
+		*t = uint(v)
+	case *uint8:
+		*t = uint8(v)
+	case *uint16:
+		*t = uint16(v)
+	case *uint32:
+		*t = uint32(v)
+	case *uint64:
+		*t = v
+	default:
+		return fmt.Errorf(unsupportedValueTypeError, target)
+	}
+	return nil
+}
+
 // parseValue parses a string value into the specified type.
 func parseValue(str string, value interface{}) error {
 	if value == nil {
 		return fmt.Errorf("target value cannot be nil")
 	}
 
-	switch value.(type) {
+	switch v := value.(type) {
 	case *string:
-		*value.(*string) = str
+		*v = str
 		return nil
-
 	case *int:
-		v, err := strconv.ParseInt(str, 0, strconv.IntSize)
-		if err != nil {
-			return fmt.Errorf("failed to parse int value %q: %w", str, err)
-		}
-		*value.(*int) = int(v)
-		return nil
-
+		return parseSignedInt(str, strconv.IntSize, value)
 	case *int8:
-		v, err := strconv.ParseInt(str, 0, 8)
-		if err != nil {
-			return fmt.Errorf("failed to parse int8 value %q: %w", str, err)
-		}
-		*value.(*int8) = int8(v)
-		return nil
-
+		return parseSignedInt(str, 8, value)
 	case *int16:
-		v, err := strconv.ParseInt(str, 0, 16)
-		if err != nil {
-			return fmt.Errorf("failed to parse int16 value %q: %w", str, err)
-		}
-		*value.(*int16) = int16(v)
-		return nil
-
+		return parseSignedInt(str, 16, value)
 	case *int32:
-		v, err := strconv.ParseInt(str, 0, 32)
-		if err != nil {
-			return fmt.Errorf("failed to parse int32 value %q: %w", str, err)
-		}
-		*value.(*int32) = int32(v)
-		return nil
-
+		return parseSignedInt(str, 32, value)
 	case *int64:
-		v, err := strconv.ParseInt(str, 0, 64)
-		if err != nil {
-			return fmt.Errorf("failed to parse int64 value %q: %w", str, err)
-		}
-		*value.(*int64) = v
-		return nil
-
+		return parseSignedInt(str, 64, value)
 	case *uint:
-		v, err := strconv.ParseUint(str, 0, strconv.IntSize)
-		if err != nil {
-			return fmt.Errorf("failed to parse uint value %q: %w", str, err)
-		}
-		*value.(*uint) = uint(v)
-		return nil
-
+		return parseUnsignedInt(str, strconv.IntSize, value)
 	case *uint8:
-		v, err := strconv.ParseUint(str, 0, 8)
-		if err != nil {
-			return fmt.Errorf("failed to parse uint8 value %q: %w", str, err)
-		}
-		*value.(*uint8) = uint8(v)
-		return nil
-
+		return parseUnsignedInt(str, 8, value)
 	case *uint16:
-		v, err := strconv.ParseUint(str, 0, 16)
-		if err != nil {
-			return fmt.Errorf("failed to parse uint16 value %q: %w", str, err)
-		}
-		*value.(*uint16) = uint16(v)
-		return nil
-
+		return parseUnsignedInt(str, 16, value)
 	case *uint32:
-		v, err := strconv.ParseUint(str, 0, 32)
-		if err != nil {
-			return fmt.Errorf("failed to parse uint32 value %q: %w", str, err)
-		}
-		*value.(*uint32) = uint32(v)
-		return nil
-
+		return parseUnsignedInt(str, 32, value)
 	case *uint64:
-		v, err := strconv.ParseUint(str, 0, 64)
-		if err != nil {
-			return fmt.Errorf("failed to parse uint64 value %q: %w", str, err)
-		}
-		*value.(*uint64) = v
-		return nil
-
+		return parseUnsignedInt(str, 64, value)
 	default:
-		return fmt.Errorf("unsupported value type: %T", value)
+		return fmt.Errorf(unsupportedValueTypeError, value)
 	}
+}
+
+// Helper function to parse CPUSet from string
+func parseCPUSet(str, sep string, cpuSet *cpuset.CPUSet) error {
+	if sep != "," {
+		return fmt.Errorf("invalid separator for CPUSet: %q", sep)
+	}
+	var err error
+	if *cpuSet, err = cpuset.Parse(str); err != nil {
+		klog.ErrorS(err, "Failed to parse CPUSet", "str", str)
+		return err
+	}
+	klog.V(4).InfoS("parseValueList", "sep", sep, "cpuset", cpuSet.String())
+	return nil
+}
+
+// Helper function to validate unsigned integer types
+func validateUnsignedType(v int64, targetType string, maxValue int64) error {
+	if v < 0 {
+		return fmt.Errorf("negative value %d invalid for %s", v, targetType)
+	}
+	if maxValue > 0 && v > maxValue {
+		return fmt.Errorf("value %d out of range for %s", v, targetType)
+	}
+	return nil
+}
+
+// Helper function to validate signed integer types
+func validateSignedType(v int64, targetType string, minValue, maxValue int64) error {
+	if v > maxValue || v < minValue {
+		return fmt.Errorf("value %d out of range for %s", v, targetType)
+	}
+	return nil
+}
+
+// Helper function to validate and convert value for specific type
+func validateAndConvertValue(v int64, targetType string) error {
+	switch targetType {
+	case "uint", "uint64":
+		return validateUnsignedType(v, targetType, 0)
+	case "uint8":
+		return validateUnsignedType(v, targetType, math.MaxUint8)
+	case "uint16":
+		return validateUnsignedType(v, targetType, math.MaxUint16)
+	case "uint32":
+		return validateUnsignedType(v, targetType, math.MaxUint32)
+	case "int8":
+		return validateSignedType(v, targetType, math.MinInt8, math.MaxInt8)
+	case "int16":
+		return validateSignedType(v, targetType, math.MinInt16, math.MaxInt16)
+	case "int32":
+		return validateSignedType(v, targetType, math.MinInt32, math.MaxInt32)
+	default:
+		return fmt.Errorf(unsupportedValueTypeError, targetType)
+	}
+}
+
+// Helper function to validate and append value to slice
+func validateAndAppend(v int64, targetType string, appendFunc func()) error {
+	if err := validateAndConvertValue(v, targetType); err != nil {
+		return err
+	}
+	appendFunc()
+	return nil
+}
+
+// Helper function to append value to appropriate slice type
+func appendToSlice(valuep interface{}, v int64) error {
+	switch ptr := valuep.(type) {
+	case *[]int:
+		*ptr = append(*ptr, int(v))
+	case *[]int64:
+		*ptr = append(*ptr, v)
+	case *[]uint:
+		return validateAndAppend(v, "uint", func() { *ptr = append(*ptr, uint(v)) })
+	case *[]uint64:
+		return validateAndAppend(v, "uint64", func() { *ptr = append(*ptr, uint64(v)) })
+	case *[]int8:
+		return validateAndAppend(v, "int8", func() { *ptr = append(*ptr, int8(v)) })
+	case *[]int16:
+		return validateAndAppend(v, "int16", func() { *ptr = append(*ptr, int16(v)) })
+	case *[]int32:
+		return validateAndAppend(v, "int32", func() { *ptr = append(*ptr, int32(v)) })
+	case *[]uint8:
+		return validateAndAppend(v, "uint8", func() { *ptr = append(*ptr, uint8(v)) })
+	case *[]uint16:
+		return validateAndAppend(v, "uint16", func() { *ptr = append(*ptr, uint16(v)) })
+	case *[]uint32:
+		return validateAndAppend(v, "uint32", func() { *ptr = append(*ptr, uint32(v)) })
+	default:
+		return fmt.Errorf("unsupported slice type: %T", valuep)
+	}
+	return nil
 }
 
 // parseValueList parses a list of values from a string into a slice or CPUSet.
@@ -207,24 +289,13 @@ func parseValueList(str, sep string, valuep interface{}) error {
 		return nil
 	}
 
-	items := strings.Split(str, sep)
-
-	// 处理 CPUSet 类型
+	// Handle CPUSet type
 	if cpuSet, ok := valuep.(*cpuset.CPUSet); ok {
-		if sep != "," {
-			return fmt.Errorf("invalid separator for CPUSet: %q", sep)
-		}
-		var err error
-		if *cpuSet, err = cpuset.Parse(str); err != nil {
-			klog.ErrorS(err, "Failed to parse CPUSet", "str", str)
-			return err
-		}
-
-		klog.V(4).InfoS("parseValueList", "sep", sep, "items", items, "cpuset", valuep.(*cpuset.CPUSet).String())
-		return nil
+		return parseCPUSet(str, sep, cpuSet)
 	}
 
-	// 处理数值类型切片
+	// Handle numeric slice types
+	items := strings.Split(str, sep)
 	for _, s := range items {
 		if s == "" {
 			continue
@@ -235,53 +306,8 @@ func parseValueList(str, sep string, valuep interface{}) error {
 			return fmt.Errorf("failed to parse number %q: %w", s, err)
 		}
 
-		switch ptr := valuep.(type) {
-		case *[]int:
-			*ptr = append(*ptr, int(v))
-		case *[]uint:
-			if v < 0 {
-				return fmt.Errorf("negative value %d invalid for uint", v)
-			}
-			*ptr = append(*ptr, uint(v))
-		case *[]int8:
-			if v > math.MaxInt8 || v < math.MinInt8 {
-				return fmt.Errorf("value %d out of range for int8", v)
-			}
-			*ptr = append(*ptr, int8(v))
-		case *[]uint8:
-			if v > math.MaxUint8 || v < 0 {
-				return fmt.Errorf("value %d out of range for uint8", v)
-			}
-			*ptr = append(*ptr, uint8(v))
-		case *[]int16:
-			if v > math.MaxInt16 || v < math.MinInt16 {
-				return fmt.Errorf("value %d out of range for int16", v)
-			}
-			*ptr = append(*ptr, int16(v))
-		case *[]uint16:
-			if v > math.MaxUint16 || v < 0 {
-				return fmt.Errorf("value %d out of range for uint16", v)
-			}
-			*ptr = append(*ptr, uint16(v))
-		case *[]int32:
-			if v > math.MaxInt32 || v < math.MinInt32 {
-				return fmt.Errorf("value %d out of range for int32", v)
-			}
-			*ptr = append(*ptr, int32(v))
-		case *[]uint32:
-			if v > math.MaxUint32 || v < 0 {
-				return fmt.Errorf("value %d out of range for uint32", v)
-			}
-			*ptr = append(*ptr, uint32(v))
-		case *[]int64:
-			*ptr = append(*ptr, v)
-		case *[]uint64:
-			if v < 0 {
-				return fmt.Errorf("negative value %d invalid for uint64", v)
-			}
-			*ptr = append(*ptr, uint64(v))
-		default:
-			return fmt.Errorf("unsupported slice type: %T", valuep)
+		if err := appendToSlice(valuep, v); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -141,7 +141,7 @@ var _ = Describe("Utils", func() {
 				var result int
 				err := parseValue("not_a_number", &result)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("failed to parse int value"))
+				Expect(err.Error()).To(ContainSubstring("failed to parse value"))
 			})
 		})
 
