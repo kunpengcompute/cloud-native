@@ -335,49 +335,59 @@ func (all *Allocation) SetCPUSetMems(mems string) {
 	all.Resources.CpusetMems = mems
 }
 
-func (all *Allocation) Merge(resp *v1alpha1.ContainerResourceHookResponse) {
-	klog.V(5).InfoS("Merging allocation response", "response", resp)
-	if all.Resources == nil {
-		return
+// Helper method to ensure ContainerResources is initialized
+func (all *Allocation) ensureContainerResources(resp *v1alpha1.ContainerResourceHookResponse) {
+	if resp.ContainerResources == nil {
+		resp.ContainerResources = &v1alpha1.LinuxContainerResources{}
 	}
-	if resp == nil {
-		return
-	}
+}
 
+// Helper method to merge CPU-related resources
+func (all *Allocation) mergeCPUResources(resp *v1alpha1.ContainerResourceHookResponse) {
 	if all.Resources.CpuPeriod != 0 {
-		if resp.ContainerResources == nil {
-			resp.ContainerResources = &v1alpha1.LinuxContainerResources{}
-		}
+		all.ensureContainerResources(resp)
 		resp.ContainerResources.CpuPeriod = all.Resources.CpuPeriod
 	}
 	if all.Resources.CpuQuota != 0 {
-		if resp.ContainerResources == nil {
-			resp.ContainerResources = &v1alpha1.LinuxContainerResources{}
-		}
+		all.ensureContainerResources(resp)
 		resp.ContainerResources.CpuQuota = all.Resources.CpuQuota
 	}
 	if all.Resources.CpuShares != 0 {
-		if resp.ContainerResources == nil {
-			resp.ContainerResources = &v1alpha1.LinuxContainerResources{}
-		}
+		all.ensureContainerResources(resp)
 		resp.ContainerResources.CpuShares = all.Resources.CpuShares
 	}
+}
+
+// Helper method to merge CPU set resources
+func (all *Allocation) mergeCPUSetResources(resp *v1alpha1.ContainerResourceHookResponse) {
 	if all.Resources.CpusetMems != "" {
-		if resp.ContainerResources == nil {
-			resp.ContainerResources = &v1alpha1.LinuxContainerResources{}
-		}
+		all.ensureContainerResources(resp)
 		resp.ContainerResources.CpusetMems = all.Resources.CpusetMems
 	}
 	if all.Resources.CpusetCpus != "" {
-		if resp.ContainerResources == nil {
-			resp.ContainerResources = &v1alpha1.LinuxContainerResources{}
-		}
+		all.ensureContainerResources(resp)
 		resp.ContainerResources.CpusetCpus = all.Resources.CpusetCpus
 	}
+}
+
+// Helper method to merge memory-related resources
+func (all *Allocation) mergeMemoryResources(resp *v1alpha1.ContainerResourceHookResponse) {
 	if all.Resources.MemoryLimitInBytes != 0 {
-		if resp.ContainerResources == nil {
-			resp.ContainerResources = &v1alpha1.LinuxContainerResources{}
-		}
+		all.ensureContainerResources(resp)
 		resp.ContainerResources.MemoryLimitInBytes = all.Resources.MemoryLimitInBytes
 	}
+	if all.Resources.MemorySwapLimitInBytes != 0 {
+		all.ensureContainerResources(resp)
+		resp.ContainerResources.MemorySwapLimitInBytes = all.Resources.MemorySwapLimitInBytes
+	}
+}
+
+func (all *Allocation) Merge(resp *v1alpha1.ContainerResourceHookResponse) {
+	klog.V(5).InfoS("Merging allocation response", "response", resp)
+	if all.Resources == nil || resp == nil {
+		return
+	}
+	all.mergeCPUResources(resp)
+	all.mergeCPUSetResources(resp)
+	all.mergeMemoryResources(resp)
 }
