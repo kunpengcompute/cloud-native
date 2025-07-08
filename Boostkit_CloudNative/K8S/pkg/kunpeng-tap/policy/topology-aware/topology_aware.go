@@ -33,6 +33,8 @@ const (
 	PolicyName = "topology-aware"
 	// PolicyDescription is a short description of this policy.
 	PolicyDescription = "A policy for cpu/memory/devices optimazation."
+	// containerRequestLogKey is the log key for container request logging
+	containerRequestLogKey = "container request"
 )
 
 // allocations is our cache for saving resource allocations in the cache.
@@ -154,7 +156,7 @@ func (p *TopologyAwarePolicy) PreCreateContainerHook(ctx policy.HookContext) (*p
 }
 
 func (p *TopologyAwarePolicy) AllocateResources(containerCtx policy.ContainerContext) error {
-	klog.V(5).InfoS("AllocateResources", "container request", containerCtx.Request)
+	klog.V(5).InfoS("AllocateResources", containerRequestLogKey, containerCtx.Request)
 
 	grant, err := p.allocatePool(containerCtx)
 	if err != nil {
@@ -162,7 +164,7 @@ func (p *TopologyAwarePolicy) AllocateResources(containerCtx policy.ContainerCon
 	}
 
 	p.applyGrant(grant)
-	klog.InfoS("Allocated resources for container", "container request", containerCtx.Request, "grant", grant)
+	klog.InfoS("Allocated resources for container", containerRequestLogKey, containerCtx.Request, "grant", grant)
 	return nil
 }
 
@@ -172,7 +174,7 @@ func (p *TopologyAwarePolicy) allocatePool(containerCtx policy.ContainerContext)
 
 	if containerCtx.Request.PodMeta.Namespace == "kube-system" {
 		// 系统容器直接分配到根节点
-		klog.V(5).InfoS("Allocating system container to root pool", "container request", containerCtx.Request)
+		klog.V(5).InfoS("Allocating system container to root pool", containerRequestLogKey, containerCtx.Request)
 		pool = p.root
 	} else {
 		// 计算其他资源的亲和性
@@ -208,70 +210,79 @@ func (p *TopologyAwarePolicy) allocatePool(containerCtx policy.ContainerContext)
 	return grant, nil
 }
 
+// Helper method to calculate affinity for specific GPU devices
+func (p *TopologyAwarePolicy) calculateSpecificGPUAffinity(request Request) map[int]int32 {
+	affinity := make(map[int]int32)
+	numaWeights := make(map[int]int)
+	// 遍历所有GPU设备
+	for _, gpuID := range p.sys.GPUIDs() {
+		gpu := p.sys.GPU(gpuID)
+		if gpu == nil {
+			continue
+		}
+
+		gpuIDStr := fmt.Sprintf("%d", gpuID)
+		for _, requestedID := range request.GetRequestedGPUDevices() {
+			if gpuIDStr == requestedID {
+				numaNodeID := int(gpu.NodeID())
+				numaWeights[numaNodeID]++
+				klog.V(4).InfoS("Matched requested GPU to NUMA node",
+					"gpuID", gpuID,
+					"numaNode", numaNodeID)
+			}
+		}
+	}
+	// 根据权重设置亲和性
+	for numaID, weight := range numaWeights {
+		affinity[numaID] += int32(weight * 100)
+		klog.V(3).InfoS("Added GPU affinity for NUMA node",
+			"numaNode", numaID,
+			"weight", weight*100)
+	}
+
+	return affinity
+}
+
+// Helper method to calculate general GPU affinity for all nodes with GPUs
+func (p *TopologyAwarePolicy) calculateGeneralGPUAffinity() map[int]int32 {
+	affinity := make(map[int]int32)
+
+	for _, nodeID := range p.sys.NodeIDs() {
+		gpuCount := len(p.sys.NodeGPUs(nodeID))
+		if gpuCount > 0 {
+			affinity[int(nodeID)] += int32(gpuCount * 100)
+			klog.V(3).InfoS("Added general GPU affinity for NUMA node",
+				"numaNode", nodeID,
+				"gpuCount", gpuCount,
+				"weight", gpuCount*100)
+		}
+	}
+
+	return affinity
+}
+
 func (p *TopologyAwarePolicy) calculatePoolAffinities(request Request) map[int]int32 {
 	// 创建一个映射来存储每个NUMA节点的权重
 	affinity := make(map[int]int32)
 	containerCtx := request.GetContext()
 
 	// 如果容器请求了GPU资源，增加对有GPU的NUMA节点的亲和性
-	if request.HasGPURequest() {
-		klog.V(3).InfoS("Container requests GPU resources",
-			"pod", containerCtx.Request.PodMeta.Name,
-			"container", containerCtx.Request.ContainerMeta.Name,
-			"requestedDevices", request.GetRequestedGPUDevices())
-
-		// 如果有特定的GPU设备请求，尝试找到这些设备所在的NUMA节点
-		if len(request.GetRequestedGPUDevices()) > 0 {
-			// 创建一个映射来存储每个NUMA节点的权重
-			numaWeights := make(map[int]int)
-
-			// 遍历所有GPU设备
-			for _, gpuID := range p.sys.GPUIDs() {
-				gpu := p.sys.GPU(gpuID)
-				if gpu == nil {
-					continue
-				}
-
-				// 将GPU ID转换为字符串以进行比较
-				gpuIDStr := fmt.Sprintf("%d", gpuID)
-
-				// 检查这个GPU是否是请求的设备之一
-				for _, requestedID := range request.GetRequestedGPUDevices() {
-					if gpuIDStr == requestedID {
-						// 找到匹配的GPU，增加其NUMA节点的权重
-						numaNodeID := int(gpu.NodeID())
-						numaWeights[numaNodeID]++
-						klog.V(4).InfoS("Matched requested GPU to NUMA node",
-							"gpuID", gpuID,
-							"numaNode", numaNodeID)
-					}
-				}
-			}
-
-			// 根据权重设置亲和性
-			for numaID, weight := range numaWeights {
-				affinity[numaID] += int32(weight * 100)
-				klog.V(3).InfoS("Added GPU affinity for NUMA node",
-					"numaNode", numaID,
-					"weight", weight*100)
-			}
-		} else {
-			// 如果没有特定的GPU设备请求，则增加所有有GPU的NUMA节点的亲和性
-			for _, nodeID := range p.sys.NodeIDs() {
-				gpuCount := len(p.sys.NodeGPUs(nodeID))
-				if gpuCount > 0 {
-					// 为每个GPU增加一定的亲和性权重
-					affinity[int(nodeID)] += int32(gpuCount * 100)
-					klog.V(3).InfoS("Added general GPU affinity for NUMA node",
-						"numaNode", nodeID,
-						"gpuCount", gpuCount,
-						"weight", gpuCount*100)
-				}
-			}
-		}
+	if !request.HasGPURequest() {
+		return affinity
 	}
 
-	return affinity
+	klog.V(3).InfoS("Container requests GPU resources",
+		"pod", containerCtx.Request.PodMeta.Name,
+		"container", containerCtx.Request.ContainerMeta.Name,
+		"requestedDevices", request.GetRequestedGPUDevices())
+
+	// 如果有特定的GPU设备请求，尝试找到这些设备所在的NUMA节点
+	if len(request.GetRequestedGPUDevices()) > 0 {
+		return p.calculateSpecificGPUAffinity(request)
+	} else {
+		// 如果没有特定的GPU设备请求，则增加所有有GPU的NUMA节点的亲和性
+		return p.calculateGeneralGPUAffinity()
+	}
 }
 
 func (p *TopologyAwarePolicy) applyGrant(grant Grant) {
@@ -327,6 +338,103 @@ func (p *TopologyAwarePolicy) sortPoolsByScore(req Request, affinity map[int]int
 	return scores, p.pools
 }
 
+// Helper method to check resource capacity comparison
+func (p *TopologyAwarePolicy) compareResourceCapacity(request Request, node1, node2 Node) (bool, bool) {
+	capacity1 := node1.FreeResource().GetScore(request).SharedCapacity()
+	capacity2 := node2.FreeResource().GetScore(request).SharedCapacity()
+
+	if capacity1 >= 0 && capacity2 < 0 {
+		klog.V(5).InfoS("Lower shared capacity wins", "winner", node1.Name(), "failed", node2.Name())
+		return true, true // node1 wins, comparison complete
+	}
+
+	if capacity1 < 0 && capacity2 >= 0 {
+		klog.V(5).InfoS("Lower shared capacity wins", "winner", node2.Name(), "failed", node1.Name())
+		return false, true // node2 wins, comparison complete
+	}
+
+	return false, false // tie, continue comparison
+}
+
+// Helper method to compare node depths
+func (p *TopologyAwarePolicy) compareDepth(node1, node2 Node) (bool, bool) {
+	depth1, depth2 := node1.RootDistance(), node2.RootDistance()
+
+	if depth1 > depth2 {
+		klog.V(5).InfoS("Lower depth wins", "winner", node1.Name(), "failed", node2.Name())
+		return true, true // node1 wins, comparison complete
+	}
+	if depth2 > depth1 {
+		klog.V(5).InfoS("Lower depth wins", "winner", node2.Name(), "failed", node1.Name())
+		return false, true // node2 wins, comparison complete
+	}
+
+	klog.V(5).InfoS("Depth is a TIE", "node1", node1.Name(), "node2", node2.Name())
+	return false, false // tie, continue comparison
+}
+
+// Helper method to compare shared capacity
+func (p *TopologyAwarePolicy) compareSharedCapacity(score1, score2 Score, node1, node2 Node) (bool, bool) {
+	shared1, shared2 := score1.SharedCapacity(), score2.SharedCapacity()
+
+	if shared1 > shared2 {
+		return true, true // node1 wins, comparison complete
+	}
+	if shared2 > shared1 {
+		return false, true // node2 wins, comparison complete
+	}
+
+	klog.V(5).InfoS("Shared capacity is a TIE", "node1", node1.Name(), "node2", node2.Name())
+	return false, false // tie, continue comparison
+}
+
+// Helper method to compare colocated containers
+func (p *TopologyAwarePolicy) compareColocated(score1, score2 Score, node1, node2 Node) (bool, bool) {
+	if score1.Colocated() < score2.Colocated() {
+		klog.V(5).InfoS("Fewer colocated containers wins", "winner", node1.Name(), "failed", node2.Name())
+		return true, true // node1 wins, comparison complete
+	}
+	if score2.Colocated() < score1.Colocated() {
+		klog.V(5).InfoS("Fewer colocated containers wins", "winner", node2.Name(), "failed", node1.Name())
+		return false, true // node2 wins, comparison complete
+	}
+
+	return false, false // tie, continue comparison
+}
+
+// Helper method to compare GPU affinity
+func (p *TopologyAwarePolicy) compareGPUAffinity(request Request, affinity map[int]int32, node1, node2 Node) (bool, bool) {
+	if !request.HasGPURequest() {
+		return false, false // no GPU request, continue comparison
+	}
+
+	numaIDs1 := node1.FreeResource().GetNode().GetNUMAIDs()
+	numaIDs2 := node2.FreeResource().GetNode().GetNUMAIDs()
+	klog.V(5).InfoS("GPU affinity compare", "node1", node1.Name(), "node2", node2.Name(), "numaIDs1", numaIDs1, "numaIDs2", numaIDs2)
+
+	var affinity1, affinity2 int32
+	for _, numaID := range numaIDs1 {
+		affinity1 += affinity[int(numaID)]
+	}
+	for _, numaID := range numaIDs2 {
+		affinity2 += affinity[int(numaID)]
+	}
+
+	klog.V(5).InfoS("GPU affinity compare", "node1", node1.Name(), "node2", node2.Name(), "affinity1", affinity1, "affinity2", affinity2)
+
+	if affinity1 > affinity2 {
+		klog.V(5).InfoS("GPU affinity wins", "winner", node1.Name(), "numaIDs", numaIDs1, "affinity", affinity1)
+		return true, true // node1 wins, comparison complete
+	}
+	if affinity2 > affinity1 {
+		klog.V(5).InfoS("GPU affinity wins", "winner", node2.Name(), "numaIDs", numaIDs2, "affinity", affinity2)
+		return false, true // node2 wins, comparison complete
+	}
+
+	klog.V(5).InfoS("GPU affinity is a TIE", "node1", node1.Name(), "node2", node2.Name())
+	return false, false // tie, continue comparison
+}
+
 // Compare two pools by scores for allocation preference.
 func (p *TopologyAwarePolicy) compare(request Request, scores map[int]Score, affinity map[int]int32, i int, j int) bool {
 	//
@@ -337,96 +445,40 @@ func (p *TopologyAwarePolicy) compare(request Request, scores map[int]Score, aff
 	// 4. id 更小的获胜
 
 	node1, node2 := p.pools[i], p.pools[j]
-	depth1, depth2 := node1.RootDistance(), node2.RootDistance()
 	id1, id2 := node1.NodeID(), node2.NodeID()
 	score1, score2 := scores[id1], scores[id2]
 
-	shared1 := score1.SharedCapacity()
-	shared2 := score2.SharedCapacity()
-
-	// 不满足资源要求的节点失败
-	if node1.FreeResource().GetScore(request).SharedCapacity() >= 0 &&
-		node2.FreeResource().GetScore(request).SharedCapacity() < 0 {
-		klog.V(5).InfoS("Lower shared capacity wins", "winner", node1.Name(), "failed", node2.Name())
-		return true
+	// 1. Check resource capacity
+	if result, done := p.compareResourceCapacity(request, node1, node2); done {
+		return result
 	}
 
-	if node1.FreeResource().GetScore(request).SharedCapacity() < 0 &&
-		node2.FreeResource().GetScore(request).SharedCapacity() >= 0 {
-		klog.V(5).InfoS("Lower shared capacity wins", "winner", node2.Name(), "failed", node1.Name())
-		return false
+	// 2. Check depth
+	if result, done := p.compareDepth(node1, node2); done {
+		return result
 	}
 
-	// 层次更低的节点获胜
-	if depth1 > depth2 {
-		klog.V(5).InfoS("Lower depth wins", "winner", node1.Name(), "failed", node2.Name())
-		return true
-	}
-	if depth2 > depth1 {
-		klog.V(5).InfoS("Lower depth wins", "winner", node2.Name(), "failed", node1.Name())
-		return false
+	// 3. Check shared capacity
+	if result, done := p.compareSharedCapacity(score1, score2, node1, node2); done {
+		return result
 	}
 
-	klog.V(5).InfoS("Depth is a TIE", "node1", node1.Name(), "node2", node2.Name())
-
-	// 更多共享容量的节点获胜
-	if shared1 > shared2 {
-		return true
-	}
-	if shared2 > shared1 {
-		return false
-	}
-	klog.V(5).InfoS("Shared capacity is a TIE", "node1", node1.Name(), "node2", node2.Name())
-
-	// 较少共置容器的节点获胜
-	if score1.Colocated() < score2.Colocated() {
-		klog.V(5).InfoS("Fewer colocated containers wins", "winner", node1.Name(), "failed", node2.Name())
-		return true
-	}
-	if score2.Colocated() < score1.Colocated() {
-		klog.V(5).InfoS("Fewer colocated containers wins", "winner", node2.Name(), "failed", node1.Name())
-		return false
+	// 4. Check colocated containers
+	if result, done := p.compareColocated(score1, score2, node1, node2); done {
+		return result
 	}
 
-	// 如果请求包含GPU，则考虑GPU亲和性和GPU数量
-	if request.HasGPURequest() {
-		// 获取两个节点的 NUMA IDs
-		numaIDs1 := node1.FreeResource().GetNode().GetNUMAIDs()
-		numaIDs2 := node2.FreeResource().GetNode().GetNUMAIDs()
-		klog.V(5).InfoS("GPU affinity compare", "node1", node1.Name(), "node2", node2.Name(), "numaIDs1", numaIDs1, "numaIDs2", numaIDs2)
-		// 计算每个节点的总亲和性权重
-		var affinity1, affinity2 int32
-		for _, numaID := range numaIDs1 {
-			affinity1 += affinity[int(numaID)]
-		}
-		for _, numaID := range numaIDs2 {
-			affinity2 += affinity[int(numaID)]
-		}
-
-		klog.V(5).InfoS("GPU affinity compare", "node1", node1.Name(), "node2", node2.Name(), "affinity1", affinity1, "affinity2", affinity2)
-
-		if affinity1 > affinity2 {
-			klog.V(5).InfoS("GPU affinity wins",
-				"winner", node1.Name(),
-				"numaIDs", numaIDs1,
-				"affinity", affinity1)
-			return true
-		}
-		if affinity2 > affinity1 {
-			klog.V(5).InfoS("GPU affinity wins",
-				"winner", node2.Name(),
-				"numaIDs", numaIDs2,
-				"affinity", affinity2)
-			return false
-		}
+	// 5. Check GPU affinity
+	if result, done := p.compareGPUAffinity(request, affinity, node1, node2); done {
+		return result
 	}
-	klog.V(5).InfoS("GPU affinity is a TIE", "node1", node1.Name(), "node2", node2.Name())
-	// id 更小的节点获胜
+
+	// 6. Final tie-breaker: smaller ID wins
 	return id1 < id2
 }
 
 func (p *TopologyAwarePolicy) PostStopContainerHook(ctx policy.HookContext) (*policy.Allocation, error) {
-	klog.V(5).InfoS("PostStopContainerHook", "container request", ctx)
+	klog.V(5).InfoS("PostStopContainerHook", containerRequestLogKey, ctx)
 	containerCtx, ok := ctx.(*policy.ContainerContext)
 	if !ok {
 		klog.ErrorS(nil, "Invalid context type for PostStopContainerHook")
@@ -476,7 +528,7 @@ func (p *TopologyAwarePolicy) PostStopContainerHook(ctx policy.HookContext) (*po
 }
 
 func (p *TopologyAwarePolicy) ReleaseResources(containerCtx policy.ContainerContext) error {
-	klog.V(5).InfoS("ReleaseResources", "container request", containerCtx.Request)
+	klog.V(5).InfoS("ReleaseResources", containerRequestLogKey, containerCtx.Request)
 
 	// 确保有必要的容器和 pod 信息
 	if containerCtx.Request.ContainerMeta.ID == "" || containerCtx.Request.PodMeta.UID == "" {
@@ -529,26 +581,69 @@ func (p *TopologyAwarePolicy) saveAllocations() {
 	if p.cache == nil {
 		return
 	}
+}
 
-	// 遍历所有的 grants 并保存
-	// p.allocations.grants.Range(func(key, value interface{}) bool {
-	// 	grant := value.(Grant)
-	// 	containerCtx := grant.GetContext()
+// Helper method to find target node for container restoration
+func (p *TopologyAwarePolicy) findTargetNodeForRestore(cpus string) Node {
+	for _, node := range p.pools {
+		if node.FreeResource().SharableCPUs().String() == cpus {
+			return node
+		}
+	}
+	return nil
+}
 
-	// 	// 更新容器的资源分配信息
-	// 	if container, ok := p.cache.LookupContainer(containerCtx.Request.ContainerMeta.ID); ok {
-	// 		// 设置 CPU 集
-	// 		cpus := grant.SharedCPUSet().String()
-	// 		container.SetCpusetCpus(cpus)
+// Helper method to create grant from container info
+func (p *TopologyAwarePolicy) createGrantFromContainer(container cache.Container, targetNode Node) (Grant, string, error) {
+	pod, ok := container.GetPod()
+	if !ok {
+		return nil, "", fmt.Errorf("pod not found for container %s", container.GetID())
+	}
 
-	// 		// 设置内存节点
-	// 		if p.enableMemoryTopology {
-	// 			memset := grant.Memset().String()
-	// 			container.SetCpusetMems(memset)
-	// 		}
-	// 	}
-	// 	return true
-	// })
+	containerCtx := policy.ContainerContext{
+		Request: policy.ContainerRequest{
+			ContainerMeta: policy.ContainerMeta{
+				ID:   container.GetID(),
+				Name: container.GetName(),
+			},
+			PodMeta: policy.PodMeta{
+				UID: pod.GetUID(),
+			},
+		},
+	}
+	grant := newGrant(targetNode, containerCtx, false, 0)
+
+	// Set allocated CPU from container limits
+	if resources := container.GetResourceRequirements(); resources.Limits != nil {
+		if cpuLimit := resources.Limits.Cpu(); cpuLimit != nil {
+			grant.SetAllocatedCPU(int(cpuLimit.MilliValue()))
+		}
+	}
+
+	gid := pod.GetUID() + ":" + container.GetName()
+	return grant, gid, nil
+}
+
+// Helper method to process a single container for restoration
+func (p *TopologyAwarePolicy) processContainerForRestore(container cache.Container) error {
+	cpus := container.GetCpusetCpus()
+	if cpus == "" {
+		return nil // Skip containers without CPU allocation
+	}
+
+	targetNode := p.findTargetNodeForRestore(cpus)
+	if targetNode == nil {
+		klog.Warningf("Node not found when restoring grant for container %s", container.GetID())
+		return nil
+	}
+
+	grant, gid, err := p.createGrantFromContainer(container, targetNode)
+	if err != nil {
+		klog.Warningf("Failed to create grant for container %s: %v", container.GetID(), err)
+		return nil
+	}
+	p.allocations.grants.Store(gid, grant)
+	return nil
 }
 
 // restoreAllocations 从 cache 中恢复资源分配状态
@@ -559,59 +654,9 @@ func (p *TopologyAwarePolicy) restoreAllocations() error {
 
 	// 遍历所有容器
 	for _, container := range p.cache.GetContainers() {
-		// 获取容器的 CPU 集和内存节点信息
-		cpus := container.GetCpusetCpus()
-
-		if cpus == "" {
-			continue
+		if err := p.processContainerForRestore(container); err != nil {
+			klog.ErrorS(err, "Failed to process container for restore", "containerID", container.GetID())
 		}
-
-		// 查找对应的节点
-		var targetNode Node
-		for _, node := range p.pools {
-			if node.FreeResource().SharableCPUs().String() == cpus {
-				targetNode = node
-				break
-			}
-		}
-
-		if targetNode == nil {
-			klog.Warningf("Node not found when restoring grant for container %s", container.GetID())
-			continue
-		}
-
-		// 获取 pod 信息
-		pod, ok := container.GetPod()
-		if !ok {
-			klog.Warningf("Pod not found for container %s", container.GetID())
-			continue
-		}
-
-		// 创建新的 grant
-		containerCtx := policy.ContainerContext{
-			Request: policy.ContainerRequest{
-				ContainerMeta: policy.ContainerMeta{
-					ID:   container.GetID(),
-					Name: container.GetName(),
-				},
-				PodMeta: policy.PodMeta{
-					UID: pod.GetUID(),
-				},
-			},
-		}
-		grant := newGrant(targetNode, containerCtx, false, 0)
-
-		// 设置分配的资源
-		// 从容器的 CPU limits 获取分配的 CPU 数量
-		if resources := container.GetResourceRequirements(); resources.Limits != nil {
-			if cpuLimit := resources.Limits.Cpu(); cpuLimit != nil {
-				grant.SetAllocatedCPU(int(cpuLimit.MilliValue()))
-			}
-		}
-
-		// 将 grant 添加到 allocations 中
-		gid := pod.GetUID() + ":" + container.GetName()
-		p.allocations.grants.Store(gid, grant)
 	}
 
 	return nil
@@ -658,7 +703,7 @@ func (p *TopologyAwarePolicy) createSocketNodes() map[system.ID]Node {
 			// 单 Socket 时，直接设置为根节点
 			socket = NewSocketNode(p, socketID, nilNode)
 			p.root = socket
-			klog.V(5).InfoS("Created pool for ", "name", socket.Name())
+			klog.V(5).InfoS("Created single socket pool for ", "name", socket.Name())
 		}
 
 		p.nodes[socket.Name()] = socket

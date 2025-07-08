@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/cpuset"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/policy"
@@ -360,6 +361,56 @@ func checkDeviceRequest(containerEnvs map[string]string, config DeviceEnvConfig)
 	return hasRequest, deviceIDs
 }
 
+// Helper method to parse CPU and memory resources
+func parseResourceRequirements(r *request, resourceReq, resourceLimit *corev1.ResourceList) {
+	// 解析CPU资源
+	if resourceLimit != nil && resourceLimit.Cpu() != nil {
+		r.cpuLimit = int(resourceLimit.Cpu().MilliValue())
+	}
+
+	if resourceReq != nil && resourceReq.Cpu() != nil {
+		r.cpuRequest = int(resourceReq.Cpu().MilliValue())
+	}
+
+	// 解析Memory请求
+	if resourceReq != nil && resourceReq.Memory() != nil {
+		r.memRequest = int(resourceReq.Memory().MilliValue())
+	}
+
+	if resourceLimit != nil && resourceLimit.Memory() != nil {
+		r.memLimit = int(resourceLimit.Memory().MilliValue())
+	} else {
+		r.memLimit = r.memRequest
+	}
+
+	r.memType = system.MemoryTypeDRAM
+}
+
+// Helper method to process GPU device requests
+func processGPUDeviceRequests(r *request, containerEnvs map[string]string) {
+	if containerEnvs == nil {
+		return
+	}
+
+	// 遍历所有已知设备配置
+	for _, config := range knownDeviceConfigs {
+		hasRequest, deviceIDs := checkDeviceRequest(containerEnvs, config)
+
+		// 根据设备类型设置相应的字段
+		switch config.DeviceType {
+		case GPU:
+			if hasRequest {
+				r.hasGPURequest = true
+				r.requestedGPUDevices = append(r.requestedGPUDevices, deviceIDs...)
+			}
+		case NPU:
+			// TODO: 添加NPU设备类型的处理
+		default:
+			klog.ErrorS(nil, "Unknown device type", "deviceType", config.DeviceType)
+		}
+	}
+}
+
 // newRequest creates a new request from a container context
 func newRequest(containerCtx policy.ContainerContext) Request {
 	r := &request{
@@ -371,54 +422,15 @@ func newRequest(containerCtx policy.ContainerContext) Request {
 	}
 	request := containerCtx.Request
 
-	resource_req, resource_limit := request.Resources.GetRequests(), request.Resources.GetLimits()
-	if resource_req == nil || resource_limit == nil {
+	resourceReq, resourceLimit := request.Resources.GetRequests(), request.Resources.GetLimits()
+	if resourceReq == nil || resourceLimit == nil {
 		klog.V(0).InfoS("Resource requirements or limits are nil")
 		return nil
 	}
-
-	// 解析CPU资源
-	if resource_limit.Cpu() != nil {
-		r.cpuLimit = int(resource_limit.Cpu().MilliValue())
-	}
-
-	if resource_req.Cpu() != nil {
-		r.cpuRequest = int(resource_req.Cpu().MilliValue())
-	}
-
-	// 解析Memory请求
-	if resource_req.Memory() != nil {
-		r.memRequest = int(resource_req.Memory().MilliValue())
-	}
-
-	if resource_limit.Memory() != nil {
-		r.memLimit = int(resource_limit.Memory().MilliValue())
-	} else {
-		r.memLimit = r.memRequest
-	}
-
-	r.memType = system.MemoryTypeDRAM
-
+	parseResourceRequirements(r, resourceReq, resourceLimit)
 	// 检查是否请求GPU资源
 	klog.InfoS("Claims done, Start to Check GPU")
-	// 检查环境变量中的GPU设备信息
-	if containerCtx.Request.ContainerEnvs != nil {
-		// 遍历所有已知设备配置
-		for _, config := range knownDeviceConfigs {
-			hasRequest, deviceIDs := checkDeviceRequest(containerCtx.Request.ContainerEnvs, config)
-
-			// 根据设备类型设置相应的字段
-			switch config.DeviceType {
-			case GPU:
-				if hasRequest {
-					r.hasGPURequest = true
-					r.requestedGPUDevices = append(r.requestedGPUDevices, deviceIDs...)
-				}
-			case NPU:
-				// TODO: 添加NPU设备类型的处理
-			}
-		}
-	}
+	processGPUDeviceRequests(r, containerCtx.Request.ContainerEnvs)
 
 	return r
 }
