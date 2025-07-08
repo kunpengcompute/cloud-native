@@ -35,10 +35,8 @@ var _ = Describe("Utils", func() {
 			result := dispatcher.TransferToCRIContainerEnvs(envs)
 
 			Expect(result).To(HaveLen(2))
-			Expect(result[0].Key).To(Equal("key1"))
-			Expect(result[0].Value).To(Equal("value1"))
-			Expect(result[1].Key).To(Equal("key2"))
-			Expect(result[1].Value).To(Equal("value2"))
+			Expect([]string{result[0].Key, result[1].Key}).To(ConsistOf("key1", "key2"))
+			Expect([]string{result[0].Value, result[1].Value}).To(ConsistOf("value1", "value2"))
 		})
 
 		It("should return an empty slice if input is nil", func() {

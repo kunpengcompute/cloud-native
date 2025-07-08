@@ -5,7 +5,6 @@ import (
 	"os"
 	"path"
 	"syscall"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -56,27 +55,29 @@ var _ = Describe("Server", func() {
 			fakeRuntimeServiceClient, fakeDispatcher,
 		), containerRuntimeConn)
 
+		go func() {
+			err := server.Run()
+			Expect(err).To(BeNil())
+		}()
+		Eventually(func() error {
+			_, err := os.Stat(options.RuntimeProxyEndpoint)
+			return err
+		}, timeout, interval).Should(BeNil())
 	})
 
 	AfterEach(func() {
 		containerRuntimeConn.Close()
+		server.Shutdown(context.Background())
 	})
 
 	Describe("Run", func() {
 		It("should start the server and accept connections", func() {
-			go func() {
-				err := server.Run()
-				Expect(err).To(BeNil())
-				Eventually(func() error {
-					_, err := os.Stat(options.RuntimeProxyEndpoint)
-					return err
-				}, timeout, interval).Should(BeNil())
-			}()
+			conn, err := grpc.NewClient(
+				options.GRPCPassthroughScheme+options.RuntimeProxyEndpoint,
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+				grpc.WithContextDialer(containerd.Dialer),
+			)
 
-			// Wait for the server to start
-			time.Sleep(100 * time.Millisecond)
-
-			conn, err := grpc.Dial("unix://"+options.RuntimeProxyEndpoint, grpc.WithInsecure())
 			Expect(err).To(BeNil())
 			defer conn.Close()
 
@@ -84,7 +85,6 @@ var _ = Describe("Server", func() {
 			versionResp, err := client.Version(context.Background(), &runtimeapi.VersionRequest{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(versionResp.RuntimeVersion).To(Equal("1.0.0"))
-			server.Shutdown(context.Background())
 		})
 	})
 })

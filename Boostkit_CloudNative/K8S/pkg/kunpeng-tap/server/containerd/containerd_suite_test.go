@@ -12,7 +12,7 @@ import (
 var (
 	interval           = 1 * time.Second
 	timeout            = 10 * time.Second
-	utSocketPathPrefix = "/tmp/tap-test"
+	utSocketPathPrefix = "/tmp/containerd/tap-test"
 )
 
 func TestContainerd(t *testing.T) {
@@ -28,7 +28,7 @@ var _ = BeforeSuite(func() {
 		Expect(err).To(BeNil())
 	}
 
-	err = os.Mkdir(utSocketPathPrefix, 0755)
+	err = os.MkdirAll(utSocketPathPrefix, 0755)
 	Expect(err).To(BeNil())
 
 })

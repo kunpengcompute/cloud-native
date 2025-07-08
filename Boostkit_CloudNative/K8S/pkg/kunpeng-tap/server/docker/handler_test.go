@@ -65,11 +65,11 @@ var _ = Describe("Handler", Ordered, func() {
 			case strings.Contains(r.URL.Path, "create"):
 				if strings.Contains(r.URL.RawQuery, "pod") {
 					w.WriteHeader(200)
-					data, err = os.ReadFile("../../../test/fake/fake_docker_pod_http_create_resp.json")
+					data, err = os.ReadFile("../../../../test/kunpeng-tap/fake/fake_docker_pod_http_create_resp.json")
 					Expect(err).To(BeNil())
 				} else {
 					w.WriteHeader(200)
-					data, err = os.ReadFile("../../../test/fake/fake_docker_http_create_resp.json")
+					data, err = os.ReadFile("../../../../test/kunpeng-tap/fake/fake_docker_http_create_resp.json")
 					Expect(err).To(BeNil())
 				}
 				fakeDockerRuntimerReceivedRequest, err = io.ReadAll(r.Body)
@@ -77,15 +77,15 @@ var _ = Describe("Handler", Ordered, func() {
 
 			case strings.Contains(r.URL.Path, "start"):
 				w.WriteHeader(200)
-				data, err = os.ReadFile("../../../test/fake/fake_docker_http_start_resp.json")
+				data, err = os.ReadFile("../../../../test/kunpeng-tap/fake/fake_docker_http_start_resp.json")
 				Expect(err).To(BeNil())
 			case strings.Contains(r.URL.Path, "stop"):
 				w.WriteHeader(200)
-				data, err = os.ReadFile("../../../test/fake/fake_docker_http_stop_resp.json")
+				data, err = os.ReadFile("../../../../test/kunpeng-tap/fake/fake_docker_http_stop_resp.json")
 				Expect(err).To(BeNil())
 			case strings.Contains(r.URL.Path, "update"):
 				w.WriteHeader(200)
-				data, err = os.ReadFile("../../../test/fake/fake_docker_http_update_resp.json")
+				data, err = os.ReadFile("../../../../test/kunpeng-tap/fake/fake_docker_http_update_resp.json")
 				Expect(err).To(BeNil())
 			case r.Method == http.MethodDelete:
 				w.WriteHeader(200)
@@ -178,7 +178,7 @@ var _ = Describe("Handler", Ordered, func() {
 
 	Describe("Create pod", func() {
 		It("should return 200", func() {
-			file, err := os.Open("../../../test/fake/fake_docker_pod_http_create_request.json")
+			file, err := os.Open("../../../../test/kunpeng-tap/fake/fake_docker_pod_http_create_request.json")
 			Expect(err).To(BeNil())
 			defer file.Close()
 			requestInFile, err := io.ReadAll(file)
@@ -211,7 +211,7 @@ var _ = Describe("Handler", Ordered, func() {
 
 	Describe("Create container", func() {
 		It("should return 200", func() {
-			file, err := os.Open("../../../test/fake/fake_docker_http_create_request.json")
+			file, err := os.Open("../../../../test/kunpeng-tap/fake/fake_docker_http_create_request.json")
 			Expect(err).To(BeNil())
 			defer file.Close()
 			requestInFile, err := io.ReadAll(file)
@@ -333,7 +333,7 @@ var _ = Describe("Handler", Ordered, func() {
 
 	Describe("Create pod with skip label", func() {
 		It("should return 200", func() {
-			file, err := os.Open("../../../test/fake/fake_docker_pod_skip_http_create_request.json")
+			file, err := os.Open("../../../../test/kunpeng-tap/fake/fake_docker_pod_skip_http_create_request.json")
 			Expect(err).To(BeNil())
 			defer file.Close()
 			requestInFile, err := io.ReadAll(file)
@@ -359,7 +359,7 @@ var _ = Describe("Handler", Ordered, func() {
 
 	Describe("Create container with skip label", func() {
 		It("should return 200", func() {
-			file, err := os.Open("../../../test/fake/fake_docker_skip_http_create_request.json")
+			file, err := os.Open("../../../../test/kunpeng-tap/fake/fake_docker_skip_http_create_request.json")
 			Expect(err).To(BeNil())
 			defer file.Close()
 			requestInFile, err := io.ReadAll(file)
