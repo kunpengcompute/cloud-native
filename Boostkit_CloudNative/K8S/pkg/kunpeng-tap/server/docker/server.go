@@ -20,7 +20,6 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 
 	"github.com/gorilla/mux"
@@ -28,6 +27,7 @@ import (
 
 	"kunpeng.huawei.com/kunpeng-cloud-computing/cmd/kunpeng-tap/proxy/options"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server/httputil"
 )
 
 func ReverseProxy(containerRuntimeEndpoint string) *httputil.ReverseProxy {

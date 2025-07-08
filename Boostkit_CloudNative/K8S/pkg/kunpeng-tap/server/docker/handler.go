@@ -73,6 +73,7 @@ type dockerHandler struct {
 func (d *dockerHandler) Direct(wr http.ResponseWriter, req *http.Request) string {
 	out := &bytes.Buffer{}
 	multi := &mockRespWriter{wr, out, 0}
+	klog.V(5).InfoS("Request", "header", req.Header, "method", req.Method, "url", req.URL.String())
 	d.reverseProxy.ServeHTTP(multi, req)
 	resp := out.String()
 	klog.V(5).InfoS("Response", "code", multi.code, "body", resp, "headers", wr.Header())
