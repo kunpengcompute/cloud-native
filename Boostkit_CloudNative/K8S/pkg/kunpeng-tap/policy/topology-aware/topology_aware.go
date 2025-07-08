@@ -446,7 +446,12 @@ func (p *TopologyAwarePolicy) compare(request Request, scores map[int]Score, aff
 
 	node1, node2 := p.pools[i], p.pools[j]
 	id1, id2 := node1.NodeID(), node2.NodeID()
-	score1, score2 := scores[id1], scores[id2]
+	score1, ok1 := scores[id1]
+	score2, ok2 := scores[id2]
+	if !ok1 || !ok2 {
+		klog.ErrorS(nil, "Score not found", "node1", node1.Name(), "node2", node2.Name())
+		return false
+	}
 
 	// 1. Check resource capacity
 	if result, done := p.compareResourceCapacity(request, node1, node2); done {
@@ -764,7 +769,12 @@ func (p *TopologyAwarePolicy) createDieNodes(sockets map[system.ID]Node) map[sys
 
 	// 遍历 Socket 节点，创建 die 节点
 	for _, socketID := range p.sys.PackageIDs() {
-		socket := sockets[socketID]
+		socket, ok := sockets[socketID]
+		if !ok {
+			klog.Warningf("Socket not found: socketID=%d", socketID)
+			continue
+		}
+
 		pkg := p.sys.Package(socketID)
 
 		for _, dieID := range pkg.DieIDs() {

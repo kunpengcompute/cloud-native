@@ -319,7 +319,7 @@ var (
 // Our cache of objects.
 type cache struct {
 	sync.Mutex `json:"-"` // we're lockable
-	//logger.Logger `json:"-"` // cache logger instance
+
 	filePath string // where to store to/load from
 	dataDir  string // container data directory
 
@@ -348,9 +348,8 @@ func cacheError(format string, args ...interface{}) error {
 // NewCache instantiates a new cache. Load it from the given path if it exists.
 func NewCache(options Options) (Cache, error) {
 	cch := &cache{
-		filePath: filepath.Join(options.CacheDir, "cache"),
-		dataDir:  filepath.Join(options.CacheDir, "containers"),
-		//Logger:     logger.NewLogger("cache"),
+		filePath:   filepath.Join(options.CacheDir, "cache"),
+		dataDir:    filepath.Join(options.CacheDir, "containers"),
 		Pods:       make(map[string]*pod),
 		Containers: make(map[string]*container),
 		NextID:     1,
@@ -365,9 +364,7 @@ func NewCache(options Options) (Cache, error) {
 	if err := cch.mkdirAll("container", cch.dataDir, dataDirPerm); err != nil {
 		return nil, err
 	}
-	//if err := cch.Load(); err != nil {
-	//	return nil, err
-	//}
+
 	if cpuInfo, err := sysfs.GetLocalCPUInfo(); err != nil {
 		return nil, err
 	} else {
@@ -424,8 +421,6 @@ func (cch *cache) InsertPod(id string, msg interface{}, status *PodStatus) (Pod,
 
 	cch.Pods[p.ID] = p
 
-	// cch.Save()
-
 	return p, nil
 }
 
@@ -441,8 +436,6 @@ func (cch *cache) DeletePod(id string) Pod {
 
 	klog.V(5).InfoS("Removing pod", "name", p.Name, "id", p.ID)
 	delete(cch.Pods, id)
-
-	// cch.Save()
 
 	return p
 }
@@ -483,16 +476,8 @@ func (cch *cache) InsertContainer(containerId string, msg interface{}) (Containe
 		return nil, cacheError("failed to insert container %s: %v", c.CacheID, err)
 	}
 
-	// c.CacheID = cch.createCacheID(c)
-
-	// cch.Containers[c.CacheID] = c
-	// if c.ID != "" {
-	// 	cch.Containers[containerId] = c
-	// }
 	c.ID = containerId
 	cch.Containers[containerId] = c
-
-	// cch.Save()
 
 	return c, nil
 }
@@ -517,8 +502,6 @@ func (cch *cache) UpdateContainerID(cacheID string, msg interface{}) (Container,
 	c.ID = reply.ContainerId
 	cch.Containers[c.ID] = c
 
-	// cch.Save()
-
 	return c, nil
 }
 
@@ -535,8 +518,6 @@ func (cch *cache) DeleteContainer(id string) Container {
 	klog.V(5).InfoS("Removing container", "name", c.PrettyName())
 	delete(cch.Containers, c.ID)
 	delete(cch.Containers, c.CacheID)
-
-	// cch.Save()
 
 	return c
 }
@@ -712,9 +693,6 @@ func (cch *cache) GetContainers() []Container {
 
 	containers := make([]Container, 0, len(cch.Containers)/2)
 	for _, container := range cch.Containers {
-		//if id != container.CacheID {
-		//	continue
-		//}
 		containers = append(containers, container)
 	}
 	return containers

@@ -156,9 +156,6 @@ func (s *supply) Allocate(req Request) (Grant, error) {
 		// 检查是否有足够的内存
 		if uint64(memoryRequest) > s.AllocatableMemory() {
 			// 释放已分配的 CPU 资源
-			// s.Release(grant)
-			// return nil, fmt.Errorf("not enough memory for %d KB in node %s (available: %d KB)",
-			// 	memoryRequest, s.node.Name(), s.AllocatableMemory())
 			klog.ErrorS(nil, "Not enough memory for container",
 				"node", s.node.Name(),
 				"request", req,

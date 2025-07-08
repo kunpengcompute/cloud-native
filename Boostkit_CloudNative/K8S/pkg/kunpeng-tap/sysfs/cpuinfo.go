@@ -163,23 +163,28 @@ func getProcessorInfos(lsCPUStr string) ([]ProcessorInfo, error) {
 		if err != nil {
 			continue
 		}
-		node, _ := strconv.ParseInt(items[1], 10, 32)
+		node, err := strconv.ParseInt(items[1], 10, 32)
+		if err != nil {
+			klog.ErrorS(err, "Failed to parse node ID", "line", line)
+			continue
+		}
 		socket, err := strconv.ParseInt(items[2], 10, 32)
 		if err != nil {
+			klog.ErrorS(err, "Failed to parse socket ID", "line", line)
 			continue
 		}
 		core, err := strconv.ParseInt(items[3], 10, 32)
 		if err != nil {
+			klog.ErrorS(err, "Failed to parse core ID", "line", line)
 			continue
 		}
 
-		info := ProcessorInfo{
+		processorInfos = append(processorInfos, ProcessorInfo{
 			CPUID:    int32(cpu),
 			CoreID:   int32(core),
 			SocketID: int32(socket),
 			NodeID:   int32(node),
-		}
-		processorInfos = append(processorInfos, info)
+		})
 	}
 	if len(processorInfos) <= 0 {
 		return nil, fmt.Errorf("no valid processor info")
@@ -188,20 +193,25 @@ func getProcessorInfos(lsCPUStr string) ([]ProcessorInfo, error) {
 	// sorted by cpu topology
 	// NOTE: in some cases, max(cpuId[...]) can be not equal to len(processors)
 	sort.Slice(processorInfos, func(i, j int) bool {
-		a, b := processorInfos[i], processorInfos[j]
-		switch {
-		case a.NodeID != b.NodeID:
-			return a.NodeID < b.NodeID
-		case a.SocketID != b.SocketID:
-			return a.SocketID < b.SocketID
-		case a.CoreID != b.CoreID:
-			return a.CoreID < b.CoreID
-		default:
-			return a.CPUID < b.CPUID
-		}
+		return sortProcessorInfosByTopology(processorInfos[i], processorInfos[j])
 	})
 
 	return processorInfos, nil
+}
+
+// sortProcessorInfosByTopology sorts processor infos by topology hierarchy:
+// NUMA Node -> Socket -> Core -> CPU
+func sortProcessorInfosByTopology(a, b ProcessorInfo) bool {
+	switch {
+	case a.NodeID != b.NodeID:
+		return a.NodeID < b.NodeID
+	case a.SocketID != b.SocketID:
+		return a.SocketID < b.SocketID
+	case a.CoreID != b.CoreID:
+		return a.CoreID < b.CoreID
+	default:
+		return a.CPUID < b.CPUID
+	}
 }
 
 func calculateCPUTotalInfo(processorInfos []ProcessorInfo) CPUTotalInfo {
@@ -378,16 +388,30 @@ func parseCpusetCpus(cpuset string) []int {
 	cpus := []int{}
 	ranges := strings.Split(cpuset, ",")
 	for _, r := range ranges {
-		if strings.Contains(r, "-") {
-			parts := strings.Split(r, "-")
-			start, _ := strconv.Atoi(parts[0])
-			end, _ := strconv.Atoi(parts[1])
-			for i := start; i <= end; i++ {
-				cpus = append(cpus, i)
+
+		if !strings.Contains(r, "-") {
+			cpu, err := strconv.Atoi(r)
+			if err != nil {
+				klog.ErrorS(err, "Failed to parse CPU ID", "cpuSet", cpuset, "range", r)
+				continue
 			}
-		} else {
-			cpu, _ := strconv.Atoi(r)
 			cpus = append(cpus, cpu)
+			continue
+		}
+
+		parts := strings.Split(r, "-")
+		start, err := strconv.Atoi(parts[0])
+		if err != nil {
+			klog.ErrorS(err, "Failed to parse start CPU ID", "cpuSet", cpuset, "range", r)
+			continue
+		}
+		end, err := strconv.Atoi(parts[1])
+		if err != nil {
+			klog.ErrorS(err, "Failed to parse end CPU ID", "cpuSet", cpuset, "range", r)
+			continue
+		}
+		for i := start; i <= end; i++ {
+			cpus = append(cpus, i)
 		}
 	}
 	return cpus

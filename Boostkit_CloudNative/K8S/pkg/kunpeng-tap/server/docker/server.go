@@ -37,7 +37,10 @@ func ReverseProxy(containerRuntimeEndpoint string) *httputil.ReverseProxy {
 			if len(req.URL.RawQuery) > 0 {
 				param = "?" + req.URL.RawQuery
 			}
-			u, _ := url.Parse("http://docker" + req.URL.Path + param)
+			u, err := url.Parse("http://docker" + req.URL.Path + param)
+			if err != nil {
+				klog.ErrorS(err, "Failed to parse URL", "url", "http://docker"+req.URL.Path+param)
+			}
 			*req.URL = *u
 		},
 		Transport: &http.Transport{
@@ -94,5 +97,7 @@ func (d *DockerServer) Run() error {
 }
 
 func (d *DockerServer) Shutdown(ctx context.Context) {
-	d.httpServer.Shutdown(ctx)
+	if err := d.httpServer.Shutdown(ctx); err != nil {
+		klog.ErrorS(err, "Failed to shutdown docker server gracefully")
+	}
 }

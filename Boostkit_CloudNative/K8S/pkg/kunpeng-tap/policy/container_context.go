@@ -334,7 +334,16 @@ func (c *ContainerRequest) FromProxy(req *v1alpha1.ContainerResourceHookRequest)
 	c.ContainerMeta.FromProxy(req.ContainerMeta, req.PodAnnotations)
 	c.PodLabels = req.GetPodLabels()
 	c.PodAnnotations = req.GetPodAnnotations()
-	c.CgroupParent, _ = GetContainerCgroupParentDirByID(req.GetPodCgroupParent(), c.ContainerMeta.ID)
+	var err error
+	c.CgroupParent, err = GetContainerCgroupParentDirByID(req.GetPodCgroupParent(), c.ContainerMeta.ID)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get container cgroup parent dir",
+			"podCgroupParent", req.GetPodCgroupParent(),
+			"containerID", c.ContainerMeta.ID)
+		// Set a fallback value or keep the original pod cgroup parent
+		c.CgroupParent = req.GetPodCgroupParent()
+	}
+
 	c.ContainerEnvs = req.GetContainerEnvs()
 
 	if c.Resources == nil {

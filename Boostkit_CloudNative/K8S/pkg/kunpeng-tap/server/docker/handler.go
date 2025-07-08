@@ -312,8 +312,14 @@ func (d *dockerHandler) ProxyRequestToDockerRuntime(
 		return nil, err
 	}
 	req.Body = io.NopCloser(nBody)
-	nBody, _ = utils.EncodeBody(cfgBody)
-	newLength, _ := utils.CalculateContentLength(nBody)
+	nBody, err = utils.EncodeBody(cfgBody)
+	if err != nil {
+		klog.ErrorS(err, "Failed to encode body")
+	}
+	newLength, err := utils.CalculateContentLength(nBody)
+	if err != nil {
+		klog.ErrorS(err, "Failed to calculate content length")
+	}
 	req.ContentLength = newLength
 	resp := d.Direct(wr, req)
 
@@ -321,7 +327,6 @@ func (d *dockerHandler) ProxyRequestToDockerRuntime(
 	err = json.Unmarshal([]byte(resp), createResp)
 	if err != nil {
 		klog.ErrorS(err, "Failed to Unmarshal create resp", "response", resp)
-		return nil, err
 	}
 
 	klog.V(5).InfoS("Response from create container", "response", resp)

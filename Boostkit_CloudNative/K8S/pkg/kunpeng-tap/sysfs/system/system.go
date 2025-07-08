@@ -320,10 +320,15 @@ func (s *system) discoverCPU(path string) error {
 		s.offline = s.offline.Union(cpuset.New(cpu.id))
 	}
 
-	if node, _ := filepath.Glob(filepath.Join(path, "node[0-9]*")); len(node) == 1 {
+	node, err := filepath.Glob(filepath.Join(path, "node[0-9]*"))
+	if err != nil {
+		klog.ErrorS(err, "Failed to get node", "path", path)
+		return err
+	}
+	if len(node) == 1 {
 		cpu.node = getEnumeratedID(node[0])
 	} else {
-		return fmt.Errorf("exactly one node per cpu allowed")
+		return fmt.Errorf("exactly one node per cpu allowed: %v", node)
 	}
 
 	s.updateThreadsPerCore(cpu)
@@ -341,7 +346,11 @@ func (s *system) discoverNodes() error {
 	s.nodes = make(map[ID]Node)
 
 	// Discover NUMA nodes and populate the map
-	entries, _ := filepath.Glob(filepath.Join(s.path, sysfsNumaNodePath, "node[0-9]*"))
+	entries, err := filepath.Glob(filepath.Join(s.path, sysfsNumaNodePath, "node[0-9]*"))
+	if err != nil {
+		klog.ErrorS(err, "Failed to discover NUMA nodes")
+		return err
+	}
 	for _, entry := range entries {
 		if err := s.discoverNode(entry); err != nil {
 			return err
