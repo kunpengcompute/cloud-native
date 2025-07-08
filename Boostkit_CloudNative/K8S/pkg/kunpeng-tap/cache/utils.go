@@ -333,6 +333,93 @@ type ContainerInfo struct {
 	RuntimeSpec *specs.Spec `json:"runtimeSpec"`
 }
 
+// Helper method to process a single pod sandbox
+func (cch *cache) processPodSandbox(containerdClient criv1.RuntimeServiceClient, pod *criv1.PodSandbox) error {
+	podStatus, err := containerdClient.PodSandboxStatus(context.TODO(), &criv1.PodSandboxStatusRequest{
+		PodSandboxId: pod.GetId(),
+		Verbose:      true,
+	})
+	if err != nil {
+		klog.ErrorS(err, "Failed to get pod details", "podId", pod.GetId())
+		return err
+	}
+	klog.V(3).InfoS("Get pod status", "PodStatus", podStatus)
+	// Parse pod info from status
+	podInfoInStatus := &SandboxInfo{}
+	if err := json.Unmarshal([]byte(podStatus.Info["info"]), podInfoInStatus); err != nil {
+		klog.ErrorS(err, "Failed to get pod details", "podId", pod.GetId())
+		return err
+	}
+	klog.V(3).InfoS("Get pod info", "PodInfo", podInfoInStatus)
+
+	podInfo := &v1alpha1.PodSandboxHookRequest{
+		Labels:      pod.GetLabels(),
+		Annotations: pod.GetAnnotations(),
+		PodMeta: &v1alpha1.PodSandboxMetadata{
+			Name:      pod.GetMetadata().GetName(),
+			Namespace: pod.GetMetadata().GetNamespace(),
+			Uid:       pod.GetMetadata().GetUid(),
+		},
+		RuntimeHandler: pod.GetRuntimeHandler(),
+		Resources:      RuntimeSpecToResource(podInfoInStatus.RuntimeSpec),
+	}
+	// Get CgroupParent from pod info
+	if podInfoInStatus.Config != nil && podInfoInStatus.Config.Linux != nil {
+		podInfo.CgroupParent = podInfoInStatus.Config.Linux.CgroupParent
+	} else if podInfoInStatus.RuntimeSpec != nil {
+		podInfo.CgroupParent = podInfoInStatus.RuntimeSpec.Annotations[crioCgroupParent]
+	}
+	klog.V(3).InfoS("Get CgroupParent from pod info", "CgroupParent", podInfo.CgroupParent)
+
+	cch.InsertPod(pod.GetId(), podInfo, nil)
+	return nil
+}
+
+// Helper method to process a single container
+func (cch *cache) processContainer(containerdClient criv1.RuntimeServiceClient, container *criv1.Container) error {
+	containerStatus, err := containerdClient.ContainerStatus(context.TODO(), &criv1.ContainerStatusRequest{
+		ContainerId: container.GetId(),
+		Verbose:     true,
+	})
+	if err != nil {
+		klog.ErrorS(err, "Failed to get container details", "Container", container.GetId())
+		return err
+	}
+	// Parse container info from status
+	containerInfoInStatus := &ContainerInfo{}
+	klog.V(3).InfoS("Get container info", "PodInfo", containerInfoInStatus)
+	if err := json.Unmarshal([]byte(containerStatus.Info["info"]), containerInfoInStatus); err != nil {
+		klog.ErrorS(err, "Failed to get container details", "podId", container.GetId())
+		return err
+	}
+
+	cInfo := &v1alpha1.ContainerResourceHookRequest{
+		ContainerResources:   RuntimeSpecToResource(containerInfoInStatus.RuntimeSpec),
+		ContainerAnnotations: container.GetAnnotations(),
+		ContainerMeta: &v1alpha1.ContainerMetadata{
+			Name: container.GetMetadata().GetName(),
+			Id:   container.GetId(),
+		},
+	}
+	// Get pod info from cache
+	podCheckPoint, exit := cch.LookupPod(container.GetPodSandboxId())
+	if exit {
+		cInfo.PodMeta = &v1alpha1.PodSandboxMetadata{
+			Name:      podCheckPoint.GetName(),
+			Uid:       podCheckPoint.GetUID(),
+			Namespace: podCheckPoint.GetNamespace(),
+		}
+		cInfo.PodResources = podCheckPoint.GetLinuxResources()
+	}
+
+	// Get container envs from container info
+	if containerInfoInStatus.Config != nil {
+		cInfo.ContainerEnvs = ContainerdEnvConvert(containerInfoInStatus.Config.Envs)
+	}
+	cch.InsertContainer(cInfo.ContainerMeta.Id, cInfo)
+	return nil
+}
+
 func (cch *cache) LoadStoreContainerd(containerdClient criv1.RuntimeServiceClient) error {
 
 	podResponse := &criv1.ListPodSandboxResponse{}
@@ -342,43 +429,10 @@ func (cch *cache) LoadStoreContainerd(containerdClient criv1.RuntimeServiceClien
 	}
 
 	for _, pod := range podResponse.Items {
-		podStatus, err := containerdClient.PodSandboxStatus(context.TODO(), &criv1.PodSandboxStatusRequest{
-			PodSandboxId: pod.GetId(),
-			Verbose:      true,
-		})
-		if err != nil {
-			klog.ErrorS(err, "Failed to get pod details", "podId", pod.GetId())
+		if err := cch.processPodSandbox(containerdClient, pod); err != nil {
+			// Log error but continue processing other pods
 			continue
 		}
-		klog.V(3).InfoS("Get pod status", "PodStatus", podStatus)
-
-		podInfoInStatus := &SandboxInfo{}
-		if err := json.Unmarshal([]byte(podStatus.Info["info"]), podInfoInStatus); err != nil {
-			klog.ErrorS(err, "Failed to get pod details", "podId", pod.GetId())
-			continue
-		}
-		klog.V(3).InfoS("Get pod info", "PodInfo", podInfoInStatus)
-
-		podInfo := &v1alpha1.PodSandboxHookRequest{
-			Labels:      pod.GetLabels(),
-			Annotations: pod.GetAnnotations(),
-			PodMeta: &v1alpha1.PodSandboxMetadata{
-				Name:      pod.GetMetadata().GetName(),
-				Namespace: pod.GetMetadata().GetNamespace(),
-				Uid:       pod.GetMetadata().GetUid(),
-			},
-			RuntimeHandler: pod.GetRuntimeHandler(),
-			Resources:      RuntimeSpecToResource(podInfoInStatus.RuntimeSpec),
-		}
-
-		if podInfoInStatus.Config != nil && podInfoInStatus.Config.Linux != nil {
-			podInfo.CgroupParent = podInfoInStatus.Config.Linux.CgroupParent
-		} else if podInfoInStatus.RuntimeSpec != nil {
-			podInfo.CgroupParent = podInfoInStatus.RuntimeSpec.Annotations[crioCgroupParent]
-		}
-		klog.V(3).InfoS("Get CgroupParent from pod info", "CgroupParent", podInfo.CgroupParent)
-
-		cch.InsertPod(pod.GetId(), podInfo, nil)
 	}
 
 	var containerResponse *criv1.ListContainersResponse
@@ -388,45 +442,10 @@ func (cch *cache) LoadStoreContainerd(containerdClient criv1.RuntimeServiceClien
 	}
 
 	for _, container := range containerResponse.Containers {
-		containerStatus, err := containerdClient.ContainerStatus(context.TODO(), &criv1.ContainerStatusRequest{
-			ContainerId: container.GetId(),
-			Verbose:     true,
-		})
-		if err != nil {
-			klog.ErrorS(err, "Failed to get container details", "Container", container.GetId())
+		if err := cch.processContainer(containerdClient, container); err != nil {
+			// Log error but continue processing other containers
 			continue
 		}
-
-		containerInfoInStatus := &ContainerInfo{}
-		klog.V(3).InfoS("Get container info", "PodInfo", containerInfoInStatus)
-		if err := json.Unmarshal([]byte(containerStatus.Info["info"]), containerInfoInStatus); err != nil {
-			klog.ErrorS(err, "Failed to get container details", "podId", container.GetId())
-			continue
-		}
-
-		cInfo := &v1alpha1.ContainerResourceHookRequest{
-			ContainerResources:   RuntimeSpecToResource(containerInfoInStatus.RuntimeSpec),
-			ContainerAnnotations: container.GetAnnotations(),
-			ContainerMeta: &v1alpha1.ContainerMetadata{
-				Name: container.GetMetadata().GetName(),
-				Id:   container.GetId(),
-			},
-		}
-
-		podCheckPoint, exit := cch.LookupPod(container.GetPodSandboxId())
-		if exit {
-			cInfo.PodMeta = &v1alpha1.PodSandboxMetadata{
-				Name:      podCheckPoint.GetName(),
-				Uid:       podCheckPoint.GetUID(),
-				Namespace: podCheckPoint.GetNamespace(),
-			}
-			cInfo.PodResources = podCheckPoint.GetLinuxResources()
-		}
-
-		if containerInfoInStatus.Config != nil {
-			cInfo.ContainerEnvs = ContainerdEnvConvert(containerInfoInStatus.Config.Envs)
-		}
-		cch.InsertContainer(cInfo.ContainerMeta.Id, cInfo)
 	}
 
 	return nil
@@ -444,6 +463,31 @@ func ContainerdEnvConvert(containerdEnvs []*criv1.KeyValue) map[string]string {
 	return env
 }
 
+// Helper method to process CPU resources from runtime spec
+func processCPUResources(linuxContainerResources *v1alpha1.LinuxContainerResources, cpu *specs.LinuxCPU) {
+	if cpu.Period != nil {
+		linuxContainerResources.CpuPeriod = int64(*cpu.Period)
+	}
+	if cpu.Shares != nil {
+		linuxContainerResources.CpuShares = int64(*cpu.Shares)
+	}
+	if cpu.Quota != nil {
+		linuxContainerResources.CpuQuota = *cpu.Quota
+	}
+	linuxContainerResources.CpusetCpus = cpu.Cpus
+	linuxContainerResources.CpusetMems = cpu.Mems
+}
+
+// Helper method to process memory resources from runtime spec
+func processMemoryResources(linuxContainerResources *v1alpha1.LinuxContainerResources, memory *specs.LinuxMemory) {
+	if memory.Limit != nil {
+		linuxContainerResources.MemoryLimitInBytes = *memory.Limit
+	}
+	if memory.Swap != nil {
+		linuxContainerResources.MemorySwapLimitInBytes = *memory.Swap
+	}
+}
+
 func RuntimeSpecToResource(runtimeSpec *specs.Spec) *v1alpha1.LinuxContainerResources {
 
 	if runtimeSpec == nil || runtimeSpec.Linux == nil || runtimeSpec.Linux.Resources == nil {
@@ -452,30 +496,16 @@ func RuntimeSpecToResource(runtimeSpec *specs.Spec) *v1alpha1.LinuxContainerReso
 
 	linuxContainerResources := &v1alpha1.LinuxContainerResources{}
 	if runtimeSpec.Linux.Resources.CPU != nil {
-		if runtimeSpec.Linux.Resources.CPU.Period != nil {
-			linuxContainerResources.CpuPeriod = int64(*runtimeSpec.Linux.Resources.CPU.Period)
-		}
-		if runtimeSpec.Linux.Resources.CPU.Shares != nil {
-			linuxContainerResources.CpuShares = int64(*runtimeSpec.Linux.Resources.CPU.Shares)
-		}
-		if runtimeSpec.Linux.Resources.CPU.Quota != nil {
-			linuxContainerResources.CpuQuota = *runtimeSpec.Linux.Resources.CPU.Quota
-		}
-		linuxContainerResources.CpusetCpus = runtimeSpec.Linux.Resources.CPU.Cpus
-		linuxContainerResources.CpusetMems = runtimeSpec.Linux.Resources.CPU.Mems
+		processCPUResources(linuxContainerResources, runtimeSpec.Linux.Resources.CPU)
 	}
 
 	if runtimeSpec.Linux.Resources.Memory != nil {
-		if runtimeSpec.Linux.Resources.Memory.Limit != nil {
-			linuxContainerResources.MemoryLimitInBytes = *runtimeSpec.Linux.Resources.Memory.Limit
-		}
-		if runtimeSpec.Linux.Resources.Memory.Swap != nil {
-			linuxContainerResources.MemorySwapLimitInBytes = *runtimeSpec.Linux.Resources.Memory.Swap
-		}
+		processMemoryResources(linuxContainerResources, runtimeSpec.Linux.Resources.Memory)
 	}
 
 	if runtimeSpec.Process != nil && runtimeSpec.Process.OOMScoreAdj != nil {
 		linuxContainerResources.OomScoreAdj = int64(*runtimeSpec.Process.OOMScoreAdj)
 	}
+
 	return linuxContainerResources
 }
