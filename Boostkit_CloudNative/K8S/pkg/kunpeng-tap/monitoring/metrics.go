@@ -52,4 +52,33 @@ var (
 		},
 		[]string{"hook"},
 	)
+
+	// ========== Topology-aware 资源树为中心的监控指标 ==========
+
+	// 1. 资源树节点资源容量指标
+	TopologyNodeCapacity = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "tap_topology_node_capacity",
+			Help: "Resource capacity of topology nodes",
+		},
+		[]string{"node_name", "node_type", "node_id", "hierarchy_level", "resource_type", "capacity_type"},
+	)
+
+	// 2. 资源树节点资源使用指标
+	TopologyNodeUsage = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "tap_topology_node_usage",
+			Help: "Resource usage of topology nodes",
+		},
+		[]string{"node_name", "node_type", "node_id", "hierarchy_level", "resource_type", "usage_type"},
+	)
+
+	// 3. 资源树节点容器分布指标
+	TopologyNodeContainerCount = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "tap_topology_node_container_count",
+			Help: "Number of containers allocated to each topology node",
+		},
+		[]string{"node_name", "node_type", "node_id", "hierarchy_level", "container_state"},
+	)
 )

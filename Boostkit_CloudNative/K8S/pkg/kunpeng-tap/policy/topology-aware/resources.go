@@ -39,6 +39,10 @@ type Supply interface {
 	GetScore(Request) Score
 	// Granted returns the locally granted capacity in this supply.
 	GrantedShared() int
+	// GrantedCPUByRequest returns the amount of milli-CPU granted by request.
+	GrantedCPUByRequest() int
+	// GrantedCPUByLimit returns the amount of milli-CPU granted by limit.
+	GrantedCPUByLimit() int
 	// AllocatableSharedCPU calculates the allocatable amount of shared CPU of this supply.
 	AllocatableSharedCPU() int
 
@@ -60,13 +64,14 @@ type Supply interface {
 }
 
 type supply struct {
-	node          Node
-	isolated      cpuset.CPUSet
-	sharable      cpuset.CPUSet
-	grantedShared int
-	// 新增内存相关字段
-	memoryTotal   uint64 // 总内存量（KB）
-	grantedMemory uint64 // 已分配内存量（KB）
+	node                Node
+	isolated            cpuset.CPUSet
+	sharable            cpuset.CPUSet
+	grantedShared       int
+	grantedCPUByRequest int
+	grantedCPUByLimit   int
+	memoryTotal         uint64 // 总内存量（KB）
+	grantedMemory       uint64 // 已分配内存量（KB）
 }
 
 func newSupply(n Node, isolated cpuset.CPUSet, sharable cpuset.CPUSet) Supply {
@@ -78,11 +83,14 @@ func newSupply(n Node, isolated cpuset.CPUSet, sharable cpuset.CPUSet) Supply {
 	}
 
 	return &supply{
-		node:          n,
-		isolated:      isolated,
-		sharable:      sharable,
-		memoryTotal:   memTotal,
-		grantedMemory: 0,
+		node:                n,
+		isolated:            isolated,
+		sharable:            sharable,
+		grantedShared:       0,
+		grantedCPUByRequest: 0,
+		grantedCPUByLimit:   0,
+		memoryTotal:         memTotal,
+		grantedMemory:       0,
 	}
 }
 
@@ -100,9 +108,20 @@ func (cs *supply) SharableCPUs() cpuset.CPUSet {
 	return cs.sharable.Clone()
 }
 
+// Collect collects the given supply into this one.
 func (s *supply) Collect(more Supply) {
-	s.isolated = s.isolated.Union(more.(*supply).isolated)
-	s.sharable = s.sharable.Union(more.(*supply).sharable)
+	moreSupply, ok := more.(*supply)
+	if !ok {
+		klog.ErrorS(nil, "Failed to collect supply", "supply", more)
+		return
+	}
+	s.isolated = s.isolated.Union(moreSupply.isolated)
+	s.sharable = s.sharable.Union(moreSupply.sharable)
+	s.grantedShared += moreSupply.grantedShared
+	s.grantedCPUByRequest += moreSupply.grantedCPUByRequest
+	s.grantedCPUByLimit += moreSupply.grantedCPUByLimit
+	s.memoryTotal += moreSupply.memoryTotal
+	s.grantedMemory += moreSupply.grantedMemory
 }
 
 // Score collects data for scoring this supply wrt. the given request.
@@ -113,8 +132,10 @@ func (s *supply) GetScore(req Request) Score {
 		colocated: 0,
 	}
 	// 计算可分配的共享 CPU
-	score.shared = s.AllocatableSharedCPU()
-	score.shared -= req.CPULimit()
+	score.shared = s.AllocatableSharedCPU() - req.CPULimit()
+	score.sharedByRequest = s.AllocatableCPUByRequest() - req.CPURequest()
+	score.sharedByLimit = s.AllocatableCPUByLimit() - req.CPULimit()
+	score.memoryCapacity = s.AllocatableMemory()
 
 	// 计算 colocation score
 	s.node.Policy().allocations.grants.Range(func(_, grantVal interface{}) bool {
@@ -139,9 +160,30 @@ func (s *supply) GrantedShared() int {
 	return s.grantedShared
 }
 
+func (s *supply) GrantedCPUByRequest() int {
+	return s.grantedCPUByRequest
+}
+
+func (s *supply) GrantedCPUByLimit() int {
+	return s.grantedCPUByLimit
+}
+
 func (s *supply) AllocatableSharedCPU() int {
 	shared := 1000 * s.sharable.Size()
+	return shared - s.grantedShared
+}
+
+func (s *supply) TotalSharedCPU() int {
+	shared := 1000 * s.sharable.Size()
 	return shared
+}
+
+func (s *supply) AllocatableCPUByRequest() int {
+	return s.TotalSharedCPU() - s.grantedCPUByRequest
+}
+
+func (s *supply) AllocatableCPUByLimit() int {
+	return s.TotalSharedCPU() - s.grantedCPUByLimit
 }
 
 func (s *supply) Allocate(req Request) (Grant, error) {
@@ -177,16 +219,30 @@ func (s *supply) AllocateCPU(req Request) (Grant, error) {
 	grant := newGrant(s.node, req.GetContext(), false, 0)
 
 	resource := req.GetContext().Request.Resources
-	limitCpu := resource.GetLimits().Cpu()
+	requestCpu := resource.GetRequests().Cpu().MilliValue()
+	limitCpu := resource.GetLimits().Cpu().MilliValue()
 
-	// 节点内的共享CPU部分不满足 container 要求
-	if limitCpu.MilliValue() > 0 && s.AllocatableSharedCPU() < int(limitCpu.MilliValue()) {
-
-		return nil, fmt.Errorf("not enough shared CPU for %d in %s(-%d) of %s",
-			limitCpu.MilliValue(), s.sharable.String(), s.grantedShared, s.node.Name())
+	// requestCpu值的和不超出 TotalSharedCPU
+	totalSharedCPU := s.TotalSharedCPU()
+	if requestCpu+int64(s.GrantedCPUByRequest()) > int64(totalSharedCPU) {
+		return nil, fmt.Errorf("request CPU %d exceeds total shared CPU %d", requestCpu, totalSharedCPU)
 	}
-	s.grantedShared += int(limitCpu.MilliValue())
-	grant.SetAllocatedCPU(int(limitCpu.MilliValue()))
+
+	// limitCpu 值超出 TotalSharedCPU
+	if limitCpu > 0 && int64(totalSharedCPU) < limitCpu {
+		return nil, fmt.Errorf("not enough shared CPU for %d in %s(-%d) of %s",
+			limitCpu, s.sharable.String(), s.grantedShared, s.node.Name())
+	}
+
+	// Update the granted CPU for grant and supply.
+	grant.SetAllocatedCPU(int(limitCpu))
+	grant.SetAllocatedCPUByRequest(int(requestCpu))
+	grant.SetAllocatedCPUByLimit(int(limitCpu))
+
+	// Update the granted CPU for supply.
+	s.grantedShared += int(limitCpu)
+	s.grantedCPUByRequest += int(requestCpu)
+	s.grantedCPUByLimit += int(limitCpu)
 
 	return grant, nil
 }
@@ -216,7 +272,8 @@ func (s *supply) Memset() cpuset.CPUSet {
 func (s *supply) Release(g Grant) {
 	// 释放 CPU 资源
 	s.grantedShared -= g.AllocatedCPUs()
-
+	s.grantedCPUByRequest -= g.AllocatedCPUByRequest()
+	s.grantedCPUByLimit -= g.AllocatedCPUByLimit()
 	// 确保 grantedShared 不会小于 0
 	if s.grantedShared < 0 {
 		s.grantedShared = 0
@@ -241,6 +298,8 @@ type Request interface {
 	GetContext() policy.ContainerContext
 	CPULimit() int
 	CPURequest() int
+	MemoryLimit() int64
+	MemoryRequest() int64
 	HasGPURequest() bool
 	GetRequestedGPUDevices() []string
 	// String returns a printable representation of this request.
@@ -252,8 +311,8 @@ type request struct {
 	container           policy.ContainerContext
 	cpuLimit            int               // millicores
 	cpuRequest          int               // millicores
-	memLimit            int               // KB
-	memRequest          int               // KB
+	memLimit            int64             // KB
+	memRequest          int64             // KB
 	memType             system.MemoryType // memory type
 	hasGPURequest       bool              // 是否请求GPU资源
 	requestedGPUDevices []string          // 请求的GPU设备ID列表
@@ -269,6 +328,14 @@ func (r *request) CPULimit() int {
 
 func (r *request) CPURequest() int {
 	return r.cpuRequest
+}
+
+func (r *request) MemoryLimit() int64 {
+	return r.memLimit
+}
+
+func (r *request) MemoryRequest() int64 {
+	return r.memRequest
 }
 
 func (r *request) HasGPURequest() bool {
@@ -371,11 +438,11 @@ func parseResourceRequirements(r *request, resourceReq, resourceLimit *corev1.Re
 
 	// 解析Memory请求
 	if resourceReq != nil && resourceReq.Memory() != nil {
-		r.memRequest = int(resourceReq.Memory().MilliValue())
+		r.memRequest = resourceReq.Memory().Value()
 	}
 
 	if resourceLimit != nil && resourceLimit.Memory() != nil {
-		r.memLimit = int(resourceLimit.Memory().MilliValue())
+		r.memLimit = resourceLimit.Memory().Value()
 	} else {
 		r.memLimit = r.memRequest
 	}
@@ -440,10 +507,18 @@ type Grant interface {
 	String() string
 	// AllocatedCPUs returns the amount of milli-CPU allocated.
 	AllocatedCPUs() int
+	// AllocatedCPUByRequest returns the amount of milli-CPU allocated by request.
+	AllocatedCPUByRequest() int
+	// AllocatedCPUByLimit returns the amount of milli-CPU allocated by limit.
+	AllocatedCPUByLimit() int
 	// Exclusive returns whether this grant is exclusive.
 	Exclusive() bool
 	// SetAllocatedCPU sets the amount of milli-CPU allocated.
 	SetAllocatedCPU(allocatedCPUs int)
+	// SetAllocatedCPUByRequest sets the amount of milli-CPU allocated by request.
+	SetAllocatedCPUByRequest(allocatedCPUs int)
+	// SetAllocatedCPUByLimit sets the amount of milli-CPU allocated by limit.
+	SetAllocatedCPUByLimit(allocatedCPUs int)
 	// AllocatedMemory returns the amount of memory allocated in KB.
 	AllocatedMemory() uint64
 	// SetAllocatedMemory sets the amount of memory allocated in KB.
@@ -459,20 +534,24 @@ type Grant interface {
 var _ Grant = &grant{}
 
 type grant struct {
-	containerCtx    policy.ContainerContext
-	node            Node
-	exclusive       bool
-	allocatedCPUs   int    // milliCPUs
-	allocatedMemory uint64 // memory in KB
+	containerCtx          policy.ContainerContext
+	node                  Node
+	exclusive             bool
+	allocatedCPUs         int // milliCPUs
+	allocatedCPUByRequest int
+	allocatedCPUByLimit   int
+	allocatedMemory       uint64 // memory in KB
 }
 
 func newGrant(n Node, ctrCtx policy.ContainerContext, exclusive bool, grantedCPUs int) Grant {
 	return &grant{
-		node:            n,
-		containerCtx:    ctrCtx,
-		exclusive:       exclusive,
-		allocatedCPUs:   grantedCPUs,
-		allocatedMemory: 0,
+		node:                  n,
+		containerCtx:          ctrCtx,
+		exclusive:             exclusive,
+		allocatedCPUs:         grantedCPUs,
+		allocatedCPUByRequest: 0,
+		allocatedCPUByLimit:   0,
+		allocatedMemory:       0,
 	}
 }
 
@@ -494,12 +573,28 @@ func (g *grant) AllocatedCPUs() int {
 	return g.allocatedCPUs
 }
 
+func (g *grant) AllocatedCPUByRequest() int {
+	return g.allocatedCPUByRequest
+}
+
+func (g *grant) AllocatedCPUByLimit() int {
+	return g.allocatedCPUByLimit
+}
+
 func (g *grant) Exclusive() bool {
 	return g.exclusive
 }
 
 func (g *grant) SetAllocatedCPU(allocatedCPUs int) {
 	g.allocatedCPUs = allocatedCPUs
+}
+
+func (g *grant) SetAllocatedCPUByRequest(allocatedCPUs int) {
+	g.allocatedCPUByRequest = allocatedCPUs
+}
+
+func (g *grant) SetAllocatedCPUByLimit(allocatedCPUs int) {
+	g.allocatedCPUByLimit = allocatedCPUs
 }
 
 func (g *grant) AllocatedMemory() uint64 {
@@ -529,6 +624,12 @@ type Score interface {
 	Request() Request
 
 	SharedCapacity() int
+	// SharedCapacityByRequest returns the remaining shared capacity by request.
+	SharedCapacityByRequest() int
+	// SharedCapacityByLimit returns the remaining shared capacity by limit.
+	SharedCapacityByLimit() int
+	// MemoryCapacity returns the remaining memory capacity.
+	MemoryCapacity() uint64
 	// Colocated returns the number of containers already allocated to this node.
 	Colocated() int
 	// GPUCount returns the number of GPUs attached to this node.
@@ -539,12 +640,15 @@ type Score interface {
 
 // score implements the Score interface
 type score struct {
-	supply    Supply  // CPU supply (node)
-	request   Request // CPU request (container)
-	isolated  int     // remaining isolated CPUs
-	shared    int     // remaining shared capacity
-	colocated int     // number of colocated containers
-	gpuCount  int     // number of GPUs attached to this node
+	supply          Supply  // CPU supply (node)
+	request         Request // CPU request (container)
+	isolated        int     // remaining isolated CPUs
+	shared          int     // remaining shared capacity
+	sharedByRequest int     // remaining shared capacity by request
+	sharedByLimit   int     // remaining shared capacity by limit
+	memoryCapacity  uint64  // remaining memory capacity
+	colocated       int     // number of colocated containers
+	gpuCount        int     // number of GPUs attached to this node
 }
 
 func (s *score) Supply() Supply {
@@ -561,6 +665,18 @@ func (s *score) String() string {
 
 func (s *score) SharedCapacity() int {
 	return s.shared
+}
+
+func (s *score) SharedCapacityByRequest() int {
+	return s.sharedByRequest
+}
+
+func (s *score) SharedCapacityByLimit() int {
+	return s.sharedByLimit
+}
+
+func (s *score) MemoryCapacity() uint64 {
+	return s.memoryCapacity
 }
 
 func (s *score) Colocated() int {

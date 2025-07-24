@@ -161,6 +161,9 @@ func (d *dispatcher) DeleteFromCacheIfNeed(request interface{}) {
 	case *runtimeapi.StopPodSandboxRequest:
 		klog.V(5).InfoS("Delete pod from cache", "PodId", request.GetPodSandboxId())
 		d.cache.DeletePod(request.GetPodSandboxId())
+	case utils.DockerStopRequest:
+		klog.V(5).InfoS("Delete container from cache", "ContainerId", request.ContainerID)
+		d.cache.DeleteContainer(request.ContainerID)
 	default:
 		klog.V(5).InfoS("DeleteFromCacheIfNeed Unknown request type", "RequestType", reflect.TypeOf(request).String())
 	}
@@ -281,68 +284,108 @@ func BackfillContainerRequest(proxyContainerReq interface{}, hookContainerReq in
 func (d *dispatcher) ParseContainerRequest(req interface{}) interface{} {
 	switch request := req.(type) {
 	case *runtimeapi.CreateContainerRequest:
-		// get the pod info from local store
-		podID := request.GetPodSandboxId()
-		podInfo, exist := d.cache.LookupPod(podID)
-		if !exist {
-			err := fmt.Errorf("fail to get pod(%v) related to container", podID)
-			klog.Errorf("fail to parse request %v %v", request, err)
-			return nil
-		}
-		return &v1alpha1.ContainerResourceHookRequest{
-			PodMeta: &v1alpha1.PodSandboxMetadata{
-				Name:      podInfo.GetName(),
-				Uid:       podInfo.GetUID(),
-				Namespace: podInfo.GetNamespace(),
-				Id:        podInfo.GetID(),
-			},
-			PodResources: podInfo.GetLinuxResources(),
-			ContainerMeta: &v1alpha1.ContainerMetadata{
-				Name:    request.GetConfig().GetMetadata().GetName(),
-				Attempt: request.GetConfig().GetMetadata().GetAttempt(),
-			},
-			ContainerAnnotations: request.GetConfig().GetAnnotations(),
-			ContainerResources:   TransferToHookResources(request.GetConfig().GetLinux().GetResources()),
-			PodAnnotations:       podInfo.GetAnnotations(),
-			PodLabels:            podInfo.GetLabels(),
-			PodCgroupParent:      podInfo.GetCgroupParentDir(),
-			ContainerEnvs:        TransferCRIContainerEnvsToMap(request.GetConfig().GetEnvs()),
-		}
+		return d.parseCRICreateContainerRequest(request)
 	case utils.DockerCreateRequest:
-		podID := request.ConfigWrapper.Config.Labels[utils.SandboxIDLabelKey]
-		podInfo, exist := d.cache.LookupPod(podID)
-		if !exist {
-			err := fmt.Errorf("fail to get pod(%v) related to container", podID)
-			klog.Errorf("fail to parse request %v %v", request, err)
-			return nil
-		}
-
-		return &v1alpha1.ContainerResourceHookRequest{
-			PodMeta: &v1alpha1.PodSandboxMetadata{
-				Name:      podInfo.GetName(),
-				Uid:       podInfo.GetUID(),
-				Namespace: podInfo.GetNamespace(),
-				Id:        podInfo.GetID(),
-			},
-			PodResources: podInfo.GetLinuxResources(),
-			ContainerMeta: &v1alpha1.ContainerMetadata{
-				Name: request.ContainerName,
-			},
-			ContainerAnnotations: request.ContainerRawAnnotations,
-			ContainerResources:   utils.HostConfigToResource(request.HostConfig),
-			PodAnnotations:       podInfo.GetAnnotations(),
-			PodLabels:            podInfo.GetLabels(),
-			PodCgroupParent:      podInfo.GetCgroupParentDir(),
-			ContainerEnvs:        utils.SplitDockerEnv(request.Env),
-		}
+		return d.parseDockerCreateContainerRequest(request)
 	case *runtimeapi.StopContainerRequest:
-		return &v1alpha1.ContainerResourceHookRequest{
-			ContainerMeta: &v1alpha1.ContainerMetadata{
-				Id: request.GetContainerId(),
-			},
-		}
+		return d.parseCRIStopContainerRequest(request)
+	case utils.DockerStopRequest:
+		return d.parseDockerStopContainerRequest(request)
 	}
 	return nil
+}
+
+// parseCRICreateContainerRequest parses CRI CreateContainerRequest
+func (d *dispatcher) parseCRICreateContainerRequest(request *runtimeapi.CreateContainerRequest) interface{} {
+	podInfo, err := d.getPodInfo(request.GetPodSandboxId())
+	if err != nil {
+		klog.Errorf("fail to parse request %v %v", request, err)
+		return nil
+	}
+
+	return d.buildContainerResourceHookRequest(
+		podInfo,
+		&v1alpha1.ContainerMetadata{
+			Name:    request.GetConfig().GetMetadata().GetName(),
+			Attempt: request.GetConfig().GetMetadata().GetAttempt(),
+		},
+		request.GetConfig().GetAnnotations(),
+		TransferToHookResources(request.GetConfig().GetLinux().GetResources()),
+		TransferCRIContainerEnvsToMap(request.GetConfig().GetEnvs()),
+	)
+}
+
+// parseDockerCreateContainerRequest parses Docker CreateContainerRequest
+func (d *dispatcher) parseDockerCreateContainerRequest(request utils.DockerCreateRequest) interface{} {
+	podID := request.ConfigWrapper.Config.Labels[utils.SandboxIDLabelKey]
+	podInfo, err := d.getPodInfo(podID)
+	if err != nil {
+		klog.Errorf("fail to parse request %v %v", request, err)
+		return nil
+	}
+
+	return d.buildContainerResourceHookRequest(
+		podInfo,
+		&v1alpha1.ContainerMetadata{
+			Name: request.ContainerName,
+		},
+		request.ContainerRawAnnotations,
+		utils.HostConfigToResource(request.HostConfig),
+		utils.SplitDockerEnv(request.Env),
+	)
+}
+
+// parseCRIStopContainerRequest parses CRI StopContainerRequest
+func (d *dispatcher) parseCRIStopContainerRequest(request *runtimeapi.StopContainerRequest) interface{} {
+	return &v1alpha1.ContainerResourceHookRequest{
+		ContainerMeta: &v1alpha1.ContainerMetadata{
+			Id: request.GetContainerId(),
+		},
+	}
+}
+
+// parseDockerStopContainerRequest parses Docker StopContainerRequest
+func (d *dispatcher) parseDockerStopContainerRequest(request utils.DockerStopRequest) interface{} {
+	return &v1alpha1.ContainerResourceHookRequest{
+		ContainerMeta: &v1alpha1.ContainerMetadata{
+			Id: request.ContainerID,
+		},
+	}
+}
+
+// getPodInfo retrieves pod information from cache
+func (d *dispatcher) getPodInfo(podID string) (cache.Pod, error) {
+	podInfo, exist := d.cache.LookupPod(podID)
+	if !exist {
+		return nil, fmt.Errorf("fail to get pod(%v) related to container", podID)
+	}
+	return podInfo, nil
+}
+
+// buildContainerResourceHookRequest builds ContainerResourceHookRequest from pod info and container metadata
+func (d *dispatcher) buildContainerResourceHookRequest(
+	podInfo cache.Pod,
+	containerMeta *v1alpha1.ContainerMetadata,
+	containerAnnotations map[string]string,
+	containerResources *v1alpha1.LinuxContainerResources,
+	containerEnvs map[string]string,
+) *v1alpha1.ContainerResourceHookRequest {
+	return &v1alpha1.ContainerResourceHookRequest{
+		PodMeta: &v1alpha1.PodSandboxMetadata{
+			Name:      podInfo.GetName(),
+			Uid:       podInfo.GetUID(),
+			Namespace: podInfo.GetNamespace(),
+			Id:        podInfo.GetID(),
+		},
+		PodResources:         podInfo.GetLinuxResources(),
+		ContainerMeta:        containerMeta,
+		ContainerAnnotations: containerAnnotations,
+		ContainerResources:   containerResources,
+		PodAnnotations:       podInfo.GetAnnotations(),
+		PodLabels:            podInfo.GetLabels(),
+		PodCgroupParent:      podInfo.GetCgroupParentDir(),
+		ContainerEnvs:        containerEnvs,
+	}
 }
 
 func (d *dispatcher) ParsePodRequest(req interface{}) interface{} {

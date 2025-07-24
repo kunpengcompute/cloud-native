@@ -111,12 +111,57 @@ func (d *dockerHandler) HandleStopContainer() func(http.ResponseWriter, *http.Re
 			monitoring.ProxyRequestDuration.WithLabelValues(monitoring.ProxyStopContainerRequest).Observe(duration)
 		}()
 
-		vars := mux.Vars(req)
-		containerID := vars["containerid"]
+		// Parse Docker stop request
+		dockerStopRequest, err := utils.ParseDockerStopRequest(req)
+		if err != nil {
+			klog.ErrorS(err, "Failed to parse docker stop request")
+			http.Error(wr, err.Error(), http.StatusBadRequest)
+			return
+		}
 
-		klog.V(5).InfoS("Stop container", "containerId", containerID)
+		klog.V(5).InfoS("Stop container", "containerId", dockerStopRequest.ContainerID)
 
-		d.Direct(wr, req)
+		// Parse hook request
+		hookReq := d.dispatcher.ParseContainerRequest(dockerStopRequest)
+		if hookReq == nil {
+			klog.ErrorS(nil, "Failed to parse container request for hook")
+			http.Error(wr, "Failed to parse container request", http.StatusInternalServerError)
+			return
+		}
+
+		// Send request to Docker runtime first
+		dockerResponse := d.Direct(wr, req)
+
+		// Parse Docker response status code
+		respCode := utils.ParseDockerResponseCode(dockerResponse)
+
+		klog.V(5).InfoS("Docker stop response", "containerId", dockerStopRequest.ContainerID, "responseCode", respCode, "response", dockerResponse)
+
+		// Only call PostStopContainer hook if the stop operation was successful
+		if respCode != 204 && respCode != 304 {
+			klog.V(3).InfoS("Skipping PostStopContainer hook due to Docker error", "containerId", dockerStopRequest.ContainerID, "responseCode", respCode)
+			return
+		}
+
+		// Check if container exists in cache for hook
+		_, exist := d.cache.LookupContainer(dockerStopRequest.ContainerID)
+		if !exist {
+			klog.V(3).InfoS("Container not found in cache for PostStopContainer hook", "containerId", dockerStopRequest.ContainerID)
+			return
+		}
+
+		// Call PostStopContainer hook
+		hookResp := d.dispatcher.Dispatch(context.Background(), policy.PostStopContainer, hookReq, nil)
+		if hookResp != nil {
+			klog.V(5).InfoS("PostStopContainer hook response", "containerId", dockerStopRequest.ContainerID, "response", hookResp)
+		}
+
+		// Delete container from cache after successful stop operation
+		if _, exist := d.cache.LookupContainer(dockerStopRequest.ContainerID); exist {
+			klog.V(3).InfoS("Remove container from container cache", "containerId", dockerStopRequest.ContainerID)
+			d.cache.DeleteContainer(dockerStopRequest.ContainerID)
+		}
+
 	}
 }
 

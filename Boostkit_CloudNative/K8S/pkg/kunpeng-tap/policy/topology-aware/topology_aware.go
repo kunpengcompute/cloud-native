@@ -62,8 +62,9 @@ type TopologyAwarePolicy struct {
 	root                 Node
 	nodeCnt              int
 	depth                int
-	allocations          allocations // container pool assignmentss
-	enableMemoryTopology bool        // 是否启用内存拓扑感知
+	allocations          allocations             // container pool assignmentss
+	enableMemoryTopology bool                    // 是否启用内存拓扑感知
+	metricsManager       *TopologyMetricsManager // 资源树监控管理器
 }
 
 // Name returns the name of this policy.
@@ -75,12 +76,29 @@ func (p *TopologyAwarePolicy) Description() string {
 	return PolicyDescription
 }
 
+func (p *TopologyAwarePolicy) Root() Node {
+	return p.root
+}
+
+func (p *TopologyAwarePolicy) MemoryTopology() bool {
+	return p.enableMemoryTopology
+}
+
 // NewTopologyAwarePolicy creates a new topology-aware policy
 func NewTopologyAwarePolicy(c cache.Cache, opts *policy.PolicyOptions) policy.Policy {
-	sys, err := system.NewSystem("")
-	if err != nil {
-		klog.ErrorS(err, "Failed to discover system resources")
-		return nil
+	return NewTopologyAwarePolicyWithSystem(c, opts, nil)
+}
+
+// NewTopologyAwarePolicyWithSystem creates a new topology-aware policy with a custom system
+// This function is primarily for testing purposes to allow injection of mock system
+func NewTopologyAwarePolicyWithSystem(c cache.Cache, opts *policy.PolicyOptions, sys system.System) policy.Policy {
+	var err error
+	if sys == nil {
+		sys, err = system.NewSystem("")
+		if err != nil {
+			klog.ErrorS(err, "Failed to discover system resources")
+			return nil
+		}
 	}
 	p := &TopologyAwarePolicy{
 		BasePolicy:           *policy.NewBasePolicy(PolicyName, PolicyDescription),
@@ -100,7 +118,33 @@ func NewTopologyAwarePolicy(c cache.Cache, opts *policy.PolicyOptions) policy.Po
 		klog.ErrorS(err, "Failed to restore allocations from cache")
 	}
 
+	// 初始化资源树监控管理器
+	p.metricsManager = NewTopologyMetricsManager(p)
+
+	// 启动监控指标更新
+	p.startMetricsMonitoring()
+
 	return p
+}
+
+// GetAllocations 返回 allocations 的引用，用于监控
+func (p *TopologyAwarePolicy) GetAllocations() *allocations {
+	return &p.allocations
+}
+
+// GetPools 返回 pools 的副本，用于监控
+func (p *TopologyAwarePolicy) GetPools() []Node {
+	return append([]Node{}, p.pools...)
+}
+
+// GetSystem 返回系统信息，用于监控
+func (p *TopologyAwarePolicy) GetSystem() system.System {
+	return p.sys
+}
+
+// GetAllocationsGrants 返回 grants 的引用，用于监控
+func (p *TopologyAwarePolicy) GetAllocationsGrants() *sync.Map {
+	return &p.allocations.grants
 }
 
 // 实现 PreCreateContainerHook 方法
@@ -110,6 +154,11 @@ func (p *TopologyAwarePolicy) PreCreateContainerHook(ctx policy.HookContext) (*p
 		klog.ErrorS(nil, "Invalid context type for PreCreateContainerHook")
 		return nil, fmt.Errorf("invalid context type: expected *policy.ContainerContext")
 	}
+
+	// 使用 defer 确保在函数结束时更新指标
+	defer func() {
+		p.updateAllMetrics()
+	}()
 
 	if err := p.AllocateResources(*containerCtx); err != nil {
 		klog.ErrorS(err, "Failed to allocate resources",
@@ -157,13 +206,12 @@ func (p *TopologyAwarePolicy) PreCreateContainerHook(ctx policy.HookContext) (*p
 
 func (p *TopologyAwarePolicy) AllocateResources(containerCtx policy.ContainerContext) error {
 	klog.V(5).InfoS("AllocateResources", containerRequestLogKey, containerCtx.Request)
-
+	// 分配资源池
 	grant, err := p.allocatePool(containerCtx)
 	if err != nil {
 		return err
 	}
 
-	p.applyGrant(grant)
 	klog.InfoS("Allocated resources for container", containerRequestLogKey, containerCtx.Request, "grant", grant)
 	return nil
 }
@@ -191,7 +239,12 @@ func (p *TopologyAwarePolicy) allocatePool(containerCtx policy.ContainerContext)
 			klog.V(5).InfoS("node fitting for container", "node", n.Name(), "score", score[n.NodeID()].String())
 		}
 
-		pool = pools[0]
+		// 选择出最优的资源池
+		pool = p.findBestAvailablePool(request, pools)
+		if pool == nil {
+			return nil, fmt.Errorf("no suitable pool found for container %s",
+				containerCtx.Request.PodMeta.Name)
+		}
 	}
 
 	supply := pool.FreeResource()
@@ -205,9 +258,140 @@ func (p *TopologyAwarePolicy) allocatePool(containerCtx policy.ContainerContext)
 
 	// 使用 sync.Map 的 Store 方法
 	p.allocations.grants.Store(gid, grant)
-
+	// 记录资源使用情况，向上层传递
+	p.propagateResourceUsageToParent(grant)
 	p.saveAllocations()
+
 	return grant, nil
+}
+
+// propagateResourceUsageToParent 根据 grant 中的分配信息来增量更新上层节点的资源使用情况
+func (p *TopologyAwarePolicy) propagateResourceUsageToParent(grant Grant) {
+	currentNode := grant.GetNode()
+	if currentNode == nil || currentNode.IsNil() {
+		klog.V(4).InfoS("Current node is nil, skipping resource propagation")
+		return
+	}
+
+	klog.V(4).InfoS("Propagating resource usage to parent nodes",
+		"currentNode", currentNode.Name(),
+		"allocatedCPUs", grant.AllocatedCPUs(),
+		"allocatedCPUByRequest", grant.AllocatedCPUByRequest(),
+		"allocatedCPUByLimit", grant.AllocatedCPUByLimit(),
+		"allocatedMemory", grant.AllocatedMemory())
+
+	// 从当前节点开始，逐层向上传递资源使用情况
+	parent := currentNode.Parent()
+	for parent != nil && !parent.IsNil() {
+		// 根据 grant 中的分配信息来增量更新父节点的资源使用情况
+		p.updateParentResourceUsageByGrant(parent, grant)
+
+		parentSupply := parent.FreeResource()
+		if parentSupply != nil {
+			klog.V(4).InfoS("Updated parent resource usage",
+				"parent", parent.Name(),
+				"grantedShared", parentSupply.GrantedShared(),
+				"grantedSharedRequest", parentSupply.GrantedCPUByRequest(),
+				"grantedSharedLimit", parentSupply.GrantedCPUByLimit(),
+				"grantedMemory", parentSupply.GrantedMemory())
+		}
+
+		// 继续向上传递
+		parent = parent.Parent()
+	}
+}
+
+// updateParentResourceUsageByGrant 根据 grant 中的分配信息来增量更新父节点的资源使用情况
+func (p *TopologyAwarePolicy) updateParentResourceUsageByGrant(parent Node, grant Grant) {
+	if parent == nil || parent.IsNil() {
+		return
+	}
+
+	// 获取父节点的资源供应
+	parentSupply := parent.FreeResource()
+	if parentSupply == nil {
+		klog.V(4).InfoS("Parent supply is nil, skipping update", "parent", parent.Name())
+		return
+	}
+
+	// 根据 grant 中的分配信息来增量更新父节点的资源使用情况
+	if supply, ok := parentSupply.(*supply); ok {
+		// 增加 grant 中分配的 CPU 资源
+		supply.grantedShared += grant.AllocatedCPUs()
+		supply.grantedCPUByRequest += grant.AllocatedCPUByRequest()
+		supply.grantedCPUByLimit += grant.AllocatedCPUByLimit()
+		supply.grantedMemory += grant.AllocatedMemory()
+
+		klog.V(5).InfoS("Updated parent resource usage by grant",
+			"parent", parent.Name(),
+			"grantedShared", supply.grantedShared,
+			"grantedCPUByRequest", supply.grantedCPUByRequest,
+			"grantedCPUByLimit", supply.grantedCPUByLimit,
+			"grantedMemory", supply.grantedMemory,
+			"grantAllocatedCPUs", grant.AllocatedCPUs(),
+			"grantAllocatedCPUByRequest", grant.AllocatedCPUByRequest(),
+			"grantAllocatedCPUByLimit", grant.AllocatedCPUByLimit(),
+			"grantAllocatedMemory", grant.AllocatedMemory())
+	}
+}
+
+// findBestAvailablePool finds the best available pool for the request.
+func (p *TopologyAwarePolicy) findBestAvailablePool(request Request, pools []Node) Node {
+	bestPool := pools[0]
+
+	// 从上至下遍历所有资源池，找到最优的资源池
+	for _, pool := range pools {
+		// If the pool has enough capacity by request, include the pool's parent.
+		if !checkCapacityByRequest(request, p.root, pool) {
+			continue
+		}
+		// If the pool has enough capacity for memory.
+		if !checkMemoryCapacity(request, p.root, pool) {
+			continue
+		}
+		// If the pool has lower depth, it is better.
+		if pool.RootDistance() > bestPool.RootDistance() {
+			bestPool = pool
+		}
+	}
+	klog.V(5).InfoS("Best pool", "bestPool", bestPool.Name())
+	return bestPool
+}
+
+// checkCapacity checks if the pool has enough capacity for the request.
+func checkCapacityByRequest(request Request, root, pool Node) bool {
+	// 不断向上遍历，确认是否满足容量条件
+	for pool != nil && pool != root {
+		freeResource := pool.FreeResource()
+		if freeResource == nil {
+			klog.ErrorS(nil, "Pool has nil FreeResource", "pool", pool.Name())
+			return false
+		}
+
+		score := freeResource.GetScore(request)
+		if score == nil {
+			klog.ErrorS(nil, "FreeResource returned nil score", "pool", pool.Name(), "request", request.String())
+			return false
+		}
+
+		if score.SharedCapacityByRequest() < 0 {
+			return false
+		}
+		pool = pool.Parent()
+	}
+	return true
+}
+
+// checkMemoryCapacity checks if the pool has enough capacity for the request.
+func checkMemoryCapacity(request Request, root, pool Node) bool {
+	// 不断向上遍历，确认是否满足容量条件
+	for pool != nil && pool != root {
+		if pool.FreeResource().GetScore(request).MemoryCapacity() < uint64(request.MemoryLimit()/1024) {
+			return false
+		}
+		pool = pool.Parent()
+	}
+	return true
 }
 
 // Helper method to calculate affinity for specific GPU devices
@@ -490,6 +674,11 @@ func (p *TopologyAwarePolicy) PostStopContainerHook(ctx policy.HookContext) (*po
 		return nil, nil
 	}
 
+	// 使用 defer 确保在函数结束时更新指标
+	defer func() {
+		p.updateAllMetrics()
+	}()
+
 	// 在 StopContainer 请求中，我们只有 containerID
 	if containerCtx.Request.ContainerMeta.ID == "" {
 		klog.ErrorS(nil, "Container ID is empty in PostStopContainerHook")
@@ -569,7 +758,12 @@ func (p *TopologyAwarePolicy) releasePool(containerCtx policy.ContainerContext) 
 	}
 
 	grant := grantVal.(Grant)
+
+	// 在释放资源前，先减少上层节点的资源使用情况
+	p.propagateResourceReleaseToParent(grant)
+
 	grant.Release()
+	klog.V(5).InfoS("Released resources and propagated release to parent nodes", "grant", grant)
 
 	// 使用 sync.Map 的 Delete 方法
 	p.allocations.grants.Delete(gid)
@@ -579,6 +773,90 @@ func (p *TopologyAwarePolicy) releasePool(containerCtx policy.ContainerContext) 
 	p.saveAllocations()
 
 	return grant, true
+}
+
+// propagateResourceReleaseToParent 根据 grant 中的分配信息来减少上层节点的资源使用情况
+func (p *TopologyAwarePolicy) propagateResourceReleaseToParent(grant Grant) {
+	currentNode := grant.GetNode()
+	if currentNode == nil || currentNode.IsNil() {
+		klog.V(4).InfoS("Current node is nil, skipping resource release propagation")
+		return
+	}
+
+	klog.V(4).InfoS("Propagating resource release to parent nodes",
+		"currentNode", currentNode.Name(),
+		"allocatedCPUs", grant.AllocatedCPUs(),
+		"allocatedCPUByRequest", grant.AllocatedCPUByRequest(),
+		"allocatedCPUByLimit", grant.AllocatedCPUByLimit(),
+		"allocatedMemory", grant.AllocatedMemory())
+
+	// 从当前节点开始，逐层向上减少资源使用情况
+	parent := currentNode.Parent()
+	for parent != nil && !parent.IsNil() {
+		// 根据 grant 中的分配信息来减少父节点的资源使用情况
+		p.updateParentResourceUsageByRelease(parent, grant)
+
+		parentSupply := parent.FreeResource()
+		if parentSupply != nil {
+			klog.V(4).InfoS("Updated parent resource usage after release",
+				"parent", parent.Name(),
+				"grantedShared", parentSupply.GrantedShared(),
+				"grantedSharedRequest", parentSupply.GrantedCPUByRequest(),
+				"grantedSharedLimit", parentSupply.GrantedCPUByLimit(),
+				"grantedMemory", parentSupply.GrantedMemory())
+		}
+
+		// 继续向上传递
+		parent = parent.Parent()
+	}
+}
+
+// updateParentResourceUsageByRelease 根据 grant 中的分配信息来减少父节点的资源使用情况
+func (p *TopologyAwarePolicy) updateParentResourceUsageByRelease(parent Node, grant Grant) {
+	if parent == nil || parent.IsNil() {
+		return
+	}
+
+	// 获取父节点的资源供应
+	parentSupply := parent.FreeResource()
+	if parentSupply == nil {
+		klog.V(4).InfoS("Parent supply is nil, skipping release update", "parent", parent.Name())
+		return
+	}
+
+	// 根据 grant 中的分配信息来减少父节点的资源使用情况
+	if supply, ok := parentSupply.(*supply); ok {
+		// 减少 grant 中分配的 CPU 资源
+		supply.grantedShared -= grant.AllocatedCPUs()
+		supply.grantedCPUByRequest -= grant.AllocatedCPUByRequest()
+		supply.grantedCPUByLimit -= grant.AllocatedCPUByLimit()
+		supply.grantedMemory -= grant.AllocatedMemory()
+
+		// 确保值不会小于 0
+		if supply.grantedShared < 0 {
+			supply.grantedShared = 0
+		}
+		if supply.grantedCPUByRequest < 0 {
+			supply.grantedCPUByRequest = 0
+		}
+		if supply.grantedCPUByLimit < 0 {
+			supply.grantedCPUByLimit = 0
+		}
+		if supply.grantedMemory < 0 {
+			supply.grantedMemory = 0
+		}
+
+		klog.V(5).InfoS("Updated parent resource usage by release",
+			"parent", parent.Name(),
+			"grantedShared", supply.grantedShared,
+			"grantedCPUByRequest", supply.grantedCPUByRequest,
+			"grantedCPUByLimit", supply.grantedCPUByLimit,
+			"grantedMemory", supply.grantedMemory,
+			"grantAllocatedCPUs", grant.AllocatedCPUs(),
+			"grantAllocatedCPUByRequest", grant.AllocatedCPUByRequest(),
+			"grantAllocatedCPUByLimit", grant.AllocatedCPUByLimit(),
+			"grantAllocatedMemory", grant.AllocatedMemory())
+	}
 }
 
 // saveAllocations 将当前的资源分配状态保存到 cache 中
@@ -918,4 +1196,24 @@ func (p *TopologyAwarePolicy) checkHWTopology() error {
 
 	klog.Info("Hardware topology check passed")
 	return nil
+}
+
+// startMetricsMonitoring 启动监控指标更新
+func (p *TopologyAwarePolicy) startMetricsMonitoring() {
+	klog.InfoS("Topology-aware policy monitoring enabled",
+		"policy", p.Name(),
+		"description", p.Description())
+
+	// 立即执行一次指标更新
+	if p.metricsManager != nil {
+		p.metricsManager.UpdateAllMetrics()
+	}
+}
+
+// updateAllMetrics 更新所有监控指标
+func (p *TopologyAwarePolicy) updateAllMetrics() {
+	// 使用新的监控管理器更新指标
+	if p.metricsManager != nil {
+		p.metricsManager.UpdateAllMetrics()
+	}
 }

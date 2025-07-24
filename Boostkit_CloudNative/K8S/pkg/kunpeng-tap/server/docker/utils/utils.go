@@ -21,7 +21,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"path"
+	"strconv"
 	"strings"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -29,6 +31,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"k8s.io/klog/v2"
 
+	"github.com/gorilla/mux"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-tap/policy-manager/v1alpha1"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server"
 )
@@ -216,4 +219,43 @@ func GenerateEnvList(envs map[string]string) (result []string) {
 		result = append(result, fmt.Sprintf("%s=%s", key, value))
 	}
 	return
+}
+
+// DockerStopRequest represents a Docker stop container request
+type DockerStopRequest struct {
+	ContainerID string
+	Timeout     *int
+}
+
+// ParseDockerStopRequest parses the Docker stop container request from HTTP request
+func ParseDockerStopRequest(req *http.Request) (DockerStopRequest, error) {
+	vars := mux.Vars(req)
+	containerID := vars["containerid"]
+	if containerID == "" {
+		return DockerStopRequest{}, fmt.Errorf("container ID is empty")
+	}
+
+	// Parse timeout from query parameters
+	var timeout *int
+	if timeoutStr := req.URL.Query().Get("t"); timeoutStr != "" {
+		if t, err := strconv.Atoi(timeoutStr); err == nil {
+			timeout = &t
+		}
+	}
+
+	return DockerStopRequest{
+		ContainerID: containerID,
+		Timeout:     timeout,
+	}, nil
+}
+
+func ParseDockerResponseCode(response string) int {
+	if strings.Contains(response, "No such container") {
+		return 404
+	} else if strings.Contains(response, "container already stopped") {
+		return 304
+	} else if strings.Contains(response, "server error") {
+		return 500
+	}
+	return 204
 }

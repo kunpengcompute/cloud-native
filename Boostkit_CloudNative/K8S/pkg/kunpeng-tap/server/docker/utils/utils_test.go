@@ -18,10 +18,12 @@ package utils_test
 
 import (
 	"bytes"
+	"net/http"
 	"strings"
 
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -222,5 +224,48 @@ var _ = Describe("Utils", func() {
 			result := utils.GetRuntimeResourceType(labels)
 			Expect(result).To(Equal(server.RuntimeContainerResource))
 		})
+	})
+})
+
+var _ = Describe("ParseDockerStopRequest", func() {
+	It("should parse valid docker stop request", func() {
+		req, err := http.NewRequest("POST", "/v1.39/containers/test-container/stop?t=10", nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Set up mux vars
+		vars := map[string]string{"containerid": "test-container"}
+		req = mux.SetURLVars(req, vars)
+
+		stopReq, err := utils.ParseDockerStopRequest(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stopReq.ContainerID).To(Equal("test-container"))
+		Expect(*stopReq.Timeout).To(Equal(10))
+	})
+
+	It("should parse docker stop request without timeout", func() {
+		req, err := http.NewRequest("POST", "/v1.39/containers/test-container/stop", nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Set up mux vars
+		vars := map[string]string{"containerid": "test-container"}
+		req = mux.SetURLVars(req, vars)
+
+		stopReq, err := utils.ParseDockerStopRequest(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stopReq.ContainerID).To(Equal("test-container"))
+		Expect(stopReq.Timeout).To(BeNil())
+	})
+
+	It("should return error for empty container ID", func() {
+		req, err := http.NewRequest("POST", "/v1.39/containers//stop", nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Set up mux vars with empty container ID
+		vars := map[string]string{"containerid": ""}
+		req = mux.SetURLVars(req, vars)
+
+		_, err = utils.ParseDockerStopRequest(req)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("container ID is empty"))
 	})
 })

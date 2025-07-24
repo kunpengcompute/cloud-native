@@ -57,6 +57,7 @@ vet: ## Run go vet against code.
 .PHONY: test
 test: fmt vet ## Run tests.
 	go test ./pkg/kunpeng-tap/... -v
+	go test ./test/kunpeng-tap/... -v
 
 .PHONY: test-e2e
 test-e2e: fmt vet ## Run the e2e tests.
