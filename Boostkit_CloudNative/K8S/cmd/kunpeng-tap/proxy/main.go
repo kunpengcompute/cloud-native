@@ -44,7 +44,37 @@ import (
 )
 
 func main() {
+	parseFlags()
 
+	if options.Version {
+		version.PrintVersion()
+		return
+	}
+
+	validateOptions()
+	setupRuntimeEndpoint()
+
+	cache := createCache()
+	policyManager := createPolicyManager(cache)
+	d := dispatcher.NewDispatcher(policyManager, cache)
+	proxyServer := createProxyServer(d, policyManager, cache)
+
+	startServer(proxyServer)
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
+
+	ctx, cancel := context.WithTimeout(context.Background(), options.GracefulTimeout)
+	defer cancel()
+
+	proxyServer.Shutdown(ctx)
+	klog.InfoS("Proxy server shutting down")
+	os.Exit(0)
+}
+
+// parseFlags initializes and parses command line flags
+func parseFlags() {
 	flag.StringVar(&options.RuntimeProxyEndpoint, "runtime-proxy-endpoint", options.DefaultRuntimeProxyEndpoint,
 		"runtimeproxy service endpoint.")
 	flag.StringVar(&options.ContainerRuntimeEndpoint, "container-runtime-service-endpoint", options.DefaultDockerRuntimeServiceEndpoint,
@@ -55,6 +85,8 @@ func main() {
 		"NRI socket path (only used when container-runtime-mode is NRI).")
 	flag.StringVar(&options.ResourcePolicy, "resource-policy", options.DefaultResourcePolicy,
 		"container resource policy(numa-aware|topology-aware).")
+	flag.StringVar(&options.ResourcePriority, "resource-priority", options.DefaultResourcePriority,
+		"resource allocation priority for topology-aware policy(cpu-first|gpu-first). Default cpu-first")
 	flag.DurationVar(&options.GracefulTimeout, "graceful-timeout", options.DefaultGracefulTimeout,
 		"the duration for which the server gracefully wait for existing connections to finish, default 15s.")
 	flag.StringVar(&options.MetricsAddr, "metrics-bind-address", ":9091", "The address the metrics endpoint binds to. Default :9091")
@@ -64,12 +96,19 @@ func main() {
 
 	klog.InitFlags(nil)
 	flag.Parse()
+}
 
-	if options.Version {
-		version.PrintVersion()
-		return
+// validateOptions validates command line options
+func validateOptions() {
+	if options.ResourcePriority != options.ResourcePriorityCPUFirst &&
+		options.ResourcePriority != options.ResourcePriorityGPUFirst {
+		klog.Fatalf("invalid resource priority %v, must be one of: %v, %v",
+			options.ResourcePriority, options.ResourcePriorityCPUFirst, options.ResourcePriorityGPUFirst)
 	}
+}
 
+// setupRuntimeEndpoint prepares the runtime proxy endpoint
+func setupRuntimeEndpoint() {
 	if err := os.Remove(options.RuntimeProxyEndpoint); err != nil && !os.IsNotExist(err) {
 		klog.Fatalf("failed to unlink %v: %v", options.RuntimeProxyEndpoint, err)
 	}
@@ -77,66 +116,77 @@ func main() {
 	if err := os.MkdirAll(filepath.Dir(options.RuntimeProxyEndpoint), 0750); err != nil {
 		klog.Fatalf("failed to mkdir %v: %v", filepath.Dir(options.RuntimeProxyEndpoint), err)
 	}
+}
 
+// createCache creates and returns a new cache instance
+func createCache() cache.Cache {
 	cache, err := cache.NewCache(cache.Options{CacheDir: "/topology_cache"})
 	if err != nil {
 		klog.Fatalf("failed to create cache: %v", err)
 	}
+	return cache
+}
 
-	// 创建策略选项
-	policyOpts := policy.NewPolicyOptions()
-	policyOpts.EnableMemoryTopology = options.EnableMemoryTopology
-
-	var p policy.HookManager
+// createPolicyManager creates and configures the policy manager
+func createPolicyManager(cache cache.Cache) policy.HookManager {
+	policyOpts := createPolicyOptions()
 
 	switch options.ResourcePolicy {
 	case options.TopologyAwarePolicy:
-		p = policy.NewPolicyManagerWithPolicies(cache, []policy.Policy{
+		return policy.NewPolicyManagerWithPolicies(cache, []policy.Policy{
 			topologyaware.NewTopologyAwarePolicy(cache, policyOpts),
 		})
 	case options.NumaAwarePolicy:
-		p = policy.NewPolicyManagerWithPolicies(cache, []policy.Policy{
+		return policy.NewPolicyManagerWithPolicies(cache, []policy.Policy{
 			numa_aware.NewNumaAwarePolicy(cache),
 		})
 	default:
 		klog.Fatalf("unknown resource policy %v", options.ResourcePolicy)
+		return nil
 	}
-	dispatcher := dispatcher.NewDispatcher(p, cache)
+}
 
-	var proxyServer server.ProxyServer
+// createPolicyOptions creates and configures policy options
+func createPolicyOptions() *policy.PolicyOptions {
+	policyOpts := policy.NewPolicyOptions()
+	policyOpts.EnableMemoryTopology = options.EnableMemoryTopology
 
-	// Setup runtime proxy endpoint and create proxy server based on container runtime mode
+	switch options.ResourcePriority {
+	case options.ResourcePriorityGPUFirst:
+		policyOpts.ResourcePriority = policy.ResourcePriorityGPUFirst
+		klog.InfoS("Using GPU-first resource allocation strategy")
+	case options.ResourcePriorityCPUFirst:
+		fallthrough
+	default:
+		policyOpts.ResourcePriority = policy.ResourcePriorityCPUFirst
+		klog.InfoS("Using CPU-first resource allocation strategy")
+	}
+
+	return policyOpts
+}
+
+// createProxyServer creates the appropriate proxy server based on runtime mode
+func createProxyServer(d dispatcher.Dispatcher, policyManager policy.HookManager, cache cache.Cache) server.ProxyServer {
 	switch options.ContainerRuntimeMode {
 	case options.ContainerRuntimeModeContainerd:
-		proxyServer = NewContainerdProxyServer(dispatcher, cache)
+		return NewContainerdProxyServer(d, cache)
 	case options.ContainerRuntimeModeDocker:
-		proxyServer = NewDockerProxyServer(dispatcher, cache)
+		return NewDockerProxyServer(d, cache)
 	case options.ContainerRuntimeModeNRI:
 		// NRI mode works as a plugin, no proxy socket needed
 		klog.InfoS("NRI mode: skipping proxy socket setup", "nriSocketPath", options.NRISocketPath)
-		proxyServer = NewNriProxyServer(p, cache, options.NRISocketPath)
+		return NewNriProxyServer(policyManager, cache, options.NRISocketPath)
 	default:
 		klog.Fatalf("unknown runtime engine backend %v", options.ContainerRuntimeMode)
+		return nil
 	}
+}
 
-	// Expose the Prometheus http endpoint
+// startServer starts the proxy server and monitoring
+func startServer(proxyServer server.ProxyServer) {
 	go monitoring.ExportMetrics()
 	monitoring.ProxyHealthz.Set(1)
 	go proxyServer.Run()
-
-	c := make(chan os.Signal, 1)
-	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
-	// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
-	signal.Notify(c, os.Interrupt)
-	<-c
-
-	ctx, cancel := context.WithTimeout(context.Background(), options.GracefulTimeout)
-	defer cancel()
-
-	proxyServer.Shutdown(ctx)
-
-	klog.InfoS("Proxy server shutting down")
-	os.Exit(0)
 }
 
 func NewContainerdProxyServer(dispatcher dispatcher.Dispatcher, cache cache.Cache) server.ProxyServer {

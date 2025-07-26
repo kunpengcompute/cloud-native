@@ -65,6 +65,7 @@ type TopologyAwarePolicy struct {
 	depth                int
 	allocations          allocations             // container pool assignmentss
 	enableMemoryTopology bool                    // 是否启用内存拓扑感知
+	resourcePriority     policy.ResourcePriority // 资源分配优先级策略
 	metricsManager       *TopologyMetricsManager // 资源树监控管理器
 }
 
@@ -106,6 +107,7 @@ func NewTopologyAwarePolicyWithSystem(c cache.Cache, opts *policy.PolicyOptions,
 		sys:                  sys,
 		cache:                c,
 		enableMemoryTopology: opts.EnableMemoryTopology,
+		resourcePriority:     opts.ResourcePriority,
 	}
 	p.allocations = p.newAllocations()
 
@@ -350,25 +352,92 @@ func (p *TopologyAwarePolicy) updateParentResourceUsageByGrant(parent Node, gran
 
 // findBestAvailablePool finds the best available pool for the request.
 func (p *TopologyAwarePolicy) findBestAvailablePool(request Request, pools []Node) Node {
-	bestPool := pools[0]
+	// GPU-First策略下的特殊处理
+	if p.resourcePriority == policy.ResourcePriorityGPUFirst && request.HasGPURequest() {
+		if pool := p.findGPUAffinityPool(request, pools); pool != nil {
+			return pool
+		}
+		klog.V(4).InfoS("GPU-First: No GPU NUMA pools with sufficient capacity found, falling back to regular allocation")
+	}
 
-	// 从上至下遍历所有资源池，找到最优的资源池
+	// 常规处理逻辑
+	return p.findRegularPool(request, pools)
+}
+
+// findGPUAffinityPool finds a pool with GPU affinity for GPU requests
+func (p *TopologyAwarePolicy) findGPUAffinityPool(request Request, pools []Node) Node {
+	// 阶段1：尝试特定GPU的NUMA节点
+	specificAffinity := p.calculatePoolAffinities(request)
+	if pool := p.findPoolWithAffinity(request, pools, specificAffinity, "specific GPU"); pool != nil {
+		return pool
+	}
+
+	// 阶段2：尝试其他GPU的NUMA节点
+	generalAffinity := p.calculateGeneralGPUAffinity()
+	return p.findAlternativeGPUPool(request, pools, generalAffinity, specificAffinity)
+}
+
+// findPoolWithAffinity finds a NUMA-level pool with given affinity
+func (p *TopologyAwarePolicy) findPoolWithAffinity(request Request, pools []Node, affinity map[int]int32, affinityType string) Node {
 	for _, pool := range pools {
-		// If the pool has enough capacity by request, include the pool's parent.
-		if !checkCapacityByRequest(request, p.root, pool) {
+		if !p.isNUMALevelPool(pool) {
 			continue
 		}
-		// If the pool has enough capacity for memory.
-		if !checkMemoryCapacity(request, p.root, pool) {
+
+		poolAffinity := p.calculatePoolAffinityValue(pool, affinity)
+		if poolAffinity > 0 && p.hasCapacity(request, pool) {
+			klog.V(5).InfoS("GPU-First: Found suitable NUMA pool", "bestPool", pool.Name(), "affinity", poolAffinity, "type", affinityType)
+			return pool
+		}
+	}
+	return nil
+}
+
+// findAlternativeGPUPool finds alternative GPU pools excluding specific GPU pools
+func (p *TopologyAwarePolicy) findAlternativeGPUPool(request Request, pools []Node, generalAffinity, specificAffinity map[int]int32) Node {
+	for _, pool := range pools {
+		if !p.isNUMALevelPool(pool) {
 			continue
 		}
-		// If the pool has lower depth, it is better.
-		if pool.RootDistance() > bestPool.RootDistance() {
+
+		poolAffinity := p.calculatePoolAffinityValue(pool, generalAffinity)
+		hasSpecificGPU := p.calculatePoolAffinityValue(pool, specificAffinity) > 0
+
+		if poolAffinity > 0 && !hasSpecificGPU && p.hasCapacity(request, pool) {
+			klog.V(5).InfoS("GPU-First: Found suitable alternative GPU NUMA pool", "bestPool", pool.Name(), "affinity", poolAffinity)
+			return pool
+		}
+	}
+	return nil
+}
+
+// findRegularPool finds the best pool using regular allocation logic
+func (p *TopologyAwarePolicy) findRegularPool(request Request, pools []Node) Node {
+	bestPool := pools[0]
+	for _, pool := range pools {
+		if p.hasCapacity(request, pool) && pool.RootDistance() > bestPool.RootDistance() {
 			bestPool = pool
 		}
 	}
 	klog.V(5).InfoS("Best pool", "bestPool", bestPool.Name())
 	return bestPool
+}
+
+// Helper functions
+func (p *TopologyAwarePolicy) isNUMALevelPool(pool Node) bool {
+	return len(pool.FreeResource().GetNode().GetNUMAIDs()) == 1
+}
+
+func (p *TopologyAwarePolicy) calculatePoolAffinityValue(pool Node, affinity map[int]int32) int32 {
+	var poolAffinity int32
+	for _, numaID := range pool.FreeResource().GetNode().GetNUMAIDs() {
+		poolAffinity += affinity[int(numaID)]
+	}
+	return poolAffinity
+}
+
+func (p *TopologyAwarePolicy) hasCapacity(request Request, pool Node) bool {
+	return checkCapacityByRequest(request, p.root, pool) && checkMemoryCapacity(request, p.root, pool)
 }
 
 // checkCapacity checks if the pool has enough capacity for the request.
@@ -611,10 +680,22 @@ func (p *TopologyAwarePolicy) compareGPUAffinity(request Request, affinity map[i
 
 	var affinity1, affinity2 int32
 	for _, numaID := range numaIDs1 {
-		affinity1 += affinity[int(numaID)]
+		baseAffinity := affinity[int(numaID)]
+		// GPU-First策略下，增强GPU亲和性权重
+		if p.resourcePriority == policy.ResourcePriorityGPUFirst && baseAffinity > 0 {
+			affinity1 += baseAffinity * 100 // 增强权重100倍，确保GPU亲和性优先
+		} else {
+			affinity1 += baseAffinity
+		}
 	}
 	for _, numaID := range numaIDs2 {
-		affinity2 += affinity[int(numaID)]
+		baseAffinity := affinity[int(numaID)]
+		// GPU-First策略下，增强GPU亲和性权重
+		if p.resourcePriority == policy.ResourcePriorityGPUFirst && baseAffinity > 0 {
+			affinity2 += baseAffinity * 100 // 增强权重100倍，确保GPU亲和性优先
+		} else {
+			affinity2 += baseAffinity
+		}
 	}
 
 	klog.V(5).InfoS("GPU affinity compare", "node1", node1.Name(), "node2", node2.Name(), "affinity1", affinity1, "affinity2", affinity2)
@@ -638,7 +719,7 @@ func (p *TopologyAwarePolicy) compare(request Request, scores map[int]Score, aff
 	// 比较计分的算法如下：
 	// 1. 如果节点在树中较低，则获胜
 	// 2. 如果是共享分配，则较少共置容器获胜
-	// 3. 如果请求包含GPU，则GPU亲和性权重更高的节点获胜
+	// 3. 根据资源优先级策略，调整CPU和GPU亲和性的比较顺序
 	// 4. id 更小的获胜
 
 	node1, node2 := p.pools[i], p.pools[j]
@@ -670,13 +751,59 @@ func (p *TopologyAwarePolicy) compare(request Request, scores map[int]Score, aff
 		return result
 	}
 
-	// 5. Check GPU affinity
-	if result, done := p.compareGPUAffinity(request, affinity, node1, node2); done {
+	// 5. Apply resource priority strategy
+	if result, done := p.applyResourcePriorityStrategy(request, affinity, node1, node2); done {
 		return result
 	}
 
 	// 6. Final tie-breaker: smaller ID wins
 	return id1 < id2
+}
+
+// applyResourcePriorityStrategy applies the configured resource priority strategy
+func (p *TopologyAwarePolicy) applyResourcePriorityStrategy(request Request, affinity map[int]int32, node1, node2 Node) (bool, bool) {
+	switch p.resourcePriority {
+	case policy.ResourcePriorityGPUFirst:
+		// GPU优先策略：先比较GPU亲和性，再比较CPU容量
+		if result, done := p.compareGPUAffinity(request, affinity, node1, node2); done {
+			return result, true
+		}
+		// GPU亲和性相同时，比较CPU容量
+		if result, done := p.compareCPUCapacity(node1, node2); done {
+			return result, true
+		}
+	case policy.ResourcePriorityCPUFirst:
+		fallthrough
+	default:
+		// CPU优先（默认）：先比较CPU容量，再比较GPU亲和性
+		if result, done := p.compareCPUCapacity(node1, node2); done {
+			return result, true
+		}
+		// CPU容量相同时，比较GPU亲和性
+		if result, done := p.compareGPUAffinity(request, affinity, node1, node2); done {
+			return result, true
+		}
+	}
+
+	return false, false // 继续其他比较
+}
+
+// compareCPUCapacity compares CPU capacity between two nodes
+func (p *TopologyAwarePolicy) compareCPUCapacity(node1, node2 Node) (bool, bool) {
+	capacity1 := node1.FreeResource().AllocatableSharedCPU()
+	capacity2 := node2.FreeResource().AllocatableSharedCPU()
+
+	if capacity1 > capacity2 {
+		klog.V(5).InfoS("Higher CPU capacity wins", "winner", node1.Name(), "capacity", capacity1, "failed", node2.Name(), "capacity", capacity2)
+		return true, true // node1 wins, comparison complete
+	}
+	if capacity2 > capacity1 {
+		klog.V(5).InfoS("Higher CPU capacity wins", "winner", node2.Name(), "capacity", capacity2, "failed", node1.Name(), "capacity", capacity1)
+		return false, true // node2 wins, comparison complete
+	}
+
+	klog.V(5).InfoS("CPU capacity is a TIE", "node1", node1.Name(), "node2", node2.Name(), "capacity", capacity1)
+	return false, false // tie, continue comparison
 }
 
 func (p *TopologyAwarePolicy) PostStopContainerHook(ctx policy.HookContext) (*policy.Allocation, error) {

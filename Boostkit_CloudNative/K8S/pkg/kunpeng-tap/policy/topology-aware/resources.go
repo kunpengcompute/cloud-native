@@ -396,33 +396,71 @@ func parseDeviceID(device, regex string) (string, bool) {
 
 // checkDeviceRequest 检查容器是否请求了特定类型的设备
 func checkDeviceRequest(containerEnvs map[string]string, config DeviceEnvConfig) (bool, []string) {
+	if containerEnvs == nil {
+		return false, nil
+	}
+
+	var deviceIDs []string
 	hasRequest := false
-	deviceIDs := []string{}
 
 	// 检查分配设备环境变量
-	if allocDevices, ok := containerEnvs[config.AllocateEnvName]; ok {
+	if allocDevices := containerEnvs[config.AllocateEnvName]; allocDevices != "" {
 		hasRequest = true
-		devices := strings.Split(allocDevices, ",")
-		for _, device := range devices {
-			if deviceID, ok := parseDeviceID(device, config.DeviceRegex); ok {
-				deviceIDs = append(deviceIDs, deviceID)
-			}
-		}
+		deviceIDs = append(deviceIDs, extractDeviceIDs(allocDevices, config.DeviceRegex)...)
 	}
 
 	// 检查可见设备环境变量
-	if visibleDevices, ok := containerEnvs[config.VisibleEnvName]; ok {
+	if visibleDevices := containerEnvs[config.VisibleEnvName]; visibleDevices != "" {
 		hasRequest = true
-		devices := strings.Split(visibleDevices, ",")
-		for _, deviceID := range devices {
-			deviceID = strings.TrimSpace(deviceID)
-			if deviceID != "" {
-				deviceIDs = append(deviceIDs, deviceID)
-			}
-		}
+		deviceIDs = append(deviceIDs, extractVisibleDeviceIDs(visibleDevices, config.DeviceRegex)...)
 	}
 
 	return hasRequest, deviceIDs
+}
+
+// extractDeviceIDs 从设备字符串中提取设备ID列表
+func extractDeviceIDs(deviceStr, regex string) []string {
+	if deviceStr == "" {
+		return nil
+	}
+
+	var deviceIDs []string
+	devices := strings.Split(deviceStr, ",")
+
+	for _, device := range devices {
+		if deviceID, ok := parseDeviceID(device, regex); ok {
+			deviceIDs = append(deviceIDs, deviceID)
+		}
+	}
+
+	return deviceIDs
+}
+
+// extractVisibleDeviceIDs 从可见设备字符串中提取设备ID列表
+func extractVisibleDeviceIDs(deviceStr, regex string) []string {
+	if deviceStr == "" {
+		return nil
+	}
+
+	var deviceIDs []string
+	devices := strings.Split(deviceStr, ",")
+
+	for _, device := range devices {
+		device = strings.TrimSpace(device)
+		if device == "" {
+			continue
+		}
+
+		// 尝试使用正则表达式提取设备ID
+		if deviceID, ok := parseDeviceID(device, regex); ok {
+			deviceIDs = append(deviceIDs, deviceID)
+		} else {
+			// 如果正则表达式匹配失败，直接使用原始字符串作为设备ID
+			deviceIDs = append(deviceIDs, device)
+		}
+	}
+
+	return deviceIDs
 }
 
 // Helper method to parse CPU and memory resources

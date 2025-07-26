@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"testing"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
@@ -284,11 +283,6 @@ func getAllocationType(cpuSet string) string {
 		return "System"
 	}
 	return "Unknown"
-}
-
-func TestTopologyAware(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "TopologyAware Policy Suite")
 }
 
 var _ = ginkgo.Describe("TopologyAware Policy", func() {
