@@ -15,6 +15,7 @@ package deviceplugin
 
 import (
 	"context"
+	"maps"
 	"net"
 	"os"
 	"path"
@@ -41,8 +42,13 @@ const (
 	terminating
 )
 
+// server implements devicePluginServer and pluginapi.PluginInterfaceServer interfaces.
 type server struct {
 	grpcServer *grpc.Server
+	devices    map[string]DeviceInfo
+	// updateCh represents the updated full DeviceInfo,
+	// for example,it might be [1, 2, 3] before the update, and [1, 2, 3, 5] after the update.
+	updatesCh  chan map[string]DeviceInfo
 	devType    string
 	state      serverState
 	stateMutex sync.Mutex
@@ -61,15 +67,97 @@ func (srv *server) GetPreferredAllocation(ctx context.Context, rqt *pluginapi.Pr
 }
 
 func (srv *server) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
+	klog.V(4).Info("Started ListAndWatch for", srv.devType)
+
+	if err := srv.sendDevices(stream); err != nil {
+		return err
+	}
+
+	// Upload the new information to kubelet when the device status is updated.
+	for srv.devices = range srv.updatesCh {
+		if err := srv.sendDevices(stream); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (srv *server) sendDevices(stream pluginapi.DevicePlugin_ListAndWatchServer) error {
+	resp := new(pluginapi.ListAndWatchResponse)
+	for id, device := range srv.devices {
+		resp.Devices = append(resp.Devices, &pluginapi.Device{
+			ID:     id,
+			Health: device.health,
+		})
+	}
+
+	klog.V(4).Info("Sending to kubelet", resp.Devices)
+
+	if err := stream.Send(resp); err != nil {
+		if stopErr := srv.Stop(); stopErr != nil {
+			klog.Errorf("Stop grpc server failed: %v", stopErr)
+		}
+		return errors.Wrapf(err, "Cannot update device list")
+	}
+
 	return nil
 }
 
 func (srv *server) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
-	return &pluginapi.AllocateResponse{}, nil
+	response := new(pluginapi.AllocateResponse)
+
+	for _, crqt := range rqt.ContainerRequests {
+		cresp := new(pluginapi.ContainerAllocateResponse)
+
+		cresp.Envs = map[string]string{}
+		cresp.Annotations = map[string]string{}
+
+		for _, id := range crqt.DevicesIDs {
+			dev, ok := srv.devices[id]
+			if !ok {
+				return nil, errors.Errorf("Invalid allocation request with non-existing device %s", id)
+			}
+
+			if dev.health != pluginapi.Healthy {
+				return nil, errors.Errorf("Invalid allocation request with unhealthy device %s", id)
+			}
+
+			for i := range dev.devices {
+				cresp.Devices = append(cresp.Devices, &dev.devices[i])
+			}
+
+			for i := range dev.mounts {
+				cresp.Mounts = append(cresp.Mounts, &dev.mounts[i])
+			}
+
+			maps.Copy(cresp.Envs, dev.envs)
+
+			maps.Copy(cresp.Annotations, dev.annotations)
+		}
+
+		response.ContainerResponses = append(response.ContainerResponses, cresp)
+	}
+
+	return response, nil
 }
 
+// Serve starts a gRPC server to serve pluginapi.PluginInterfaceServer interface.
 func (srv *server) Serve(namespace string) error {
 	return srv.setupAndServe(namespace, pluginapi.DevicePluginPath, pluginapi.KubeletSocket)
+}
+
+// Stop stops serving pluginapi.PluginInterfaceServer interface.
+func (srv *server) Stop() error {
+	if srv.grpcServer == nil {
+		return errors.New("Can't stop non-existing gRPC server. Calling Stop() before Serve()?")
+	}
+
+	srv.setState(terminating)
+	srv.grpcServer.Stop()
+	close(srv.updatesCh)
+
+	return nil
 }
 
 func (srv *server) getState() serverState {

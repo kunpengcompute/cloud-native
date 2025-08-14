@@ -24,16 +24,15 @@ type DeviceInfo struct {
 	mounts      []pluginapi.Mount
 	envs        map[string]string
 	annotations map[string]string
-	topology    *pluginapi.TopologyInfo
 	health      string
-	nodes       []pluginapi.DeviceSpec
+	devices     []pluginapi.DeviceSpec
 }
 
 // NewDeviceInfo makes DeviceInfo struct and adds topology information to it.
-func NewDeviceInfo(state string, nodes []pluginapi.DeviceSpec, mounts []pluginapi.Mount, envs, annotations map[string]string) DeviceInfo {
+func NewDeviceInfo(state string, devices []pluginapi.DeviceSpec, mounts []pluginapi.Mount, envs, annotations map[string]string) DeviceInfo {
 	deviceInfo := DeviceInfo{
 		health:      state,
-		nodes:       nodes,
+		devices:     devices,
 		mounts:      mounts,
 		envs:        envs,
 		annotations: annotations,
