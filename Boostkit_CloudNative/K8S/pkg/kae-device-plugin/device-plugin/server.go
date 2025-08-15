@@ -42,6 +42,15 @@ const (
 	terminating
 )
 
+// devicePluginServer maintains a gRPC server satisfying
+// pluginapi.PluginInterfaceServer interfaces.
+// This internal unexposed interface simplifies unit testing.
+type devicePluginServer interface {
+	Serve(namespace string) error
+	Stop() error
+	Update(devices map[string]DeviceInfo)
+}
+
 // server implements devicePluginServer and pluginapi.PluginInterfaceServer interfaces.
 type server struct {
 	grpcServer *grpc.Server
@@ -52,6 +61,15 @@ type server struct {
 	devType    string
 	state      serverState
 	stateMutex sync.Mutex
+}
+
+func newServer(devType string) devicePluginServer {
+	return &server{
+		devices:   make(map[string]DeviceInfo),
+		updatesCh: make(chan map[string]DeviceInfo, 1),
+		state:     uninitialized,
+		devType:   devType,
+	}
 }
 
 func (srv *server) GetDevicePluginOptions(ctx context.Context, empty *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
@@ -158,6 +176,11 @@ func (srv *server) Stop() error {
 	close(srv.updatesCh)
 
 	return nil
+}
+
+// Update sends updates from Manager to ListAndWatch's event loop.
+func (srv *server) Update(devices map[string]DeviceInfo) {
+	srv.updatesCh <- devices
 }
 
 func (srv *server) getState() serverState {

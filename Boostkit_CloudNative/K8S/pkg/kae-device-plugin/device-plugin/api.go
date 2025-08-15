@@ -41,6 +41,15 @@ func NewDeviceInfo(state string, devices []pluginapi.DeviceSpec, mounts []plugin
 	return deviceInfo
 }
 
+// AddDevice adds device info to DeviceTree.
+func (tree DeviceTree) AddDevice(devType, id string, info DeviceInfo) {
+	if _, present := tree[devType]; !present {
+		tree[devType] = make(map[string]DeviceInfo)
+	}
+
+	tree[devType][id] = info
+}
+
 // DeviceTree contains a tree-like structure of device type -> device ID -> device info.
 type DeviceTree map[string]map[string]DeviceInfo
 
