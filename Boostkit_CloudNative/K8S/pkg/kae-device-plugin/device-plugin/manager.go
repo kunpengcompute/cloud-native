@@ -15,6 +15,8 @@
 package deviceplugin
 
 import (
+	"reflect"
+
 	"k8s.io/klog"
 )
 
@@ -45,7 +47,7 @@ func (n *notifier) Notify(newDeviceTree DeviceTree) {
 
 	for devType, new := range newDeviceTree {
 		if old, ok := n.deviceTree[devType]; ok {
-			if !equal(old, new) {
+			if !reflect.DeepEqual(old, new) {
 				updated[devType] = new
 			}
 
@@ -65,25 +67,6 @@ func (n *notifier) Notify(newDeviceTree DeviceTree) {
 	}
 
 	n.deviceTree = newDeviceTree
-}
-
-func equal(old, new map[string]DeviceInfo) bool {
-	if len(old) != len(new) {
-		return false
-	}
-
-	for deviceId, deviceInfo := range new {
-		if _, ok := old[deviceId]; !ok {
-			return false
-		}
-
-		// ListAndWatch now only care device id and device health, so we just compare these two
-		if deviceInfo.health != old[deviceId].health {
-			return false
-		}
-	}
-
-	return true
 }
 
 // Manager manages life cycle of device plugins and handles the scan results

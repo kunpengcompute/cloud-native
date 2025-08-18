@@ -1,0 +1,65 @@
+version: '1.0'
+name: pipeline-kae-device-plugin
+displayName: pipeline-kae-device-plugin
+triggers:
+  trigger: auto
+  pr:
+    branches:
+      prefix:
+        - kae-device-plugin
+stages:
+  - name: stage-62d8ee5d
+    displayName: 编译
+    strategy: naturally
+    trigger: auto
+    executor: []
+    steps:
+      - step: build@golang
+        name: build_golang
+        displayName: Golang 构建
+        golangVersion: 1.23.11
+        commands:
+          - '# 默认使用goproxy.cn'
+          - export GOPROXY=https://goproxy.cn
+          - '# 输入你的构建命令'
+          - cd Boostkit_CloudNative/K8S
+          - make kae-device-plugin-build
+        artifacts:
+          - name: BUILD_ARTIFACT
+            path:
+              - ./Boostkit_CloudNative/K8S/bin
+        caches:
+          - /go/pkg/mod
+        notify: []
+        strategy:
+          retry: '0'
+  - name: stage-15e406b3
+    displayName: 单测
+    strategy: naturally
+    trigger: auto
+    executor: []
+    steps:
+      - step: ut@golang
+        name: unit_test_go
+        displayName: Golang 单元测试
+        golangVersion: 1.23.11
+        commands:
+          - '# 默认使用goproxy.cn用户可手动调整'
+          - export GOPROXY=https://goproxy.cn
+          - '# 默认的单元测试命令'
+          - '# 输出测试报告目录到当前工作目录，可自动上传并展示'
+          - mkdir -p golang-report
+          - '# 未使用Go Mod的用户需要打开一下注释'
+          - '# export GOFLAGS=-mod=vendor'
+          - cd Boostkit_CloudNative/K8S
+          - make kae-device-plugin-test
+        report:
+          path: golang-report
+          file: report.jsonl
+          index: index.html
+        checkpoints: []
+        caches:
+          - /go/pkg/mod
+        notify: []
+        strategy:
+          retry: '0'

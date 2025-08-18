@@ -1,0 +1,150 @@
+# KAE Device Plugin Makefile
+
+# Project configuration
+PROJECT_NAME := kae-device-plugin
+VERSION ?= 0.1.0
+BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
+GIT_COMMIT := $(shell git rev-parse HEAD)
+
+# Build configuration
+GOPATH_BIN := $(shell go env GOPATH)/bin
+BUILD_DIR := bin
+DOCKER_IMAGE := kae-device-plugin:$(VERSION)
+
+# Build flags
+LDFLAGS=-ldflags "-s -w"
+
+
+
+# Setting SHELL to bash allows bash commands to be executed by recipes.
+SHELL = /usr/bin/env bash -o pipefail
+.SHELLFLAGS = -ec
+
+.PHONY: all
+all: build
+
+##@ General
+
+.PHONY: help
+help: ## Display this help.
+	@echo "K8S MPAM Controller Build System"
+	@echo ""
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+.PHONY: version
+version: ## Show version information.
+	@echo "Project: $(PROJECT_NAME)"
+	@echo "Version: $(VERSION)"
+	@echo "Build Time: $(BUILD_TIME)"
+	@echo "Git Commit: $(GIT_COMMIT)"
+
+##@ Development
+
+.PHONY: deps
+deps: ## Download dependencies.
+	@echo "Downloading dependencies..."
+	go get -d -v ./cmd/kae-device-plugin ./pkg/kae-device-plugin/...
+	@echo "Dependencies downloaded"
+
+.PHONY: fmt
+fmt: ## Format code.
+	@echo "Formatting code..."
+	go fmt ./cmd/kae-device-plugin ./pkg/kae-device-plugin/...
+	@echo "Code formatted"
+
+.PHONY: vet
+vet: ## Run go vet.
+	@echo "Running go vet..."
+	go vet ./cmd/kae-device-plugin ./pkg/kae-device-plugin/...
+	@echo "Go vet completed"
+
+.PHONY: test
+test: ## Run tests.
+	@echo "Running tests..."
+	go test ./pkg/kae-device-plugin/... -v
+	@echo "Tests completed"
+
+.PHONY: tidy
+tidy: ## Tidy go modules.
+	@echo "Tidying go modules..."
+	go mod tidy
+	@echo "Go mod tidy completed"
+
+##@ Build
+
+.PHONY: build
+build: deps ## Build the project.
+	@echo "Building $(PROJECT_NAME)..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/kae-device-plugin ./cmd/kae-device-plugin
+	@echo "$(PROJECT_NAME) built successfully"
+	@echo "Binary installed to $(GOPATH_BIN)/kae-device-plugin"
+
+.PHONY: build-local
+build-local: deps ## Build binary to local bin directory.
+	@echo "Building $(PROJECT_NAME) locally..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/kae-device-plugin ./cmd/kae-device-plugin
+	@echo "$(PROJECT_NAME) built locally in $(BUILD_DIR)/kae-device-plugin"
+
+.PHONY: clean
+clean: ## Clean build artifacts.
+	@echo "Cleaning $(PROJECT_NAME)..."
+	rm -f $(GOPATH_BIN)/kae-device-plugin
+	rm -rf $(BUILD_DIR)
+	@echo "Clean completed"
+
+##@ Docker
+
+.PHONY: docker-build
+docker-build: ## Build docker image.
+	@echo "Building docker image $(DOCKER_IMAGE)..."
+	sudo docker build --force-rm -f ./Dockerfile.kae-device-plugin -t $(DOCKER_IMAGE) .
+	@echo "Docker image $(DOCKER_IMAGE) built successfully"
+
+.PHONY: docker-push
+docker-push: ## Push docker image.
+	@echo "Pushing docker image $(DOCKER_IMAGE)..."
+	sudo docker push $(DOCKER_IMAGE)
+	@echo "Docker image pushed"
+
+.PHONY: docker-run
+docker-run: ## Run docker container.
+	@echo "Running docker container..."
+	sudo docker run --rm -it $(DOCKER_IMAGE)
+
+.PHONY: docker-clean
+docker-clean: ## Clean docker images.
+	@echo "Cleaning docker images..."
+	-sudo docker rmi $(DOCKER_IMAGE)
+	@echo "Docker images cleaned"
+
+##@ Installation
+
+.PHONY: install
+install: build ## Install binary to system.
+	@echo "Installing $(PROJECT_NAME) to system..."
+	sudo cp $(GOPATH_BIN)/kae-device-plugin /usr/local/bin/
+	sudo chmod +x /usr/local/bin/kae-device-plugin
+	@echo "Installation completed"
+
+.PHONY: uninstall
+uninstall: ## Uninstall binary from system.
+	@echo "Uninstalling $(PROJECT_NAME) from system..."
+	sudo rm -f /usr/local/bin/kae-device-plugin
+	@echo "Uninstallation completed"
+
+##@ Development Tools
+
+.PHONY: run
+run: build-local ## Run the application locally.
+	@echo "Running $(PROJECT_NAME)..."
+	./$(BUILD_DIR)/kae-device-plugin
+
+.PHONY: check
+check: fmt vet test ## Run all checks (format, vet, test).
+	@echo "All checks passed"
+
+.PHONY: ci
+ci: check build ## Run CI pipeline.
+	@echo "CI pipeline completed successfully"

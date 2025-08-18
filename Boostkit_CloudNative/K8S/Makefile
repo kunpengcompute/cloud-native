@@ -15,7 +15,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 .PHONY: all
-all: mpam-build kunpeng-tap-build
+all: mpam-build kunpeng-tap-build kae-device-plugin-build
 
 ##@ General
 
@@ -169,28 +169,78 @@ kunpeng-tap-docker-push: ## Push kunpeng-tap docker image.
 kunpeng-tap-docker-buildx: ## Build and push kunpeng-tap docker image for cross-platform.
 	$(MAKE) -f Makefile.kunpeng-tap docker-buildx
 
+##@ KAE Device Plugin
+
+.PHONY: kae-device-plugin-build
+kae-device-plugin-build: ## Build kae-device-plugin project.
+	$(MAKE) -f Makefile.kae-device-plugin build
+
+.PHONY: kae-device-plugin-build-local
+kae-device-plugin-build-local: ## Build kae-device-plugin locally.
+	$(MAKE) -f Makefile.kae-device-plugin build-local
+
+.PHONY: kae-device-plugin-clean
+kae-device-plugin-clean: ## Clean kae-device-plugin build artifacts.
+	$(MAKE) -f Makefile.kae-device-plugin clean
+
+.PHONY: kae-device-plugin-docker
+kae-device-plugin-docker: ## Build kae-device-plugin docker image.
+	$(MAKE) -f Makefile.kae-device-plugin docker-build
+
+.PHONY: kae-device-plugin-docker-push
+kae-device-plugin-docker-push: ## Push kae-device-plugin docker image.
+	$(MAKE) -f Makefile.kae-device-plugin docker-push
+
+.PHONY: kae-device-plugin-install
+kae-device-plugin-install: ## Install kae-device-plugin to system.
+	$(MAKE) -f Makefile.kae-device-plugin install
+
+.PHONY: kae-device-plugin-uninstall
+kae-device-plugin-uninstall: ## Uninstall kae-device-plugin from system.
+	$(MAKE) -f Makefile.kae-device-plugin uninstall
+
+.PHONY: kae-device-plugin-run
+kae-device-plugin-run: ## Run kae-device-plugin locally.
+	$(MAKE) -f Makefile.kae-device-plugin run
+
+.PHONY: kae-device-plugin-fmt
+kae-device-plugin-fmt: ## Format kae-device-plugin code.
+	$(MAKE) -f Makefile.kae-device-plugin fmt
+
+.PHONY: kae-device-plugin-vet
+kae-device-plugin-vet: ## Run go vet for kae-device-plugin.
+	$(MAKE) -f Makefile.kae-device-plugin vet
+
+.PHONY: kae-device-plugin-test
+kae-device-plugin-test: ## Test kae-device-plugin.
+	$(MAKE) -f Makefile.kae-device-plugin test
+
+.PHONY: kae-device-plugin-tidy
+kae-device-plugin-tidy: ## Tidy kae-device-plugin go modules.
+	$(MAKE) -f Makefile.kae-device-plugin tidy
+
 ##@ Combined Operations
 
 .PHONY: build
-build: mpam-build kunpeng-tap-build ## Build all projects.
+build: mpam-build kunpeng-tap-build kae-device-plugin-build ## Build all projects.
 
 .PHONY: clean
-clean: mpam-clean kunpeng-tap-clean ## Clean all projects.
+clean: mpam-clean kunpeng-tap-clean kae-device-plugin-clean ## Clean all projects.
 
 .PHONY: docker
-docker: mpam-docker kunpeng-tap-docker-build ## Build all docker images.
+docker: mpam-docker kunpeng-tap-docker-build kae-device-plugin-docker ## Build all docker images.
 
 .PHONY: fmt
-fmt: mpam-fmt kunpeng-tap-fmt ## Format code for all projects.
+fmt: mpam-fmt kunpeng-tap-fmt kae-device-plugin-fmt ## Format code for all projects.
 
 .PHONY: vet
-vet: mpam-vet kunpeng-tap-vet ## Run go vet for all projects.
+vet: mpam-vet kunpeng-tap-vet kae-device-plugin-vet ## Run go vet for all projects.
 
 .PHONY: test
-test: mpam-test kunpeng-tap-test ## Run tests for all projects.
+test: mpam-test kunpeng-tap-test kae-device-plugin-test ## Run tests for all projects.
 
 .PHONY: tidy
-tidy: mpam-tidy kunpeng-tap-tidy ## Tidy go modules for all projects.
+tidy: mpam-tidy kunpeng-tap-tidy kae-device-plugin-tidy ## Tidy go modules for all projects.
 
 ##@ Kunpeng TAP RPM Packaging
 
