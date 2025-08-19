@@ -76,12 +76,13 @@ type PodStatus struct {
 }
 
 type NumaNodeResources struct {
-	CpuFree  float64
-	CpuUsed  float64
-	CpuTotal float64
-	MemFree  float64
-	MemUsed  float64
-	MemTotal float64
+	CpuFree          float64
+	CpuUsed          float64 // CPU useage computed by limits.cpu
+	CpuUsedByRequest float64 // CPU useage computed by requests.cpu
+	CpuTotal         float64
+	MemFree          float64
+	MemUsed          float64
+	MemTotal         float64
 }
 
 // Pod is the exposed interface from a cached pod.
@@ -717,6 +718,7 @@ func (cch *cache) GetNodeResources() []NumaNodeResources {
 		}
 		// 按照 limits 计算 CPU 使用量
 		cpuTime := float64(res.CpuQuota) / float64(res.CpuPeriod)
+		cpuRequest := float64(res.CpuShares) / 1024
 		// 只计算 NUMA Node 亲和的 CPU 使用量
 		klog.V(5).InfoS("Getting Linux resources", "resources", res, "container", ctr, "cpuTime", cpuTime)
 		i := sysfs.GetNumaNodeFromCpuSet(cch.CpuInfo, ctr.GetLinuxResources().GetCpusetCpus())
@@ -724,6 +726,7 @@ func (cch *cache) GetNodeResources() []NumaNodeResources {
 		if i >= 0 {
 			// 依据使用量计算
 			nodes[i].CpuUsed += cpuTime
+			nodes[i].CpuUsedByRequest += cpuRequest
 		}
 	}
 	return nodes

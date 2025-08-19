@@ -17,28 +17,13 @@
 package numa_aware
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("NumaAware", func() {
-	Describe("AddHook", func() {
-		It("Should be pass", func() {
-
-		})
-	})
-
-	Describe("AddHook", func() {
-		It("Should be pass", func() {
-
-		})
-	})
-
-	Describe("SetContainerCPUSet", func() {
-		BeforeEach(func() {
-
-		})
-		It("Should be pass", func() {
-
-		})
-	})
-})
+func TestNumaAware(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "NumaAware Suite")
+}

@@ -62,6 +62,11 @@ func (p *NumaAwarePolicy) SetCache(c cache.Cache) {
 	p.cache = c
 }
 
+// GetCache returns the cache for the policy
+func (p *NumaAwarePolicy) GetCache() cache.Cache {
+	return p.cache
+}
+
 // PreCreateContainerHook implements NUMA-aware CPU set allocation
 func (p *NumaAwarePolicy) PreCreateContainerHook(ctx policy.HookContext) (*policy.Allocation, error) {
 	containerCtx, ok := ctx.(*policy.ContainerContext)
@@ -72,8 +77,13 @@ func (p *NumaAwarePolicy) PreCreateContainerHook(ctx policy.HookContext) (*polic
 
 	request := containerCtx.Request
 
-	resource_req, resource_limit := request.Resources.GetRequests(), request.Resources.GetLimits()
-	if resource_req == nil || resource_limit == nil {
+	if request.Resources == nil {
+		klog.V(0).InfoS("Resources is nil")
+		return nil, nil
+	}
+
+	resourceReq, resourceLimit := request.Resources.GetRequests(), request.Resources.GetLimits()
+	if resourceReq == nil || resourceLimit == nil {
 		klog.V(0).InfoS("Resource requirements or limits are nil")
 		return nil, nil
 	}
@@ -85,7 +95,7 @@ func (p *NumaAwarePolicy) PreCreateContainerHook(ctx policy.HookContext) (*polic
 	switch qos {
 	case v1.PodQOSGuaranteed, v1.PodQOSBurstable:
 		// Modify cpuset range for Guaranteed and Burstable pods
-		alloc = p.allocateCPUSet(resource_req, resource_limit)
+		alloc = p.AllocateCPUSet(resourceReq, resourceLimit)
 	case v1.PodQOSBestEffort:
 		// Don't modify anything for BestEffort pods
 	}
@@ -93,7 +103,7 @@ func (p *NumaAwarePolicy) PreCreateContainerHook(ctx policy.HookContext) (*polic
 	return alloc, nil
 }
 
-func (p *NumaAwarePolicy) allocateCPUSet(request, limit *v1.ResourceList) *policy.Allocation {
+func (p *NumaAwarePolicy) AllocateCPUSet(request, limit *v1.ResourceList) *policy.Allocation {
 	alloc := policy.NewAllocation()
 
 	if request == nil || limit == nil {
@@ -106,6 +116,12 @@ func (p *NumaAwarePolicy) allocateCPUSet(request, limit *v1.ResourceList) *polic
 	nodeResources := p.cache.GetNodeResources()
 
 	klog.V(5).InfoS("nodeResources", "resources", nodeResources)
+
+	// Check if there are any node resources available
+	if len(nodeResources) == 0 {
+		klog.V(0).InfoS("No node resources available")
+		return nil
+	}
 
 	// 按照请求资源选择节点
 	// Fix: 默认 CPU 中所有 NUMA 的cpu数量一致
@@ -120,6 +136,11 @@ func (p *NumaAwarePolicy) allocateCPUSet(request, limit *v1.ResourceList) *polic
 	used := math.MaxFloat64
 
 	for i, v := range nodeResources {
+		// req超出节点总CPU数量，不可亲和
+		if reqCpu+v.CpuUsedByRequest > cpuTotalInNode {
+			continue
+		}
+
 		if v.CpuUsed < used {
 			preferedNode = i
 			used = v.CpuUsed
@@ -127,6 +148,13 @@ func (p *NumaAwarePolicy) allocateCPUSet(request, limit *v1.ResourceList) *polic
 	}
 
 	klog.V(5).InfoS("Selected preferred node", "nodeId", preferedNode)
+
+	// Check if no suitable node was found
+	if preferedNode == -1 {
+		klog.V(0).InfoS("No suitable node found for CPU allocation")
+		return nil
+	}
+
 	// TODO: 设置方法修改从系统信息直接获取，check 超线程等情况
 	alloc.SetCPUSetCpus(strconv.Itoa(preferedNode*int(cpuTotalInNode)) + "-" + strconv.Itoa((preferedNode+1)*int(cpuTotalInNode)-1))
 
