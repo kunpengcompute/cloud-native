@@ -32,6 +32,9 @@ const (
 )
 
 func main() {
+	klog.InitFlags(nil)
+	defer klog.Flush()
+
 	kernelVfDrivers := flag.String("kernel-vf-drivers", "hisi_hpre", "Comma separated VF Device Driver of the KAE Devices in the system. Devices supported: hisi_hpre,hisi_zip,hisi_sec2")
 	flag.Parse()
 

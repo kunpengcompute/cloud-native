@@ -51,24 +51,28 @@ version: ## Show version information.
 fmt: ## Format code for all projects.
 	@echo "Formatting all projects..."
 	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kunpeng-tap fmt
+	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kae-device-plugin fmt
 	@echo "Code formatting completed"
 
 .PHONY: vet
 vet: ## Run go vet for all projects.
 	@echo "Running go vet for all projects..."
 	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kunpeng-tap vet
+	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kae-device-plugin vet
 	@echo "Go vet completed"
 
 .PHONY: test
 test: ## Run tests for all projects.
 	@echo "Running tests for all projects..."
 	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kunpeng-tap test
+	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kae-device-plugin test
 	@echo "All tests completed"
 
 .PHONY: tidy
 tidy: ## Tidy go modules for all projects.
 	@echo "Tidying go modules for all projects..."
 	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kunpeng-tap tidy
+	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kae-device-plugin tidy
 	@echo "Go mod tidy completed"
 
 ##@ Build
@@ -79,6 +83,7 @@ build: ## Build all projects.
 	@mkdir -p $(BUILD_DIR)
 	$(MAKE) -C Boostkit_CloudNative/K8S mpam-build
 	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-build
+	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-build
 	@echo "All projects built successfully"
 
 .PHONY: clean
@@ -86,6 +91,7 @@ clean: ## Clean build artifacts for all projects.
 	@echo "Cleaning all projects..."
 	$(MAKE) -C Boostkit_CloudNative/K8S mpam-clean
 	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-clean
+	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-clean
 	rm -rf $(BUILD_DIR) $(DIST_DIR)
 	@echo "Clean completed"
 
@@ -110,6 +116,23 @@ mpam-clean: ## Clean k8s-mpam-controller build artifacts.
 mpam-docker: ## Build k8s-mpam-controller docker image.
 	@echo "Building k8s-mpam-controller docker image..."
 	$(MAKE) -C Boostkit_CloudNative/K8S mpam-docker
+
+##@ KAE Device Plugin
+
+.PHONY: kae-device-plugin-build
+kae-device-plugin-build: ## Build k8s-mpam-controller project.
+	@echo "Building k8s-mpam-controller..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-build
+
+.PHONY: kae-device-plugin-clean
+kae-device-plugin-clean: ## Clean k8s-mpam-controller build artifacts.
+	@echo "Cleaning k8s-mpam-controller..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-clean
+
+.PHONY: kae-device-plugin-test
+kae-device-plugin-test: ## Test k8s-mpam-controller project.
+	@echo "Testing k8s-mpam-controller..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-test
 
 ##@ Kunpeng TAP
 
