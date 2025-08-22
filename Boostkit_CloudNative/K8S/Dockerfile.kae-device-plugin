@@ -1,0 +1,3 @@
+FROM openeuler-24.03-lts-sp2:latest
+COPY ./bin/kae-device-plugin /usr/local/bin/
+ENTRYPOINT ["/usr/local/bin/kae-device-plugin"]

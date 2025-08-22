@@ -120,19 +120,24 @@ mpam-docker: ## Build k8s-mpam-controller docker image.
 ##@ KAE Device Plugin
 
 .PHONY: kae-device-plugin-build
-kae-device-plugin-build: ## Build k8s-mpam-controller project.
-	@echo "Building k8s-mpam-controller..."
+kae-device-plugin-build: ## Build kae-device-plugin project.
+	@echo "Building kae-device-plugin..."
 	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-build
 
 .PHONY: kae-device-plugin-clean
-kae-device-plugin-clean: ## Clean k8s-mpam-controller build artifacts.
-	@echo "Cleaning k8s-mpam-controller..."
+kae-device-plugin-clean: ## Clean kae-device-plugin build artifacts.
+	@echo "Cleaning kae-device-plugin..."
 	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-clean
 
 .PHONY: kae-device-plugin-test
-kae-device-plugin-test: ## Test k8s-mpam-controller project.
-	@echo "Testing k8s-mpam-controller..."
+kae-device-plugin-test: ## Test kae-device-plugin project.
+	@echo "Testing kae-device-plugin..."
 	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-test
+
+.PHONY: kae-device-plugin-docker
+kae-device-plugin-docker: ## Build kae-device-plugin docker image.
+	@echo "Building kae-device-plugin docker image..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-docker
 
 ##@ Kunpeng TAP
 

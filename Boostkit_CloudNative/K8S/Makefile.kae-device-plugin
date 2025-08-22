@@ -97,7 +97,7 @@ clean: ## Clean build artifacts.
 ##@ Docker
 
 .PHONY: docker-build
-docker-build: ## Build docker image.
+docker-build: build ## Build docker image.
 	@echo "Building docker image $(DOCKER_IMAGE)..."
 	sudo docker build --force-rm -f ./Dockerfile.kae-device-plugin -t $(DOCKER_IMAGE) .
 	@echo "Docker image $(DOCKER_IMAGE) built successfully"
