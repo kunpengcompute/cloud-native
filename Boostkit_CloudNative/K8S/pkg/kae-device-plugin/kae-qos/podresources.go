@@ -105,7 +105,7 @@ func getSupportedDevices(resourceInfo map[string][]string, devices []*podresourc
 	}
 }
 
-func (pm *podResourceManager) run(timeout time.Duration) {
+func (pm *podResourceManager) Run(timeout time.Duration) {
 	defer pm.syncTicker.Stop()
 
 	for {
