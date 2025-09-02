@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kunpeng-kae-plugin
+spec:
+  template:
+    spec:
+      serviceAccountName: kae-device-plugin
+      containers:
+      - name: kunpeng-kae-plugin
+        args:
+          - "-kernel-vf-drivers=hisi_hpre,hisi_zip,hisi_sec2"
+          - "-enable-qos=true"
+        volumeMounts:
+          - name: podresources
+            mountPath: /var/lib/kubelet/pod-resources
+          - name: kernel-debug
+            mountPath: /sys/kernel/debug
+      volumes:
+        - name: podresources
+          hostPath:
+            path: /var/lib/kubelet/pod-resources
+        - name: kernel-debug
+          hostPath:
+            path: /sys/kernel/debug

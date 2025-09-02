@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kunpeng-kae-plugin
+spec:
+  template:
+    spec:
+      containers:
+      - name: kunpeng-kae-plugin
+        args:
+        - "-kernel-vf-drivers=hisi_hpre,hisi_zip,hisi_sec2"
+        - "-v=4"

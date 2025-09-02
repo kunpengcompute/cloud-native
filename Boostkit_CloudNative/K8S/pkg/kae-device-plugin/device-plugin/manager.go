@@ -17,7 +17,7 @@ package deviceplugin
 import (
 	"reflect"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // updateInfo contains info for added, updated and deleted devices.

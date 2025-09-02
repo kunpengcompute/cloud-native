@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kunpeng-kae-plugin
+  labels:
+    app: kunpeng-kae-plugin
+spec:
+  selector:
+    matchLabels:
+      app: kunpeng-kae-plugin
+  template:
+    metadata:
+      labels:
+        app: kunpeng-kae-plugin
+    spec:
+      containers:
+      - name: kunpeng-kae-plugin
+        env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+        image: kae-device-plugin:0.1.0
+        imagePullPolicy: IfNotPresent
+        command: 
+          - "/usr/local/bin/kae-device-plugin"
+        args: 
+          - "-kernel-vf-drivers=hisi_hpre,hisi_zip,hisi_sec2"
+        resources:
+          requests:
+            memory: "15Mi"
+            cpu: 70m
+          limits:
+            memory: "30Mi"
+            cpu: 140m
+        volumeMounts:
+        - name: pcidir
+          mountPath: /sys/bus/pci
+        - name: kubeletsockets
+          mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+      - name: pcidir
+        hostPath:
+          path: /sys/bus/pci
+      - name: kubeletsockets
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+      nodeSelector:
+        kubernetes.io/arch: arm64

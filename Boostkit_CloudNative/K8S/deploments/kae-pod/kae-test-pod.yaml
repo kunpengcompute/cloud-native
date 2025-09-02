@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kae-test
+spec:
+  containers:
+  - name: kae-test
+    image: kae-test:latest
+    command: ["/bin/sh", "-c", "while true; do echo hello; sleep 300000; done"]
+    imagePullPolicy: IfNotPresent
+    env:
+      - name: OPENSSL_CONF
+        value: /home/openssl.cnf
+    resources:
+      requests:
+        cpu: "4"
+        memory: "16Gi"
+        kae.kunpeng.com/hisi_hpre: "1"
+        kae.kunpeng.com/hisi_sec2: "1"
+        kae.kunpeng.com/hisi_zip: "1"
+      limits:
+        cpu: "4"
+        memory: "16Gi"
+        kae.kunpeng.com/hisi_hpre: "1"
+        kae.kunpeng.com/hisi_sec2: "1"
+        kae.kunpeng.com/hisi_zip: "1"
+    volumeMounts:
+      - name: local-lib
+        mountPath: /usr/local
+  volumes:
+    - name: local-lib
+      hostPath:
+        path: /usr/local/

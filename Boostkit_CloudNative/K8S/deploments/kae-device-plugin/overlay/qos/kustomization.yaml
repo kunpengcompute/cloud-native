@@ -1,0 +1,9 @@
+resources:
+  - ../../base
+  - rbac.yaml   # 新增的 RBAC 相关内容
+
+patches:
+  - path: add-qos.yaml
+    target:
+      kind: DaemonSet
+      name: kunpeng-kae-plugin

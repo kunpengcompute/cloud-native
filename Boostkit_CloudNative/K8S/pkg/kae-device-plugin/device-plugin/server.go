@@ -25,7 +25,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
 	"google.golang.org/grpc"
@@ -85,7 +85,7 @@ func (srv *server) GetPreferredAllocation(ctx context.Context, rqt *pluginapi.Pr
 }
 
 func (srv *server) ListAndWatch(empty *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
-	klog.V(4).Info("Started ListAndWatch for", srv.devType)
+	klog.V(4).Info("Started ListAndWatch for ", srv.devType)
 
 	if err := srv.sendDevices(stream); err != nil {
 		return err
@@ -228,7 +228,7 @@ func (srv *server) setupAndServe(namespace string, devicePluginPath string, kube
 
 		// Starts device plugin service.
 		go func() {
-			klog.V(1).Infof("Start server for %s at: %s", srv.devType, pluginSocket)
+			klog.Infof("Start server for %s at: %s", srv.devType, pluginSocket)
 
 			if serveErr := srv.grpcServer.Serve(lis); serveErr != nil {
 				klog.Errorf("unable to start gRPC server: %+v", serveErr)
@@ -246,7 +246,7 @@ func (srv *server) setupAndServe(namespace string, devicePluginPath string, kube
 			return err
 		}
 
-		klog.V(1).Infof("Device plugin for %s registered", srv.devType)
+		klog.Infof("Device plugin for %s registered", srv.devType)
 
 		// Kubelet removes plugin socket when it (re)starts
 		// plugin must restart in this case
@@ -257,9 +257,9 @@ func (srv *server) setupAndServe(namespace string, devicePluginPath string, kube
 
 		if srv.getState() == serving {
 			srv.grpcServer.Stop()
-			klog.V(1).Infof("Socket %s removed, restarting", pluginSocket)
+			klog.Infof("Socket %s removed, restarting", pluginSocket)
 		} else {
-			klog.V(1).Infof("Socket %s shut down", pluginSocket)
+			klog.Infof("Socket %s shut down", pluginSocket)
 		}
 	}
 
