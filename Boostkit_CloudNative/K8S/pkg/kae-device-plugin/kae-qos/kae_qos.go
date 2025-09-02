@@ -25,6 +25,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -37,47 +38,46 @@ const (
 )
 
 type QosManager struct {
-	podResourceManager *podResourceManager
+	client *podResourceClient
 }
 
-func NewQosManager(syncPeriod time.Duration) (*QosManager, error) {
-	podResourceManager, err := NewPodResourceManager(syncPeriod)
+func NewQosManager(waitTime time.Duration) (*QosManager, error) {
+	podResourceManager, err := NewPodResourceClient(waitTime)
 	if err != nil {
 		return nil, err
 	}
+	podResourceManager.init()
 
 	return &QosManager{
-		podResourceManager: podResourceManager,
+		client: podResourceManager,
 	}, nil
 }
 
-func (qm *QosManager) Run(timeout time.Duration) {
-	qm.podResourceManager.Run(timeout)
-}
-
 func (qm *QosManager) applyQos(pod *corev1.Pod, getQosValue func(resourceName string) string) error {
-	resources := pod.Spec.Resources.Limits
-	if resources == nil {
-		return nil
+	allocateResource := []string{}
+	for _, container := range pod.Spec.Containers {
+		resources := container.Resources.Limits
+		for resourceName := range supportDeivce {
+			if _, ok := resources[corev1.ResourceName(resourceName)]; ok {
+				allocateResource = append(allocateResource, resourceName)
+			}
+		}
 	}
 
-	allocateResource := []string{}
-	for resourceName := range supportDeivce {
-		if _, ok := resources[corev1.ResourceName(resourceName)]; ok {
-			allocateResource = append(allocateResource, resourceName)
-		}
+	if allocateResource == nil {
+		return nil
 	}
 
 	namespaceName := pod.Namespace + "/" + pod.Name
 	for _, resourceName := range allocateResource {
 		qos := getQosValue(resourceName)
-		devices := qm.podResourceManager.getDeviceIds(namespaceName, resourceName)
+		devices := qm.client.getDeviceIds(namespaceName, resourceName)
 		// podResourcesManager not synced, retrying
 		if devices == nil {
 			return fmt.Errorf("podResourcesManager not synced, retrying after synchronization is complete")
 		}
 
-		if err := setKaeQos(resourceName, devices, qos); err != nil {
+		if err := setKaeQos(getResourceType(resourceName), devices, qos); err != nil {
 			return fmt.Errorf("set qos for %s device [%v] failed: %v", resourceName, devices, err)
 		}
 	}
@@ -121,22 +121,27 @@ func resourceNameToQosKey(resourceName string) string {
 	return qosKey
 }
 
-func setKaeQos(qosType string, devices []string, qos string) error {
+func setKaeQos(resourceType string, devices []string, qos string) error {
+	if resourceType == "" {
+		return fmt.Errorf("resourceType type is empty")
+	}
+
 	if !isValidQos(qos) {
 		return fmt.Errorf("invalid qos value: %s", qos)
 	}
 
 	for _, device := range devices {
-		if err := setDeviceKaeQos(qosType, device, qos); err != nil {
+		if err := setDeviceKaeQos(resourceType, device, qos); err != nil {
 			return err
 		}
 	}
 
+	klog.V(4).Infof("Set %s device [%v] qos to %s", resourceType, devices, qos)
 	return nil
 }
 
-func setDeviceKaeQos(qosType string, device string, qos string) error {
-	qosPath := filepath.Join(kernelDebugPath, qosType)
+func setDeviceKaeQos(resourceType string, device string, qos string) error {
+	qosPath := filepath.Join(kernelDebugPath, resourceType)
 
 	pfDevice, err := getPfDeviceId(device)
 	if err != nil {

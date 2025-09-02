@@ -238,14 +238,5 @@ func (dp *DevicePlugin) getMounts(deviceName string) []pluginapi.Mount {
 		ReadOnly:      false,
 	})
 
-	// KAE checks consistency between /sys/class/uacce and /dev at runtime.
-	// If they are inconsistent, it may report "failed to check file /dev/hisi_xxx-n",
-	// which is harmless; this mount is only to suppress the warning.
-	mounts = append(mounts, pluginapi.Mount{
-		ContainerPath: filepath.Join(dp.uacceDir),
-		HostPath:      filepath.Join("/tmp", "kae-uacce", deviceName),
-		ReadOnly:      false,
-	})
-
 	return mounts
 }

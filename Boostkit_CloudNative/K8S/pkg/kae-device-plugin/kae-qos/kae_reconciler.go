@@ -18,10 +18,10 @@ package kaeqos
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/klog"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -48,6 +48,11 @@ func (r *KaeQosReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	// Check if the pod has kae device
+	if !isKAEDeviceRequested(pod) {
+		return ctrl.Result{}, nil
+	}
+
 	if pod.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Ensure the Pod has a finalizer to perform cleanup before deletion
 		if !controllerutil.ContainsFinalizer(pod, finalizerName) {
@@ -59,21 +64,28 @@ func (r *KaeQosReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{}, nil
 		}
 
+		// Get pod resources
+		if err := r.QosManager.client.fetchPodResources(pod.Namespace, pod.Name); err != nil {
+			return ctrl.Result{}, fmt.Errorf("get pod : %s resources failed: %v", req.NamespacedName, err)
+		}
+
 		// Call QosManager to update Pod's device QoS
-		err := r.QosManager.updateQos(pod)
-		if err != nil {
-			klog.Errorf("update pod : %s qos failed: %v", req.NamespacedName, err)
-			return ctrl.Result{}, err
+		if err := r.QosManager.updateQos(pod); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update pod : %s qos failed: %v", req.NamespacedName, err)
 		}
 
 		return ctrl.Result{}, nil
 	}
 
 	if controllerutil.ContainsFinalizer(pod, finalizerName) {
+		// Get pod resources
+		if err := r.QosManager.client.fetchPodResources(pod.Namespace, pod.Name); err != nil {
+			return ctrl.Result{}, fmt.Errorf("get pod : %s resources failed: %v", req.NamespacedName, err)
+		}
+
 		// Execute recovery logic, restore device qos
 		if err := r.QosManager.restoreQos(pod); err != nil {
-			klog.Errorf("restore pod : %s qos failed: %v", req.NamespacedName, err)
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("restore pod : %s qos failed: %v", req.NamespacedName, err)
 		}
 
 		// Remove finalizer to allow Kubernetes to actually delete the Pod
@@ -94,11 +106,28 @@ func (r *KaeQosReconciler) SetupWithManager(mgr ctrl.Manager, nodeName string) e
 		if !ok {
 			return false
 		}
-		return pod.Spec.NodeName == nodeName && pod.Status.Phase == corev1.PodRunning
+
+		if pod.Spec.NodeName != nodeName || pod.Status.Phase != corev1.PodRunning {
+			return false
+		}
+
+		return isKAEDeviceRequested(pod)
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Pod{}).
 		WithEventFilter(nodePredicate).
 		Complete(r)
+}
+
+func isKAEDeviceRequested(pod *corev1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		for resourceName := range container.Resources.Limits {
+			if isSupportDevice(string(resourceName)) {
+				return true
+			}
+		}
+	}
+
+	return false
 }

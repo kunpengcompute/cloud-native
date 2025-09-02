@@ -28,17 +28,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/klogr"
 )
 
 const (
-	namespace  = "kae.kunpeng.com"
-	syncPeriod = 30 * time.Second
-	timeout    = 10 * time.Second
+	namespace = "kae.kunpeng.com"
+	timeout   = 10 * time.Second
 )
 
 func main() {
 	klog.InitFlags(nil)
 	defer klog.Flush()
+	ctrl.SetLogger(klogr.New())
 
 	kernelVfDrivers := flag.String("kernel-vf-drivers", "hisi_hpre", "Comma separated VF Device Driver of the KAE Devices in the system. Devices supported: hisi_hpre,hisi_zip,hisi_sec2")
 	enableQos := flag.Bool("enable-qos", false, "Enable KAE QoS")
@@ -61,7 +62,7 @@ func main() {
 }
 
 func startQos() {
-	qosManager, err := kaeqos.NewQosManager(syncPeriod)
+	qosManager, err := kaeqos.NewQosManager(timeout)
 	if err != nil {
 		klog.Errorf("Failed to create qos manager: %v", err)
 		os.Exit(1)
@@ -88,7 +89,6 @@ func startQos() {
 	}
 
 	klog.Infof("KAE QoS manager started")
-	go qosManager.Run(timeout)
 	go func() {
 		if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 			klog.Fatalf("Failed to start manager: %v", err)

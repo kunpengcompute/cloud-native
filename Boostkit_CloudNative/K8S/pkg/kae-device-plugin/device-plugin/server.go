@@ -157,6 +157,7 @@ func (srv *server) Allocate(ctx context.Context, rqt *pluginapi.AllocateRequest)
 		response.ContainerResponses = append(response.ContainerResponses, cresp)
 	}
 
+	klog.V(4).Info("Allocate response:", response)
 	return response, nil
 }
 
