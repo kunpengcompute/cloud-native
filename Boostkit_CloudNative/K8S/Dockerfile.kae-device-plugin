@@ -1,3 +1,8 @@
-FROM openeuler-24.03-lts-sp2:latest
+FROM alpine:3.20
+LABEL org.opencontainers.image.source='https://gitee.com/kunpeng_compute/kunpeng-cloud-computing'
+LABEL version='devel'
+LABEL release='1'
+LABEL name='kae-device-plugin'
+LABEL summary='Kunpeng KAE device plugin for Kubernetes'
 COPY ./bin/kae-device-plugin /usr/local/bin/
 ENTRYPOINT ["/usr/local/bin/kae-device-plugin"]

@@ -20,7 +20,7 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-        image: kae-device-plugin:0.1.0
+        image: kae-device-plugin:1.0
         imagePullPolicy: IfNotPresent
         command: 
           - "/usr/local/bin/kae-device-plugin"

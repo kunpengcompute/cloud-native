@@ -48,11 +48,6 @@ func (r *KaeQosReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	// Check if the pod has kae device
-	if !isKAEDeviceRequested(pod) {
-		return ctrl.Result{}, nil
-	}
-
 	if pod.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Ensure the Pod has a finalizer to perform cleanup before deletion
 		if !controllerutil.ContainsFinalizer(pod, finalizerName) {

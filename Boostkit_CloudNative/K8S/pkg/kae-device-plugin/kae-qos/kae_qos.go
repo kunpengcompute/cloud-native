@@ -28,10 +28,13 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const (
-	kaeDefaultQos   = "1000"
+var (
 	kernelDebugPath = "/sys/kernel/debug"
 	pciDeviceDir    = "/sys/bus/pci/devices"
+)
+
+const (
+	kaeDefaultQos   = "1000"
 	algQosFile      = "alg_qos"
 	physfnFile      = "physfn"
 	kaeQosKeyPrefix = "qos.kae.kunpeng.com"
