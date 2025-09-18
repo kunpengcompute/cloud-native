@@ -25,9 +25,10 @@ import (
 	"github.com/gorilla/mux"
 	"k8s.io/klog/v2"
 
+	"net/http/httputil"
+
 	"kunpeng.huawei.com/kunpeng-cloud-computing/cmd/kunpeng-tap/proxy/options"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server"
-	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server/httputil"
 )
 
 func ReverseProxy(containerRuntimeEndpoint string) *httputil.ReverseProxy {

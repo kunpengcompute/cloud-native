@@ -1,6 +1,6 @@
 module kunpeng.huawei.com/kunpeng-cloud-computing
 
-go 1.23.6
+go 1.25.0
 
 require (
 	golang.org/x/sys v0.29.0
