@@ -28,6 +28,7 @@ require (
 	github.com/prometheus/common v0.66.1
 	github.com/prometheus/exporter-toolkit v0.14.1
 	github.com/shirou/gopsutil/v3 v3.24.5
+	github.com/stretchr/testify v1.11.1
 	go.uber.org/atomic v1.11.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.8
@@ -61,7 +62,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/net v0.43.0
+	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
@@ -119,6 +120,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/opencontainers/runc v1.1.5 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/prometheus/procfs v0.15.2-0.20240603130017-1754b780536b // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
