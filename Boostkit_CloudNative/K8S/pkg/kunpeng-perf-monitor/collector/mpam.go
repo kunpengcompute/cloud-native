@@ -47,6 +47,10 @@ var (
 	// name of the file that store the L3 cache usage info in dir: dirPathForMPAMGroupData/nameKeyForCache+XXX
 	fileNameForCache = "llc_occupancy"
 	fileNameForMem   = "mbm_total_bytes"
+
+	configDataFile    = "schemata"
+	configKeyForCache = "L3"
+	configKeyForMem   = "MB"
 )
 
 type mpamCollector struct {
@@ -206,7 +210,38 @@ func (c *mpamCollector) updateMPAMResUsageMetrics(ch chan<- prometheus.Metric, m
 	return nil
 }
 
+func (c *mpamCollector) updateResConfigMetrics(ch chan<- prometheus.Metric, labels mpamMetricsCommonLabels, metricType *prometheus.Desc, configData *ConfigData) error {
+	for configItem, configData := range *configData {
+		for id, value := range configData {
+			ch <- prometheus.MustNewConstMetric(metricType, prometheus.GaugeValue, float64(value), labels.groupName, labels.cpuList, labels.mode, configItem, id)
+		}
+	}
+	return nil
+}
+
 func (c *mpamCollector) updateMPAMResConfigMetrics(ch chan<- prometheus.Metric, mpamGroupRelPath string, labels mpamMetricsCommonLabels) error {
+	configFilePath := filepath.Join(*resctlMountPath, mpamGroupRelPath, configDataFile)
+	l3CacheConfigData, memConfigData, err := getMPAMConfigData(configFilePath, configKeyForCache, configKeyForMem)
+	if err != nil {
+		return fmt.Errorf("failed to get mpam config data: %w", err)
+	}
+
+	// update l3 cache config metrics
+	if l3CacheConfigData != nil {
+		err = c.updateResConfigMetrics(ch, labels, c.cacheConfig, l3CacheConfigData)
+		if err != nil {
+			return fmt.Errorf("failed to update mpam l3 cache config metrics: %w", err)
+		}
+	}
+
+	// update memory config metrics
+	if memConfigData != nil {
+		err = c.updateResConfigMetrics(ch, labels, c.memConfig, memConfigData)
+		if err != nil {
+			return fmt.Errorf("failed to update mpam memory config metrics: %w", err)
+		}
+	}
+
 	return nil
 }
 

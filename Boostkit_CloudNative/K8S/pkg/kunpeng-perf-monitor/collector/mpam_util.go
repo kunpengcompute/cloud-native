@@ -16,17 +16,141 @@
 package collector
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
+
+// configItemData: the configData for a configItem
+// e.g. configData [1:16777215 122:16777215 243:16777215 364:16777215] for configItem "L3"
+type ConfigItemData map[string]int
+
+// ConfigData stores the parsed data in a mpam resource config file, including configItem (the keys) and configItemData (the values).
+// configItem examples: "MBHDL" "MBPRI" "MBMIN" "MB" "L3PRI" "L3"
+type ConfigData map[string]ConfigItemData
+
+func strToInt(str string) (int, error) {
+	if str == "" {
+		return 0, fmt.Errorf("failed to parse int: empty string")
+	}
+	base := 10
+	if strings.ContainsAny(str, "abcdefABCDEF") {
+		base = 16
+	}
+	value, err := strconv.ParseInt(str, base, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse int from string: %s", str)
+	}
+	return int(value), nil
+}
+
+func addToConfigData(configData *ConfigData, item string, key string, value int) (err error) {
+	if configData == nil {
+		return fmt.Errorf("configData is nil")
+	}
+	if *configData == nil {
+		*configData = make(ConfigData)
+	}
+	if _, ok := (*configData)[item]; !ok {
+		(*configData)[item] = make(ConfigItemData)
+	}
+	(*configData)[item][key] = value
+	return nil
+}
+
+// parse a line
+// a link  is like: L3:1=ffffff;122=ffffff;243=ffffff;364=ffffff
+func parseLine(line string, configData1 *ConfigData, configKey1 string, configData2 *ConfigData, configKey2 string) error {
+	// remove the blank characters
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return nil // skip the empty line
+	}
+
+	// split a lint into configItem and dataStr
+	// eg: "L3" and "1=ffffff;122=ffffff;243=ffffff;364=ffffff"
+	parts := strings.SplitN(line, ":", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid line format: %s", line)
+	}
+	item := strings.TrimSpace(parts[0])
+	dataStr := strings.TrimSpace(parts[1])
+
+	// parse the dataStr
+	// split the dataStr into pairs like: XX=XXXXXX
+	keyValuePairs := strings.Split(dataStr, ";")
+	for _, pair := range keyValuePairs {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+
+		// split the pair
+		kv := strings.SplitN(pair, "=", 2)
+		if len(kv) != 2 {
+			return fmt.Errorf("invalid key-value pair: %s", pair)
+		}
+
+		key := strings.TrimSpace(kv[0])
+		valueStr := strings.TrimSpace(kv[1])
+
+		// convert the value to int64
+		value, err := strToInt(valueStr)
+		if err != nil {
+			return fmt.Errorf("failed to convert the string to int: %s", valueStr)
+		}
+
+		if strings.Contains(item, configKey1) {
+			err = addToConfigData(configData1, item, key, value)
+		} else if strings.Contains(item, configKey2) {
+			err = addToConfigData(configData2, item, key, value)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getMPAMConfigData(filename string, configKey1 string, configKey2 string) (configData1 *ConfigData, configData2 *ConfigData, err error) {
+	// get the fd
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	// init configData1 and configData2
+	configData1 = &ConfigData{}
+	configData2 = &ConfigData{}
+
+	// parse the file content line by line
+	scanner := bufio.NewScanner(file)
+	lineNumber := 0
+	for scanner.Scan() {
+		lineNumber++
+		line := scanner.Text()
+		err = parseLine(line, configData1, configKey1, configData2, configKey2)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error parsing line %d of file %v : %v", lineNumber, filename, err)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	return configData1, configData2, nil
+}
 
 // getAllTargetDirs() scans the rootDirPath recursively to find all the dirs whose name is TargetSubDir,
 // and return a map of target_dir_name to target_dir_path relative to rootDirPath.
 // The target_dir_name is the name of the parent dir of the TargetSubDir dir.
 // For dir structure below, the result should be:
-//  {"group1" "relative-path/to/group", "group2" "relative-path/to/group"}
+//  {"group1" "relative-path/to/group1", "group2" "relative-path/to/group2"}
 //
 /*
 tmpRoot/

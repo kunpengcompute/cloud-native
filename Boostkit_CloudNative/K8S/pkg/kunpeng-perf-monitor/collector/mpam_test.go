@@ -10,6 +10,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewMPAMCollector(t *testing.T) {
@@ -424,4 +425,130 @@ func TestUpdateMPAMResUsageMetrics(t *testing.T) {
 		assert.Equal(t, 1, len(ch))
 
 	})
+}
+
+func TestUpdateResConfigMetrics(t *testing.T) {
+	c := &mpamCollector{}
+	labels := mpamMetricsCommonLabels{
+		groupName: "test-group",
+		cpuList:   "0-3",
+		mode:      "balanced",
+	}
+	metricType := prometheus.NewDesc(
+		"test_metric",
+		"Test metric",
+		[]string{"group", "cpu", "mode", "config", "id"},
+		nil,
+	)
+
+	// 测试用例1：正常数据
+	t.Run("valid_config_data", func(t *testing.T) {
+		ch := make(chan prometheus.Metric, 3)
+		defer close(ch)
+		configData := &ConfigData{
+			"cache":  {"L3": 2048},
+			"memory": {"DDR": 4096},
+		}
+
+		err := c.updateResConfigMetrics(ch, labels, metricType, configData)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(ch))
+	})
+
+	// 测试用例2：空配置数据
+	t.Run("empty_config_data", func(t *testing.T) {
+		ch := make(chan prometheus.Metric, 3)
+		defer close(ch)
+		configData := &ConfigData{}
+
+		err := c.updateResConfigMetrics(ch, labels, metricType, configData)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(ch))
+	})
+
+	// 测试用例3：指标标签验证
+	t.Run("metric_labels", func(t *testing.T) {
+		ch := make(chan prometheus.Metric, 3)
+		defer close(ch)
+		configData := &ConfigData{"cache": {"L2": 1024}}
+		err := c.updateResConfigMetrics(ch, labels, metricType, configData)
+
+		metric := <-ch
+		assert.NoError(t, err)
+		assert.Equal(t, metricType.String(), metric.Desc().String())
+	})
+}
+
+func TestUpdateMPAMResConfigMetrics(t *testing.T) {
+	c := &mpamCollector{
+		cacheConfig: prometheus.NewDesc(
+			"cache_config",
+			"Cache config",
+			[]string{"group", "cpu", "mode", "config", "id"},
+			nil,
+		),
+		memConfig: prometheus.NewDesc(
+			"mem_config",
+			"Memory config",
+			[]string{"group", "cpu", "mode", "config", "id"},
+			nil,
+		),
+	}
+
+	labels := mpamMetricsCommonLabels{
+		groupName: "test-group",
+		cpuList:   "0-3",
+		mode:      "balanced",
+	}
+
+	t.Run("both_configs", func(t *testing.T) {
+		ch := make(chan prometheus.Metric, 10)
+		defer close(ch)
+
+		// 创建临时测试文件
+		testFile := createTestConfigFile(t, "L3:0=256\nMB:0=1024")
+		defer os.Remove(testFile)
+
+		// 替换全局变量便于测试
+		oldPath := *resctlMountPath
+		*resctlMountPath = filepath.Dir(testFile)
+		defer func() { *resctlMountPath = oldPath }()
+
+		err := c.updateMPAMResConfigMetrics(ch, filepath.Base(testFile), labels)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(ch)) // 预期生成2个指标
+	})
+
+	t.Run("config_file_error", func(t *testing.T) {
+		ch := make(chan prometheus.Metric, 10)
+		defer close(ch)
+
+		// 使用不存在的路径
+		err := c.updateMPAMResConfigMetrics(ch, "invalid/path", labels)
+		assert.ErrorContains(t, err, "failed to get mpam config data")
+	})
+
+	t.Run("partial_configs", func(t *testing.T) {
+		ch := make(chan prometheus.Metric, 10)
+		defer close(ch)
+
+		testFile := createTestConfigFile(t, "L3:0=512")
+		defer os.Remove(testFile)
+
+		oldPath := *resctlMountPath
+		*resctlMountPath = filepath.Dir(testFile)
+		defer func() { *resctlMountPath = oldPath }()
+
+		err := c.updateMPAMResConfigMetrics(ch, filepath.Base(testFile), labels)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(ch)) // 只生成cache指标
+	})
+}
+
+// 创建临时配置文件
+func createTestConfigFile(t *testing.T, content string) string {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, configDataFile)
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0644))
+	return dir
 }
