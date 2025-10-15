@@ -1,0 +1,38 @@
+# 通用 BDD 测试框架依赖
+
+# 核心 BDD 测试框架
+pytest-bdd>=7.0.0
+pytest>=7.0.0
+
+# Kubernetes 客户端库
+kubernetes>=28.0.0
+
+# HTTP 客户端
+requests>=2.28.0
+
+# YAML 处理
+PyYAML>=6.0
+
+# JSON 处理和验证
+jsonschema>=4.0.0
+
+# 进程管理和系统工具
+psutil>=5.9.0
+
+# 日志和调试
+colorlog>=6.7.0
+
+# 测试报告和覆盖率
+pytest-html>=3.1.0
+pytest-cov>=4.0.0
+pytest-xdist>=3.0.0
+pytest-timeout>=2.1.0
+
+# 重试机制
+tenacity>=8.0.0
+
+# 时间工具
+python-dateutil>=2.8.0
+
+# 配置管理
+configparser>=5.3.0

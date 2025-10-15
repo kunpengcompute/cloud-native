@@ -1,0 +1,119 @@
+# kunpeng-tap 边界条件测试用例配置
+# 测试极端资源请求和边界情况
+
+boundary_condition_tests:
+  - id: "BC-01"
+    name: "最小资源请求"
+    cpu_request: "0.1"
+    cpu_limit: "0.1"
+    machine_config: "2numa_48"  # 任意配置
+    qos: "guaranteed"
+    expected_behavior: "scheduled_successfully"
+    test_target: "最小资源请求"
+    note: "极小资源"
+    markers: ["boundary_condition", "min_resource", "guaranteed_qos"]
+
+  - id: "BC-02"
+    name: "超出2NUMA机器容量"
+    cpu_request: "97"
+    cpu_limit: "97"
+    machine_config: "2numa_48"
+    qos: "guaranteed"
+    expected_behavior: "scheduling_failed"
+    test_target: "超出机器容量"
+    note: "资源不足"
+    markers: ["boundary_condition", "resource_overflow", "guaranteed_qos", "2numa"]
+
+  - id: "BC-03"
+    name: "超出4NUMA机器容量"
+    cpu_request: "321"
+    cpu_limit: "321"
+    machine_config: "4numa_80"
+    qos: "guaranteed"
+    expected_behavior: "scheduling_failed"
+    test_target: "超出机器容量"
+    note: "资源不足"
+    markers: ["boundary_condition", "resource_overflow", "guaranteed_qos", "4numa"]
+
+  - id: "BC-04"
+    name: "毫核单位资源请求"
+    cpu_request: "1000m"
+    cpu_limit: "2000m"
+    machine_config: "2numa_48"  # 任意配置
+    qos: "burstable"
+    expected_behavior: "scheduled_successfully"
+    test_target: "毫核单位"
+    note: "单位转换"
+    markers: ["boundary_condition", "millicores", "burstable_qos", "unit_conversion"]
+
+  - id: "BC-05"
+    name: "小数点CPU资源请求"
+    cpu_request: "1.5"
+    cpu_limit: "1.5"
+    machine_config: "2numa_48"  # 任意配置
+    qos: "guaranteed"
+    expected_behavior: "scheduled_successfully"
+    test_target: "小数点CPU"
+    note: "非整数CPU"
+    markers: ["boundary_condition", "decimal_cpu", "guaranteed_qos"]
+
+  - id: "BC-06"
+    name: "单NUMA最大容量"
+    cpu_request: "48"
+    cpu_limit: "48"
+    machine_config: "2numa_48"
+    qos: "guaranteed"
+    expected_behavior: "scheduled_successfully"
+    expected_affinity: "numa"
+    test_target: "单NUMA最大容量"
+    note: "刚好占满单个NUMA"
+    markers: ["boundary_condition", "max_numa_capacity", "guaranteed_qos", "2numa", "numa_affinity"]
+
+  - id: "BC-07"
+    name: "单NUMA超出1核"
+    cpu_request: "49"
+    cpu_limit: "49"
+    machine_config: "2numa_48"
+    qos: "guaranteed"
+    expected_behavior: "scheduled_successfully"
+    expected_affinity: "cross_numa"
+    test_target: "单NUMA超出1核"
+    note: "必须跨NUMA调度"
+    markers: ["boundary_condition", "exceed_numa_by_one", "guaranteed_qos", "2numa", "cross_numa"]
+
+  - id: "BC-08"
+    name: "4NUMA单NUMA最大容量"
+    cpu_request: "24"
+    cpu_limit: "24"
+    machine_config: "4numa_24"
+    qos: "guaranteed"
+    expected_behavior: "scheduled_successfully"
+    expected_affinity: "numa"
+    test_target: "单NUMA最大容量"
+    note: "刚好占满单个NUMA"
+    markers: ["boundary_condition", "max_numa_capacity", "guaranteed_qos", "4numa", "numa_affinity"]
+
+  - id: "BC-09"
+    name: "4NUMA单Socket最大容量"
+    cpu_request: "48"
+    cpu_limit: "48"
+    machine_config: "4numa_24"
+    qos: "guaranteed"
+    expected_behavior: "scheduled_successfully"
+    expected_affinity: "socket"
+    test_target: "单Socket最大容量"
+    note: "刚好占满单个Socket"
+    markers: ["boundary_condition", "max_socket_capacity", "guaranteed_qos", "4numa", "socket_affinity"]
+
+  - id: "BC-10"
+    name: "BestEffort无资源限制"
+    cpu_request: ""
+    cpu_limit: ""
+    machine_config: "2numa_48"
+    qos: "besteffort"
+    expected_behavior: "scheduled_successfully"
+    expected_affinity: "none"
+    test_target: "BestEffort无资源限制"
+    note: "不应产生亲和"
+    markers: ["boundary_condition", "besteffort_qos", "no_affinity"]
+
