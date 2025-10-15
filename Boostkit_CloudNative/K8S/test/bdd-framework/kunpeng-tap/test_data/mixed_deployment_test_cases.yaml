@@ -1,0 +1,469 @@
+# kunpeng-tap 混合部署测试用例配置
+# 测试在已有容器占用资源的情况下，新容器的拓扑亲和行为
+
+# 3.1 NUMA 亲和后的资源竞争测试 - 2NUMA Guaranteed
+mixed_deployment_2numa_guaranteed:
+  - id: "MIX-2N-01"
+    name: "小资源在已占用NUMA内亲和"
+    machine_config: "2numa_48"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+      - numa: "numa1"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "4"
+      cpu_limit: "4"
+      qos: "guaranteed"
+    expected_affinity: "numa"  # NUMA#0或NUMA#1
+    expected_behavior: "affinity_expected"
+    test_target: "小资源在已占用NUMA内亲和"
+    note: "NUMA内剩余资源充足"
+    markers: ["mixed_deployment", "2numa", "guaranteed_qos", "numa_affinity", "resource_competition"]
+
+  - id: "MIX-2N-02"
+    name: "大资源选择剩余较多NUMA"
+    machine_config: "2numa_48"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "40"
+        cpu_limit: "40"
+        qos: "guaranteed"
+      - numa: "numa1"
+        cpu_request: "30"
+        cpu_limit: "30"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "20"
+      cpu_limit: "20"
+      qos: "guaranteed"
+    expected_affinity: "numa"  # NUMA#1
+    expected_numa: "numa1"
+    expected_behavior: "affinity_expected"
+    test_target: "大资源选择剩余较多NUMA"
+    note: "负载均衡策略"
+    markers: ["mixed_deployment", "2numa", "guaranteed_qos", "numa_affinity", "load_balancing"]
+
+  - id: "MIX-2N-04"
+    name: "资源不足时跨NUMA调度"
+    machine_config: "2numa_48"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "45"
+        cpu_limit: "45"
+        qos: "guaranteed"
+      - numa: "numa1"
+        cpu_request: "45"
+        cpu_limit: "45"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "8"
+      cpu_limit: "8"
+      qos: "guaranteed"
+    expected_affinity: "cross_numa"
+    expected_behavior: "cross_numa_expected"
+    test_target: "资源不足时跨NUMA调度"
+    note: "单NUMA剩余不足"
+    markers: ["mixed_deployment", "2numa", "guaranteed_qos", "cross_numa", "resource_shortage"]
+
+  - id: "MIX-2N-05"
+    name: "大容器必须跨NUMA"
+    machine_config: "2numa_48"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "10"
+        cpu_limit: "10"
+        qos: "guaranteed"
+      - numa: "numa1"
+        cpu_request: "10"
+        cpu_limit: "10"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "49"
+      cpu_limit: "49"
+      qos: "guaranteed"
+    expected_affinity: "cross_numa"
+    expected_behavior: "cross_numa_expected"
+    test_target: "大容器必须跨NUMA"
+    note: "超出单NUMA剩余容量"
+    markers: ["mixed_deployment", "2numa", "guaranteed_qos", "cross_numa", "large_container"]
+
+  - id: "MIX-2N-06"
+    name: "单NUMA剩余不足切换NUMA"
+    machine_config: "2numa_48"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "49"
+        cpu_limit: "49"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "10"
+      cpu_limit: "10"
+      qos: "guaranteed"
+    expected_affinity: "numa"
+    expected_numa: "numa1"
+    expected_behavior: "affinity_expected"
+    test_target: "单NUMA剩余不足"
+    note: "NUMA#0剩余不足，切换NUMA"
+    markers: ["mixed_deployment", "2numa", "guaranteed_qos", "numa_switch", "resource_shortage"]
+
+# 3.1 NUMA 亲和后的资源竞争测试 - 2NUMA Burstable
+mixed_deployment_2numa_burstable:
+  - id: "MIX-2N-07"
+    name: "Burstable中等资源NUMA亲和"
+    machine_config: "2numa_48"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "10"
+        cpu_limit: "20"
+        qos: "burstable"
+      - numa: "numa1"
+        cpu_request: "10"
+        cpu_limit: "20"
+        qos: "burstable"
+    new_container:
+      cpu_request: "5"
+      cpu_limit: "10"
+      qos: "burstable"
+    expected_affinity: "numa"
+    expected_behavior: "affinity_expected"
+    test_target: "中等资源切换到空闲NUMA"
+    note: "NUMA内剩余资源充足"
+    markers: ["mixed_deployment", "2numa", "burstable_qos", "numa_affinity", "resource_competition"]
+
+  - id: "MIX-2N-08"
+    name: "Burstable大资源选择剩余较多NUMA"
+    machine_config: "2numa_48"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "10"
+        cpu_limit: "40"
+        qos: "burstable"
+      - numa: "numa1"
+        cpu_request: "10"
+        cpu_limit: "30"
+        qos: "burstable"
+    new_container:
+      cpu_request: "10"
+      cpu_limit: "20"
+      qos: "burstable"
+    expected_affinity: "numa"
+    expected_numa: "numa1"
+    expected_behavior: "affinity_expected"
+    test_target: "大资源选择剩余较多NUMA"
+    note: "负载均衡策略"
+    markers: ["mixed_deployment", "2numa", "burstable_qos", "numa_affinity", "load_balancing"]
+
+  - id: "MIX-2N-09"
+    name: "Burstable requests充足limits超出"
+    machine_config: "2numa_48"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "10"
+        cpu_limit: "45"
+        qos: "burstable"
+      - numa: "numa1"
+        cpu_request: "10"
+        cpu_limit: "45"
+        qos: "burstable"
+    new_container:
+      cpu_request: "4"
+      cpu_limit: "8"
+      qos: "burstable"
+    expected_affinity: "numa"
+    expected_behavior: "affinity_expected"
+    test_target: "requests资源充足，limits资源超出"
+    note: "单NUMA资源request容量充足，limits不足"
+    markers: ["mixed_deployment", "2numa", "burstable_qos", "numa_affinity", "request_limit_diff"]
+
+  - id: "MIX-2N-10"
+    name: "Burstable大容器必须跨NUMA"
+    machine_config: "2numa_48"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "5"
+        cpu_limit: "10"
+        qos: "burstable"
+      - numa: "numa1"
+        cpu_request: "5"
+        cpu_limit: "10"
+        qos: "burstable"
+    new_container:
+      cpu_request: "25"
+      cpu_limit: "49"
+      qos: "burstable"
+    expected_affinity: "cross_numa"
+    expected_behavior: "cross_numa_expected"
+    test_target: "大容器必须跨NUMA"
+    note: "超出单NUMA剩余容量"
+    markers: ["mixed_deployment", "2numa", "burstable_qos", "cross_numa", "large_container"]
+
+# 3.1 NUMA 亲和后的资源竞争测试 - 4NUMA Guaranteed
+mixed_deployment_4numa_guaranteed:
+  - id: "MIX-4N-01"
+    name: "小资源在剩余最多NUMA亲和"
+    machine_config: "4numa_24"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+      - numa: "numa1"
+        cpu_request: "15"
+        cpu_limit: "15"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "4"
+      cpu_limit: "4"
+      qos: "guaranteed"
+    expected_affinity: "numa"
+    expected_numa: "numa0"
+    expected_behavior: "affinity_expected"
+    test_target: "小资源在剩余最多NUMA亲和"
+    note: "NUMA内剩余资源充足"
+    markers: ["mixed_deployment", "4numa", "guaranteed_qos", "numa_affinity", "load_balancing"]
+
+  - id: "MIX-4N-02"
+    name: "中等资源选择空闲NUMA"
+    machine_config: "4numa_24"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+      - numa: "numa1"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "8"
+      cpu_limit: "8"
+      qos: "guaranteed"
+    expected_affinity: "numa"
+    expected_numa: "numa2,numa3"  # NUMA#2或NUMA#3
+    expected_behavior: "affinity_expected"
+    test_target: "中等资源选择空闲NUMA"
+    note: "避开已占用NUMA"
+    markers: ["mixed_deployment", "4numa", "guaranteed_qos", "numa_affinity", "avoid_occupied"]
+
+  - id: "MIX-4N-03"
+    name: "大资源在同SOCKET内跨NUMA"
+    machine_config: "4numa_24"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "10"
+        cpu_limit: "10"
+        qos: "guaranteed"
+      - numa: "numa1"
+        cpu_request: "10"
+        cpu_limit: "10"
+        qos: "guaranteed"
+      - numa: "numa2"
+        cpu_request: "10"
+        cpu_limit: "10"
+        qos: "guaranteed"
+      - numa: "numa3"
+        cpu_request: "10"
+        cpu_limit: "10"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "20"
+      cpu_limit: "20"
+      qos: "guaranteed"
+    expected_affinity: "cross_numa_same_socket"
+    expected_behavior: "socket_affinity_expected"
+    test_target: "大资源在同SOCKET内跨NUMA"
+    note: "单NUMA不足，同SOCKET优先"
+    markers: ["mixed_deployment", "4numa", "guaranteed_qos", "socket_affinity", "cross_numa"]
+
+  - id: "MIX-4N-04"
+    name: "大资源切换到空闲SOCKET"
+    machine_config: "4numa_24"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+      - numa: "numa1"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "30"
+      cpu_limit: "30"
+      qos: "guaranteed"
+    expected_affinity: "cross_numa_same_socket"
+    expected_socket: "socket1"
+    expected_behavior: "socket_affinity_expected"
+    test_target: "大资源切换到空闲SOCKET"
+    note: "SOCKET#0剩余不足"
+    markers: ["mixed_deployment", "4numa", "guaranteed_qos", "socket_switch", "cross_numa"]
+
+  - id: "MIX-4N-05"
+    name: "超大资源必须跨SOCKET"
+    machine_config: "4numa_24"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+      - numa: "numa1"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+      - numa: "numa2"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+      - numa: "numa3"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "50"
+      cpu_limit: "50"
+      qos: "guaranteed"
+    expected_affinity: "cross_socket"
+    expected_behavior: "cross_socket_expected"
+    test_target: "超大资源必须跨SOCKET"
+    note: "单SOCKET剩余不足"
+    markers: ["mixed_deployment", "4numa", "guaranteed_qos", "cross_socket", "large_container"]
+
+# 3.1 NUMA 亲和后的资源竞争测试 - 4NUMA Burstable
+mixed_deployment_4numa_burstable:
+  - id: "MIX-4N-06"
+    name: "Burstable中等资源NUMA亲和"
+    machine_config: "4numa_24"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "10"
+        cpu_limit: "20"
+        qos: "burstable"
+      - numa: "numa1"
+        cpu_request: "10"
+        cpu_limit: "20"
+        qos: "burstable"
+    new_container:
+      cpu_request: "5"
+      cpu_limit: "10"
+      qos: "burstable"
+    expected_affinity: "numa"
+    expected_behavior: "affinity_expected"
+    test_target: "中等资源切换到空闲NUMA"
+    note: "NUMA内剩余资源充足"
+    markers: ["mixed_deployment", "4numa", "burstable_qos", "numa_affinity", "resource_competition"]
+
+  - id: "MIX-4N-07"
+    name: "Burstable大资源选择剩余较多NUMA"
+    machine_config: "4numa_24"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "10"
+        cpu_limit: "40"
+        qos: "burstable"
+      - numa: "numa1"
+        cpu_request: "10"
+        cpu_limit: "30"
+        qos: "burstable"
+    new_container:
+      cpu_request: "10"
+      cpu_limit: "20"
+      qos: "burstable"
+    expected_affinity: "numa"
+    expected_numa: "numa1"
+    expected_behavior: "affinity_expected"
+    test_target: "大资源选择剩余较多NUMA"
+    note: "负载均衡策略"
+    markers: ["mixed_deployment", "4numa", "burstable_qos", "numa_affinity", "load_balancing"]
+
+  - id: "MIX-4N-08"
+    name: "Burstable requests充足limits超出"
+    machine_config: "4numa_24"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "10"
+        cpu_limit: "45"
+        qos: "burstable"
+      - numa: "numa1"
+        cpu_request: "10"
+        cpu_limit: "45"
+        qos: "burstable"
+    new_container:
+      cpu_request: "4"
+      cpu_limit: "8"
+      qos: "burstable"
+    expected_affinity: "numa"
+    expected_behavior: "affinity_expected"
+    test_target: "requests资源充足，limits资源超出"
+    note: "单NUMA资源request容量充足，limits不足"
+    markers: ["mixed_deployment", "4numa", "burstable_qos", "numa_affinity", "request_limit_diff"]
+
+  - id: "MIX-4N-09"
+    name: "Burstable大容器必须跨NUMA"
+    machine_config: "4numa_24"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "5"
+        cpu_limit: "10"
+        qos: "burstable"
+      - numa: "numa1"
+        cpu_request: "5"
+        cpu_limit: "10"
+        qos: "burstable"
+    new_container:
+      cpu_request: "25"
+      cpu_limit: "49"
+      qos: "burstable"
+    expected_affinity: "cross_numa"
+    expected_behavior: "cross_numa_expected"
+    test_target: "大容器必须跨NUMA"
+    note: "超出单NUMA剩余容量"
+    markers: ["mixed_deployment", "4numa", "burstable_qos", "cross_numa", "large_container"]
+
+# 3.2 Socket 亲和后的资源竞争测试
+mixed_deployment_socket_affinity:
+  - id: "MIX-SK-GA-01"
+    name: "Socket亲和后NUMA负载均衡"
+    machine_config: "4numa_24"
+    existing_containers:
+      - socket: "socket0"
+        cpu_request: "40"
+        cpu_limit: "40"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "4"
+      cpu_limit: "4"
+      qos: "guaranteed"
+    expected_affinity: "numa"
+    expected_socket: "socket1"
+    expected_behavior: "affinity_expected"
+    test_target: "NUMA亲和负载均衡"
+    note: "其他Socket/NUMA内剩余充足"
+    markers: ["mixed_deployment", "4numa", "guaranteed_qos", "socket_affinity", "load_balancing"]
+
+  - id: "MIX-SK-BU-01"
+    name: "Burstable Socket亲和后NUMA负载均衡"
+    machine_config: "4numa_24"
+    existing_containers:
+      - socket: "socket0"
+        cpu_request: "40"
+        cpu_limit: "40"
+        qos: "burstable"
+      - socket: "socket1"
+        cpu_request: "40"
+        cpu_limit: "40"
+        qos: "burstable"
+    new_container:
+      cpu_request: "4"
+      cpu_limit: "8"
+      qos: "burstable"
+    expected_affinity: "numa"
+    expected_behavior: "affinity_expected"
+    test_target: "NUMA亲和负载均衡"
+    note: "Socket/NUMA内剩余充足"
+    markers: ["mixed_deployment", "4numa", "burstable_qos", "socket_affinity", "load_balancing"]
+

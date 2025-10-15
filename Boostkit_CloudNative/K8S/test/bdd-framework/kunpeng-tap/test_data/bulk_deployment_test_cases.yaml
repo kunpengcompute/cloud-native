@@ -1,0 +1,377 @@
+# kunpeng-tap 批量部署测试用例配置
+# 专注于大批量、高并发的容器部署场景
+
+# 批量部署测试用例 - 按 NUMA 拓扑分类
+bulk_deployment_tests_2numa:
+  # 标准配置 - 2NUMA 批量测试
+  - id: "BULK-2N-01"
+    name: "2NUMA小容器Guaranteed批量部署"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    qos_type: "guaranteed"
+    replica_count: 50
+    resource_config:
+      cpu_request: "1"
+      cpu_limit: "1"
+      memory_request: "2Gi"
+      memory_limit: "2Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "affinity_verification"
+      - "qos_classification"
+    test_category: "bulk_guaranteed_small"
+    deployment_strategy: "parallel"
+    
+  - id: "BULK-2N-02"
+    name: "2NUMA中等容器Guaranteed批量部署"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    qos_type: "guaranteed"
+    replica_count: 20
+    resource_config:
+      cpu_request: "2"
+      cpu_limit: "2"
+      memory_request: "4Gi"
+      memory_limit: "4Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "affinity_verification"
+    test_category: "bulk_guaranteed_medium"
+    deployment_strategy: "parallel"
+    
+  - id: "BULK-01"
+    name: "2NUMA小容器批量亲和"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    qos_type: "guaranteed"
+    replica_count: 50
+    resource_config:
+      cpu_request: "1"
+      cpu_limit: "1"
+      memory_request: "2Gi"
+      memory_limit: "2Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "affinity_verification"
+    test_category: "bulk_guaranteed_small"
+    deployment_strategy: "parallel"
+    markers: ["bulk_deployment", "2numa", "guaranteed_qos", "small_containers", "numa_balance"]
+
+  - id: "BULK-02"
+    name: "2NUMA中等容器批量亲和"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    qos_type: "guaranteed"
+    replica_count: 20
+    resource_config:
+      cpu_request: "2"
+      cpu_limit: "2"
+      memory_request: "4Gi"
+      memory_limit: "4Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "affinity_verification"
+    test_category: "bulk_guaranteed_medium"
+    deployment_strategy: "parallel"
+    markers: ["bulk_deployment", "2numa", "guaranteed_qos", "medium_containers", "numa_balance"]
+
+  - id: "BULK-03"
+    name: "2NUMA弹性容器批量亲和"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    qos_type: "burstable"
+    replica_count: 10
+    resource_config:
+      cpu_request: "1"
+      cpu_limit: "2"
+      memory_request: "2Gi"
+      memory_limit: "4Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "affinity_verification"
+    test_category: "bulk_burstable"
+    deployment_strategy: "parallel"
+    markers: ["bulk_deployment", "2numa", "burstable_qos", "elastic_containers", "numa_balance"]
+
+  - id: "BULK-04"
+    name: "2NUMA BestEffort批量调度"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    qos_type: "besteffort"
+    replica_count: 100
+    resource_config:
+      cpu_request: ""
+      cpu_limit: ""
+      memory_request: ""
+      memory_limit: ""
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: false
+      affinity_applied: false
+    validation_methods:
+      - "no_affinity_check"
+    test_category: "bulk_besteffort"
+    deployment_strategy: "parallel"
+    markers: ["bulk_deployment", "2numa", "besteffort_qos", "no_affinity"]
+
+  - id: "BULK-2N-03"
+    name: "2NUMA混合QoS批量部署"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    qos_type: "mixed"
+    replica_count: 30
+    resource_config:
+      guaranteed_replicas: 10
+      burstable_replicas: 15
+      besteffort_replicas: 5
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "mixed_qos_verification"
+    test_category: "bulk_mixed_qos"
+    deployment_strategy: "parallel"
+    markers: ["bulk_deployment", "2numa", "mixed_qos", "numa_balance"]
+
+  # 高性能配置 - 2NUMA 批量测试
+  - id: "BULK-2N-04"
+    name: "2NUMA高性能Guaranteed批量部署"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    qos_type: "guaranteed"
+    replica_count: 100
+    resource_config:
+      cpu_request: "2"
+      cpu_limit: "2"
+      memory_request: "4Gi"
+      memory_limit: "4Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "affinity_verification"
+      - "performance_metrics"
+    test_category: "bulk_guaranteed_medium"
+    deployment_strategy: "parallel"
+
+  - id: "BULK-2N-05"
+    name: "2NUMA高性能压力测试"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    qos_type: "guaranteed"
+    replica_count: 200
+    resource_config:
+      cpu_request: "1"
+      cpu_limit: "1"
+      memory_request: "2Gi"
+      memory_limit: "2Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "affinity_verification"
+      - "stress_test_metrics"
+    test_category: "bulk_stress_test"
+    deployment_strategy: "parallel"
+
+bulk_deployment_tests_4numa:
+  # 标准配置 - 4NUMA 批量测试
+  - id: "BULK-05"
+    name: "4NUMA小容器批量亲和"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    qos_type: "guaranteed"
+    replica_count: 80
+    resource_config:
+      cpu_request: "1"
+      cpu_limit: "1"
+      memory_request: "2Gi"
+      memory_limit: "2Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "socket_balance_check"
+      - "affinity_verification"
+    test_category: "bulk_4numa_guaranteed_small"
+    deployment_strategy: "parallel"
+    markers: ["bulk_deployment", "4numa", "guaranteed_qos", "small_containers", "numa_balance"]
+
+  - id: "BULK-06"
+    name: "4NUMA中等容器批量亲和"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    qos_type: "guaranteed"
+    replica_count: 40
+    resource_config:
+      cpu_request: "2"
+      cpu_limit: "2"
+      memory_request: "4Gi"
+      memory_limit: "4Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "socket_balance_check"
+      - "affinity_verification"
+    test_category: "bulk_4numa_guaranteed_medium"
+    deployment_strategy: "parallel"
+    markers: ["bulk_deployment", "4numa", "guaranteed_qos", "medium_containers", "numa_balance"]
+
+  - id: "BULK-4N-01"
+    name: "4NUMA小容器Guaranteed批量部署"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    qos_type: "guaranteed"
+    replica_count: 40
+    resource_config:
+      cpu_request: "1"
+      cpu_limit: "1"
+      memory_request: "2Gi"
+      memory_limit: "2Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "socket_balance_check"
+      - "affinity_verification"
+    test_category: "bulk_4numa_guaranteed_small"
+    deployment_strategy: "parallel"
+    markers: ["bulk_deployment", "4numa", "guaranteed_qos", "small_containers", "numa_balance", "standard"]
+
+  - id: "BULK-4N-02"
+    name: "4NUMA混合QoS批量部署"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    qos_type: "mixed"
+    replica_count: 24
+    resource_config:
+      guaranteed_replicas: 8
+      burstable_replicas: 12
+      besteffort_replicas: 4
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "socket_balance_check"
+      - "mixed_qos_verification"
+    test_category: "bulk_4numa_mixed_qos"
+    deployment_strategy: "parallel"
+    markers: ["bulk_deployment", "4numa", "mixed_qos", "numa_balance", "standard"]
+
+  # 高性能配置 - 4NUMA 批量测试
+  - id: "BULK-4N-03"
+    name: "4NUMA高性能Guaranteed批量部署"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    qos_type: "guaranteed"
+    replica_count: 80
+    resource_config:
+      cpu_request: "2"
+      cpu_limit: "2"
+      memory_request: "4Gi"
+      memory_limit: "4Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "socket_balance_check"
+      - "affinity_verification"
+    test_category: "bulk_4numa_guaranteed_medium"
+    deployment_strategy: "parallel"
+    
+  - id: "BULK-4N-04"
+    name: "4NUMA高性能压力测试"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    qos_type: "guaranteed"
+    replica_count: 160
+    resource_config:
+      cpu_request: "1"
+      cpu_limit: "1"
+      memory_request: "2Gi"
+      memory_limit: "2Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "socket_balance_check"
+      - "stress_test_metrics"
+    test_category: "bulk_4numa_stress_test"
+    deployment_strategy: "parallel"
+
+# 压力测试配置
+stress_test_config:
+  max_concurrent_deployments: 200
+  deployment_timeout: 600  # 10分钟
+  verification_timeout: 300  # 5分钟
+  cleanup_timeout: 180  # 3分钟
+  
+# 验证方法配置
+validation_config:
+  numa_balance_check:
+    tolerance: 0.2  # 20% 容忍度
+    check_interval: 30  # 30秒检查间隔
+  affinity_verification:
+    check_cpuset: true
+    check_memory_policy: true
+  performance_metrics:
+    collect_scheduling_latency: true
+    collect_resource_utilization: true
+  stress_test_metrics:
+    collect_throughput: true
+    collect_error_rate: true
+    collect_resource_contention: true

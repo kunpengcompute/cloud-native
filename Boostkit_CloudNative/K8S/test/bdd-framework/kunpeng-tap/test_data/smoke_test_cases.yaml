@@ -1,0 +1,222 @@
+# kunpeng-tap 冒烟测试用例配置
+# 快速验证核心功能是否正常工作的关键测试
+
+smoke_tests:
+  # 1. 基本拓扑感知测试 - 验证 Guaranteed QoS 的 NUMA 亲和
+  - id: "SMOKE-01"
+    name: "Guaranteed容器NUMA亲和基本验证"
+    machine_config: "2numa_48"
+    qos_type: "guaranteed"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    test_category: "smoke_guaranteed_numa"
+    resource_config:
+      cpu_request: "4"
+      cpu_limit: "4"
+      memory_request: "4Gi"
+      memory_limit: "4Gi"
+    expected_affinity: true
+    expected_topology: "NUMA"
+    test_target: "验证 Guaranteed QoS 容器的基本 NUMA 亲和功能"
+    markers: ["smoke", "guaranteed_qos", "2numa", "numa_affinity", "critical"]
+
+  # 2. Burstable QoS 测试 - 验证弹性容器的亲和
+  - id: "SMOKE-02"
+    name: "Burstable容器NUMA亲和基本验证"
+    machine_config: "2numa_48"
+    qos_type: "burstable"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    test_category: "smoke_burstable_numa"
+    resource_config:
+      cpu_request: "2"
+      cpu_limit: "4"
+      memory_request: "2Gi"
+      memory_limit: "4Gi"
+    expected_affinity: true
+    expected_topology: "NUMA"
+    test_target: "验证 Burstable QoS 容器的基本 NUMA 亲和功能"
+    markers: ["smoke", "burstable_qos", "2numa", "numa_affinity", "critical"]
+
+  # 3. BestEffort QoS 测试 - 验证无亲和性
+  - id: "SMOKE-03"
+    name: "BestEffort容器无亲和验证"
+    machine_config: "2numa_48"
+    qos_type: "besteffort"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    test_category: "smoke_besteffort_no_affinity"
+    resource_config:
+      cpu_request: ""
+      cpu_limit: ""
+      memory_request: ""
+      memory_limit: ""
+    expected_affinity: false
+    test_target: "验证 BestEffort QoS 容器不应用拓扑亲和"
+    markers: ["smoke", "besteffort_qos", "2numa", "no_affinity", "critical"]
+
+  # 4. 跨 NUMA 调度测试 - 验证大容器跨 NUMA 调度
+  - id: "SMOKE-04"
+    name: "大容器跨NUMA调度验证"
+    machine_config: "2numa_48"
+    qos_type: "guaranteed"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    test_category: "smoke_cross_numa"
+    resource_config:
+      cpu_request: "60"
+      cpu_limit: "60"
+      memory_request: "32Gi"
+      memory_limit: "32Gi"
+    expected_affinity: true
+    expected_topology: "跨NUMA"
+    expected_numa_count: 2
+    test_target: "验证超出单 NUMA 容量的容器能够跨 NUMA 调度"
+    markers: ["smoke", "guaranteed_qos", "2numa", "cross_numa", "critical"]
+
+  # 5. 4NUMA 基本测试 - 验证 4NUMA 拓扑的基本功能
+  - id: "SMOKE-05"
+    name: "4NUMA容器基本亲和验证"
+    machine_config: "4numa_24"
+    qos_type: "guaranteed"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    test_category: "smoke_4numa_basic"
+    resource_config:
+      cpu_request: "8"
+      cpu_limit: "8"
+      memory_request: "8Gi"
+      memory_limit: "8Gi"
+    expected_affinity: true
+    expected_topology: "NUMA"
+    test_target: "验证 4NUMA 拓扑的基本 NUMA 亲和功能"
+    markers: ["smoke", "guaranteed_qos", "4numa", "numa_affinity", "critical"]
+
+  # 6. Socket 亲和测试 - 验证 Socket 级别的亲和
+  - id: "SMOKE-06"
+    name: "Socket级别亲和验证"
+    machine_config: "4numa_24"
+    qos_type: "guaranteed"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    test_category: "smoke_socket_affinity"
+    resource_config:
+      cpu_request: "40"
+      cpu_limit: "40"
+      memory_request: "32Gi"
+      memory_limit: "32Gi"
+    expected_affinity: true
+    expected_topology: "SOCKET"
+    expected_socket_count: 1
+    test_target: "验证容器能够在单个 Socket 内调度"
+    markers: ["smoke", "guaranteed_qos", "4numa", "socket_affinity", "critical"]
+
+  # 7. 小批量部署测试 - 验证批量部署的基本功能
+  - id: "SMOKE-07"
+    name: "小批量部署NUMA均衡验证"
+    machine_config: "2numa_48"
+    qos_type: "guaranteed"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    test_category: "smoke_bulk_small"
+    replica_count: 10
+    resource_config:
+      cpu_request: "2"
+      cpu_limit: "2"
+      memory_request: "2Gi"
+      memory_limit: "2Gi"
+    expected_behavior:
+      all_scheduled: true
+      numa_balanced: true
+      affinity_applied: true
+    validation_methods:
+      - "numa_balance_check"
+      - "affinity_verification"
+    test_target: "验证小批量部署时的 NUMA 负载均衡"
+    markers: ["smoke", "bulk_deployment", "guaranteed_qos", "2numa", "numa_balance", "critical"]
+
+  # 8. 混合部署基本测试 - 验证资源竞争下的调度
+  - id: "SMOKE-08"
+    name: "资源竞争下的调度验证"
+    machine_config: "2numa_48"
+    existing_containers:
+      - numa: "numa0"
+        cpu_request: "20"
+        cpu_limit: "20"
+        qos: "guaranteed"
+    new_container:
+      cpu_request: "10"
+      cpu_limit: "10"
+      qos: "guaranteed"
+    expected_affinity: "numa"
+    expected_numa: "numa1"
+    expected_behavior: "affinity_expected"
+    test_target: "验证资源竞争场景下的负载均衡"
+    markers: ["smoke", "mixed_deployment", "guaranteed_qos", "2numa", "load_balancing", "critical"]
+
+  # 9. 边界条件基本测试 - 验证单 NUMA 最大容量
+  - id: "SMOKE-09"
+    name: "单NUMA最大容量验证"
+    machine_config: "2numa_48"
+    qos_type: "guaranteed"
+    resource_config:
+      cpu_request: "48"
+      cpu_limit: "48"
+      memory_request: "32Gi"
+      memory_limit: "32Gi"
+    expected_behavior: "scheduled_successfully"
+    expected_affinity: "numa"
+    test_target: "验证单 NUMA 最大容量调度"
+    markers: ["smoke", "boundary_condition", "guaranteed_qos", "2numa", "max_numa_capacity", "critical"]
+
+  # 10. QoS 分类验证 - 验证 QoS 类别正确分类
+  - id: "SMOKE-10"
+    name: "QoS类别分类验证"
+    machine_config: "2numa_48"
+    qos_type: "guaranteed"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    test_category: "smoke_qos_classification"
+    resource_config:
+      cpu_request: "4"
+      cpu_limit: "4"
+      memory_request: "4Gi"
+      memory_limit: "4Gi"
+    expected_qos_class: "Guaranteed"
+    test_target: "验证容器的 QoS 类别正确分类"
+    markers: ["smoke", "guaranteed_qos", "2numa", "qos_classification", "critical"]
+
+# 冒烟测试配置
+smoke_test_config:
+  # 测试执行配置
+  execution:
+    timeout: 300  # 5分钟总超时
+    parallel: false  # 串行执行，确保稳定性
+    fail_fast: true  # 遇到失败立即停止
+    
+  # 验证配置
+  validation:
+    check_pod_status: true
+    check_qos_class: true
+    check_cpu_affinity: true
+    check_numa_topology: true
+    
+  # 清理配置
+  cleanup:
+    on_success: true
+    on_failure: false  # 失败时保留现场用于调试
+    timeout: 60  # 清理超时1分钟
+
+# 冒烟测试执行顺序（按重要性排序）
+smoke_test_order:
+  - "SMOKE-01"  # Guaranteed NUMA 亲和 - 最核心功能
+  - "SMOKE-02"  # Burstable NUMA 亲和
+  - "SMOKE-03"  # BestEffort 无亲和
+  - "SMOKE-10"  # QoS 分类验证
+  - "SMOKE-04"  # 跨 NUMA 调度
+  - "SMOKE-05"  # 4NUMA 基本功能
+  - "SMOKE-06"  # Socket 亲和
+  - "SMOKE-07"  # 小批量部署
+  - "SMOKE-08"  # 混合部署
+  - "SMOKE-09"  # 边界条件
+

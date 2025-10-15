@@ -1,0 +1,1001 @@
+# kunpeng-tap 拓扑感知测试用例配置
+# 专注于 QoS 类型和拓扑亲和验证
+
+# NUMA 拓扑分类
+numa_topology_categories:
+  2numa:
+    name: "2NUMA 拓扑"
+    description: "双 NUMA 节点配置"
+    configs: ["2numa_48", "2numa_160"]
+  4numa:
+    name: "4NUMA 拓扑"
+    description: "四 NUMA 节点配置"
+    configs: ["4numa_24", "4numa_80"]
+
+# 机器配置分类
+machine_config_categories:
+  standard:
+    name: "标准配置"
+    description: "适用于标准测试环境的机器配置"
+    configs:
+      2numa_48:
+        name: "2NUMA-48核"
+        numa_count: 2
+        cores_per_numa: 48
+        total_cores: 96
+        numa_topology:
+          numa0: "0-47"
+          numa1: "48-95"
+        memory_per_numa: "32Gi"
+        total_memory: "64Gi"
+
+      4numa_24:
+        name: "4NUMA-24核"
+        numa_count: 4
+        cores_per_numa: 24
+        total_cores: 96
+        socket_count: 2
+        cores_per_socket: 48
+        numa_topology:
+          numa0: "0-23"
+          numa1: "24-47"
+          numa2: "48-71"
+          numa3: "72-95"
+        socket_topology:
+          socket0: "0-47"
+          socket1: "48-95"
+        memory_per_numa: "16Gi"
+        total_memory: "64Gi"
+
+  high_perf:
+    name: "高性能配置"
+    description: "适用于高性能测试环境的机器配置"
+    configs:
+      2numa_160:
+        name: "2NUMA-160核"
+        numa_count: 2
+        cores_per_numa: 160
+        total_cores: 320
+        numa_topology:
+          numa0: "0-159"
+          numa1: "160-319"
+        memory_per_numa: "128Gi"
+        total_memory: "256Gi"
+
+      4numa_80:
+        name: "4NUMA-80核"
+        numa_count: 4
+        cores_per_numa: 80
+        total_cores: 320
+        socket_count: 2
+        cores_per_socket: 160
+        numa_topology:
+          numa0: "0-79"
+          numa1: "80-159"
+          numa2: "160-239"
+          numa3: "240-319"
+        socket_topology:
+          socket0: "0-159"
+          socket1: "160-319"
+        memory_per_numa: "64Gi"
+        total_memory: "256Gi"
+
+# 兼容性：保留原有的 machine_configs 结构
+machine_configs:
+  2numa_48:
+    name: "2NUMA-48核"
+    category: "standard"
+    numa_topology_type: "2numa"
+    numa_count: 2
+    cores_per_numa: 48
+    total_cores: 96
+    numa_topology:
+      numa0: "0-47"
+      numa1: "48-95"
+    memory_per_numa: "32Gi"
+    total_memory: "64Gi"
+
+  2numa_160:
+    name: "2NUMA-160核"
+    category: "high_perf"
+    numa_topology_type: "2numa"
+    numa_count: 2
+    cores_per_numa: 160
+    total_cores: 320
+    numa_topology:
+      numa0: "0-159"
+      numa1: "160-319"
+    memory_per_numa: "128Gi"
+    total_memory: "256Gi"
+
+  4numa_24:
+    name: "4NUMA-24核"
+    category: "standard"
+    numa_topology_type: "4numa"
+    numa_count: 4
+    cores_per_numa: 24
+    total_cores: 96
+    socket_count: 2
+    cores_per_socket: 48
+    numa_topology:
+      numa0: "0-23"
+      numa1: "24-47"
+      numa2: "48-71"
+      numa3: "72-95"
+    socket_topology:
+      socket0: "0-47"
+      socket1: "48-95"
+    memory_per_numa: "16Gi"
+    total_memory: "64Gi"
+
+  4numa_80:
+    name: "4NUMA-80核"
+    category: "high_perf"
+    numa_topology_type: "4numa"
+    numa_count: 4
+    cores_per_numa: 80
+    total_cores: 320
+    socket_count: 2
+    cores_per_socket: 160
+    numa_topology:
+      numa0: "0-79"
+      numa1: "80-159"
+      numa2: "160-239"
+      numa3: "240-319"
+    socket_topology:
+      socket0: "0-159"
+      socket1: "160-319"
+    memory_per_numa: "64Gi"
+    total_memory: "256Gi"
+
+# QoS 类型定义
+qos_types:
+  guaranteed:
+    description: "Guaranteed QoS - requests = limits"
+    expected_affinity: true
+    test_configs:
+      small:
+        cpu_request: "1"
+        cpu_limit: "1"
+        memory_request: "2Gi"
+        memory_limit: "2Gi"
+      medium:
+        cpu_request: "4"
+        cpu_limit: "4"
+        memory_request: "8Gi"
+        memory_limit: "8Gi"
+      large:
+        cpu_request: "24"
+        cpu_limit: "24"
+        memory_request: "32Gi"
+        memory_limit: "32Gi"
+      
+  burstable:
+    description: "Burstable QoS - requests < limits"
+    expected_affinity: true
+    test_configs:
+      small:
+        cpu_request: "0.5"
+        cpu_limit: "1"
+        memory_request: "1Gi"
+        memory_limit: "2Gi"
+      medium:
+        cpu_request: "2"
+        cpu_limit: "4"
+        memory_request: "4Gi"
+        memory_limit: "8Gi"
+      large:
+        cpu_request: "12"
+        cpu_limit: "24"
+        memory_request: "16Gi"
+        memory_limit: "32Gi"
+        
+  besteffort:
+    description: "BestEffort QoS - 无 requests 和 limits"
+    expected_affinity: false
+    test_configs:
+      default:
+        # 不设置任何资源限制
+        cpu_request: null
+        cpu_limit: null
+        memory_request: null
+        memory_limit: null
+
+# 拓扑级别定义
+topology_levels:
+  CLUSTER:
+    description: "集群级别 - 可以调度到任意节点"
+    validation_method: "cluster_level_check"
+  NUMA:
+    description: "NUMA 节点级别 - 应该在单个 NUMA 内"
+    validation_method: "numa_affinity_check"
+  SOCKET:
+    description: "SOCKET 级别 - 应该在单个 SOCKET 内"
+    validation_method: "socket_affinity_check"
+  CROSS_NUMA:
+    description: "跨 NUMA - 跨越多个 NUMA 节点"
+    validation_method: "cross_numa_check"
+  CROSS_SOCKET:
+    description: "跨 SOCKET - 跨越多个 SOCKET"
+    validation_method: "cross_socket_check"
+
+# 功能测试用例 - 按 NUMA 拓扑分类
+# 完全对应 TESTCASE.md 中的测试用例定义
+functional_tests_2numa:
+  # 标准配置 - 2NUMA-48核测试 (对应 TESTCASE.md 2N-01 到 2N-09)
+
+  # 2N-01: 多核容器NUMA内亲和
+  - id: "2N-01"
+    name: "2NUMA-48核-4核容器NUMA内亲和"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "4"
+      cpu_limit: "4"
+      memory_request: "8Gi"
+      memory_limit: "8Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_guaranteed_medium"
+
+  # 2N-02: 半NUMA容器亲和
+  - id: "2N-02"
+    name: "2NUMA-48核-24核容器半NUMA亲和"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "24"
+      cpu_limit: "24"
+      memory_request: "32Gi"
+      memory_limit: "32Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_guaranteed_large"
+
+  # 2N-03: 接近满NUMA亲和
+  - id: "2N-03"
+    name: "2NUMA-48核-47核容器接近满NUMA"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "47"
+      cpu_limit: "47"
+      memory_request: "32Gi"
+      memory_limit: "32Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_guaranteed_near_full"
+
+  # 2N-04: 满NUMA亲和
+  - id: "2N-04"
+    name: "2NUMA-48核-48核容器满NUMA"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "48"
+      cpu_limit: "48"
+      memory_request: "32Gi"
+      memory_limit: "32Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_guaranteed_full_numa"
+
+  # 2N-05: 跨NUMA调度
+  - id: "2N-05"
+    name: "2NUMA-48核-49核容器跨NUMA"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "49"
+      cpu_limit: "49"
+      memory_request: "40Gi"
+      memory_limit: "40Gi"
+    expected_topology: "CROSS_NUMA"
+    expected_numa_count: 2
+    test_category: "2numa_guaranteed_cross_numa"
+
+  # 2N-06: 大容器跨NUMA
+  - id: "2N-06"
+    name: "2NUMA-48核-72核容器大跨NUMA"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "72"
+      cpu_limit: "72"
+      memory_request: "48Gi"
+      memory_limit: "48Gi"
+    expected_topology: "CROSS_NUMA"
+    expected_numa_count: 2
+    test_category: "2numa_guaranteed_large_cross_numa"
+
+  # 2N-07: 满机器资源（调整为90核以确保可以调度）
+  - id: "2N-07"
+    name: "2NUMA-48核-90核容器满机器"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "90"
+      cpu_limit: "90"
+      memory_request: "64Gi"
+      memory_limit: "64Gi"
+    expected_topology: "CROSS_NUMA"
+    expected_numa_count: 2
+    test_category: "2numa_guaranteed_full_machine"
+
+  # 2N-08: 小数点资源请求 (Burstable)
+  - id: "2N-08"
+    name: "2NUMA-48核-0.5核Burstable容器"
+    qos_type: "burstable"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "0.5"
+      cpu_limit: "1"
+      memory_request: "1Gi"
+      memory_limit: "2Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_burstable_small"
+
+  # 2N-09: 弹性资源请求 (Burstable)
+  - id: "2N-09"
+    name: "2NUMA-48核-2核Burstable容器"
+    qos_type: "burstable"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "2"
+      cpu_limit: "4"
+      memory_request: "4Gi"
+      memory_limit: "8Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_burstable_medium"
+
+  # 高性能配置 - 2NUMA-160核测试 (对应 TESTCASE.md 2N-10 到 2N-18)
+
+  # 2N-10: 多核容器NUMA内亲和
+  - id: "2N-10"
+    name: "2NUMA-160核-8核容器NUMA内亲和"
+    qos_type: "guaranteed"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "8"
+      cpu_limit: "8"
+      memory_request: "16Gi"
+      memory_limit: "16Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_guaranteed_medium"
+
+  # 2N-11: 半NUMA容器亲和
+  - id: "2N-11"
+    name: "2NUMA-160核-80核容器半NUMA亲和"
+    qos_type: "guaranteed"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "80"
+      cpu_limit: "80"
+      memory_request: "128Gi"
+      memory_limit: "128Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_guaranteed_large"
+
+  # 2N-12: 接近满NUMA亲和
+  - id: "2N-12"
+    name: "2NUMA-160核-159核容器接近满NUMA"
+    qos_type: "guaranteed"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "159"
+      cpu_limit: "159"
+      memory_request: "128Gi"
+      memory_limit: "128Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_guaranteed_near_full"
+
+  # 2N-13: 满NUMA亲和
+  - id: "2N-13"
+    name: "2NUMA-160核-160核容器满NUMA"
+    qos_type: "guaranteed"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "160"
+      cpu_limit: "160"
+      memory_request: "128Gi"
+      memory_limit: "128Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_guaranteed_full_numa"
+
+  # 2N-14: 跨NUMA调度
+  - id: "2N-14"
+    name: "2NUMA-160核-161核容器跨NUMA"
+    qos_type: "guaranteed"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "161"
+      cpu_limit: "161"
+      memory_request: "160Gi"
+      memory_limit: "160Gi"
+    expected_topology: "CROSS_NUMA"
+    expected_numa_count: 2
+    test_category: "2numa_guaranteed_cross_numa"
+
+  # 2N-15: 大容器跨NUMA
+  - id: "2N-15"
+    name: "2NUMA-160核-240核容器大跨NUMA"
+    qos_type: "guaranteed"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "240"
+      cpu_limit: "240"
+      memory_request: "200Gi"
+      memory_limit: "200Gi"
+    expected_topology: "CROSS_NUMA"
+    expected_numa_count: 2
+    test_category: "2numa_guaranteed_large_cross_numa"
+
+  # 2N-16: 满机器资源（调整为310核以确保可以调度）
+  - id: "2N-16"
+    name: "2NUMA-160核-310核容器满机器"
+    qos_type: "guaranteed"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "310"
+      cpu_limit: "310"
+      memory_request: "256Gi"
+      memory_limit: "256Gi"
+    expected_topology: "CROSS_NUMA"
+    expected_numa_count: 2
+    test_category: "2numa_guaranteed_full_machine"
+
+  # 2N-17: 小数点资源请求 (Burstable)
+  - id: "2N-17"
+    name: "2NUMA-160核-0.5核Burstable容器"
+    qos_type: "burstable"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "0.5"
+      cpu_limit: "1"
+      memory_request: "1Gi"
+      memory_limit: "2Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_burstable_small"
+
+  # 2N-18: 弹性资源请求 (Burstable)
+  - id: "2N-18"
+    name: "2NUMA-160核-16核Burstable容器"
+    qos_type: "burstable"
+    machine_config: "2numa_160"
+    config_category: "high_perf"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "16"
+      cpu_limit: "32"
+      memory_request: "32Gi"
+      memory_limit: "64Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "2numa_burstable_large"
+
+functional_tests_4numa:
+  # 标准配置 - 4NUMA-24核测试 (对应 TESTCASE.md 4N-01 到 4N-12)
+
+  # 4N-01: 多核容器NUMA内亲和
+  - id: "4N-01"
+    name: "4NUMA-24核-4核容器单NUMA亲和"
+    qos_type: "guaranteed"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "4"
+      cpu_limit: "4"
+      memory_request: "8Gi"
+      memory_limit: "8Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_guaranteed_medium"
+
+  # 4N-02: 半NUMA容器亲和
+  - id: "4N-02"
+    name: "4NUMA-24核-12核容器半NUMA亲和"
+    qos_type: "guaranteed"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "12"
+      cpu_limit: "12"
+      memory_request: "16Gi"
+      memory_limit: "16Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_guaranteed_large"
+
+  # 4N-03: 接近满NUMA亲和
+  - id: "4N-03"
+    name: "4NUMA-24核-23核容器接近满NUMA"
+    qos_type: "guaranteed"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "23"
+      cpu_limit: "23"
+      memory_request: "16Gi"
+      memory_limit: "16Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_guaranteed_near_full"
+
+  # 4N-04: 满NUMA亲和
+  - id: "4N-04"
+    name: "4NUMA-24核-24核容器满NUMA"
+    qos_type: "guaranteed"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "24"
+      cpu_limit: "24"
+      memory_request: "16Gi"
+      memory_limit: "16Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_guaranteed_full_numa"
+
+  # 4N-05: 跨NUMA同SOCKET
+  - id: "4N-05"
+    name: "4NUMA-24核-25核容器跨NUMA同SOCKET"
+    qos_type: "guaranteed"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "25"
+      cpu_limit: "25"
+      memory_request: "20Gi"
+      memory_limit: "20Gi"
+    expected_topology: "SOCKET"
+    expected_socket_count: 1
+    expected_numa_count: 2
+    test_category: "4numa_guaranteed_cross_numa_same_socket"
+
+  # 4N-06: 1.5NUMA容器
+  - id: "4N-06"
+    name: "4NUMA-24核-36核容器1.5NUMA"
+    qos_type: "guaranteed"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "36"
+      cpu_limit: "36"
+      memory_request: "24Gi"
+      memory_limit: "24Gi"
+    expected_topology: "SOCKET"
+    expected_socket_count: 1
+    expected_numa_count: 2
+    test_category: "4numa_guaranteed_cross_numa_same_socket"
+
+  # 4N-07: 满SOCKET亲和
+  - id: "4N-07"
+    name: "4NUMA-24核-48核容器满SOCKET"
+    qos_type: "guaranteed"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "48"
+      cpu_limit: "48"
+      memory_request: "32Gi"
+      memory_limit: "32Gi"
+    expected_topology: "SOCKET"
+    expected_socket_count: 1
+    expected_numa_count: 2
+    test_category: "4numa_guaranteed_full_socket"
+
+  # 4N-08: 跨SOCKET调度
+  - id: "4N-08"
+    name: "4NUMA-24核-49核容器跨SOCKET"
+    qos_type: "guaranteed"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "49"
+      cpu_limit: "49"
+      memory_request: "40Gi"
+      memory_limit: "40Gi"
+    expected_topology: "CROSS_SOCKET"
+    expected_socket_count: 2
+    expected_numa_count: 3
+    test_category: "4numa_guaranteed_cross_socket"
+
+  # 4N-09: 大容器跨SOCKET
+  - id: "4N-09"
+    name: "4NUMA-24核-72核容器大跨SOCKET"
+    qos_type: "guaranteed"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "72"
+      cpu_limit: "72"
+      memory_request: "48Gi"
+      memory_limit: "48Gi"
+    expected_topology: "CROSS_SOCKET"
+    expected_socket_count: 2
+    expected_numa_count: 3
+    test_category: "4numa_guaranteed_cross_socket"
+
+  # 4N-10: 满机器资源（调整为90核以确保可以调度）
+  - id: "4N-10"
+    name: "4NUMA-24核-90核容器满机器"
+    qos_type: "guaranteed"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "90"
+      cpu_limit: "90"
+      memory_request: "64Gi"
+      memory_limit: "64Gi"
+    expected_topology: "CROSS_SOCKET"
+    expected_socket_count: 2
+    expected_numa_count: 4
+    test_category: "4numa_guaranteed_full_machine"
+
+  # 4N-11: 小数点资源请求 (Burstable)
+  - id: "4N-11"
+    name: "4NUMA-24核-0.5核Burstable容器"
+    qos_type: "burstable"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "0.5"
+      cpu_limit: "1"
+      memory_request: "1Gi"
+      memory_limit: "2Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_burstable_small"
+
+  # 4N-12: 弹性资源请求 (Burstable)
+  - id: "4N-12"
+    name: "4NUMA-24核-2核Burstable容器"
+    qos_type: "burstable"
+    machine_config: "4numa_24"
+    config_category: "standard"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "2"
+      cpu_limit: "4"
+      memory_request: "4Gi"
+      memory_limit: "8Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_burstable_medium"
+
+  # 高性能配置 - 4NUMA-80核测试 (对应 TESTCASE.md 4N-13 到 4N-24)
+
+  # 4N-13: 多核容器NUMA内亲和
+  - id: "4N-13"
+    name: "4NUMA-80核-8核容器单NUMA亲和"
+    qos_type: "guaranteed"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "8"
+      cpu_limit: "8"
+      memory_request: "16Gi"
+      memory_limit: "16Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_guaranteed_medium"
+
+  # 4N-14: 半NUMA容器亲和
+  - id: "4N-14"
+    name: "4NUMA-80核-40核容器半NUMA亲和"
+    qos_type: "guaranteed"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "40"
+      cpu_limit: "40"
+      memory_request: "64Gi"
+      memory_limit: "64Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_guaranteed_large"
+
+  # 4N-15: 接近满NUMA亲和
+  - id: "4N-15"
+    name: "4NUMA-80核-79核容器接近满NUMA"
+    qos_type: "guaranteed"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "79"
+      cpu_limit: "79"
+      memory_request: "64Gi"
+      memory_limit: "64Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_guaranteed_near_full"
+
+  # 4N-16: 满NUMA亲和
+  - id: "4N-16"
+    name: "4NUMA-80核-80核容器满NUMA"
+    qos_type: "guaranteed"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "80"
+      cpu_limit: "80"
+      memory_request: "64Gi"
+      memory_limit: "64Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_guaranteed_full_numa"
+
+  # 4N-17: 跨NUMA同SOCKET
+  - id: "4N-17"
+    name: "4NUMA-80核-81核容器跨NUMA同SOCKET"
+    qos_type: "guaranteed"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "81"
+      cpu_limit: "81"
+      memory_request: "80Gi"
+      memory_limit: "80Gi"
+    expected_topology: "SOCKET"
+    expected_socket_count: 1
+    expected_numa_count: 2
+    test_category: "4numa_guaranteed_cross_numa_same_socket"
+
+  # 4N-18: 1.5NUMA容器
+  - id: "4N-18"
+    name: "4NUMA-80核-120核容器1.5NUMA"
+    qos_type: "guaranteed"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "120"
+      cpu_limit: "120"
+      memory_request: "96Gi"
+      memory_limit: "96Gi"
+    expected_topology: "SOCKET"
+    expected_socket_count: 1
+    expected_numa_count: 2
+    test_category: "4numa_guaranteed_cross_numa_same_socket"
+
+  # 4N-19: 满SOCKET亲和
+  - id: "4N-19"
+    name: "4NUMA-80核-160核容器满SOCKET"
+    qos_type: "guaranteed"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "160"
+      cpu_limit: "160"
+      memory_request: "128Gi"
+      memory_limit: "128Gi"
+    expected_topology: "SOCKET"
+    expected_socket_count: 1
+    expected_numa_count: 2
+    test_category: "4numa_guaranteed_full_socket"
+
+  # 4N-20: 跨SOCKET调度
+  - id: "4N-20"
+    name: "4NUMA-80核-161核容器跨SOCKET"
+    qos_type: "guaranteed"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "161"
+      cpu_limit: "161"
+      memory_request: "160Gi"
+      memory_limit: "160Gi"
+    expected_topology: "CROSS_SOCKET"
+    expected_socket_count: 2
+    expected_numa_count: 3
+    test_category: "4numa_guaranteed_cross_socket"
+
+  # 4N-21: 大容器跨SOCKET
+  - id: "4N-21"
+    name: "4NUMA-80核-240核容器大跨SOCKET"
+    qos_type: "guaranteed"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "240"
+      cpu_limit: "240"
+      memory_request: "192Gi"
+      memory_limit: "192Gi"
+    expected_topology: "CROSS_SOCKET"
+    expected_socket_count: 2
+    expected_numa_count: 3
+    test_category: "4numa_guaranteed_cross_socket"
+
+  # 4N-22: 满机器资源（调整为310核以确保可以调度）
+  - id: "4N-22"
+    name: "4NUMA-80核-310核容器满机器"
+    qos_type: "guaranteed"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "310"
+      cpu_limit: "310"
+      memory_request: "256Gi"
+      memory_limit: "256Gi"
+    expected_topology: "CROSS_SOCKET"
+    expected_socket_count: 2
+    expected_numa_count: 4
+    test_category: "4numa_guaranteed_full_machine"
+
+  # 4N-23: 小数点资源请求 (Burstable)
+  - id: "4N-23"
+    name: "4NUMA-80核-0.5核Burstable容器"
+    qos_type: "burstable"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "0.5"
+      cpu_limit: "1"
+      memory_request: "1Gi"
+      memory_limit: "2Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_burstable_small"
+
+  # 4N-24: 弹性资源请求 (Burstable)
+  - id: "4N-24"
+    name: "4NUMA-80核-16核Burstable容器"
+    qos_type: "burstable"
+    machine_config: "4numa_80"
+    config_category: "high_perf"
+    numa_topology_type: "4numa"
+    custom_config:
+      cpu_request: "16"
+      cpu_limit: "32"
+      memory_request: "32Gi"
+      memory_limit: "64Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "4numa_burstable_large"
+
+# 注意：functional_tests_4numa_legacy 已删除
+# 请使用上面的 functional_tests_2numa 和 functional_tests_4numa
+
+# 边界条件测试 (对应 TESTCASE.md BC-01 到 BC-05)
+boundary_tests:
+  # BC-01: 最小资源容器
+  - id: "BC-01"
+    name: "最小资源Guaranteed容器-0.1核"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "0.1"
+      cpu_limit: "0.1"
+      memory_request: "128Mi"
+      memory_limit: "128Mi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "boundary_min_guaranteed"
+
+  # BC-02: 满NUMA资源
+  - id: "BC-02"
+    name: "满NUMA资源Guaranteed容器-48核"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "48"
+      cpu_limit: "48"
+      memory_request: "32Gi"
+      memory_limit: "32Gi"
+    expected_topology: "NUMA"
+    expected_numa_count: 1
+    test_category: "boundary_full_numa"
+
+  # BC-03: 超出单NUMA
+  - id: "BC-03"
+    name: "超出单NUMA资源容器-49核"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "49"
+      cpu_limit: "49"
+      memory_request: "33Gi"
+      memory_limit: "33Gi"
+    expected_topology: "CROSS_NUMA"
+    expected_numa_count: 2
+    test_category: "boundary_exceed_numa"
+
+  # BC-04: 零资源请求 (BestEffort)
+  - id: "BC-04"
+    name: "零资源请求BestEffort容器"
+    qos_type: "besteffort"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: null
+      cpu_limit: null
+      memory_request: null
+      memory_limit: null
+    expected_topology: "CLUSTER"
+    expected_affinity: false
+    test_category: "boundary_besteffort_no_affinity"
+
+  # BC-05: 内存密集型容器
+  - id: "BC-05"
+    name: "内存密集型容器-1核64Gi"
+    qos_type: "guaranteed"
+    machine_config: "2numa_48"
+    config_category: "standard"
+    numa_topology_type: "2numa"
+    custom_config:
+      cpu_request: "1"
+      cpu_limit: "1"
+      memory_request: "64Gi"
+      memory_limit: "64Gi"
+    expected_topology: "CROSS_NUMA"  # 内存超出单NUMA
+    expected_numa_count: 2
+    test_category: "boundary_memory_intensive"
