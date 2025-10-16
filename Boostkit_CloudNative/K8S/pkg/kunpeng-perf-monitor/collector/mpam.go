@@ -143,7 +143,6 @@ func (c *mpamCollector) getLabels(mpamGroupName string, mpamGroupRelPath string)
 // update rescource usage info, such as l3 cache usage and memory usage info
 func (c *mpamCollector) updateResUsageMetrics(ch chan<- prometheus.Metric, mpamGroupRelPath string, labels mpamMetricsCommonLabels, metricType *prometheus.Desc, targetDirs []string) error {
 	if len(targetDirs) == 0 {
-		c.logger.Error("non fatal error, targetDir is empty. Skip update mpam resource usage metrics", "metric", metricType, "group", labels.groupName)
 		return fmt.Errorf("non fatal error, targetDir is empty. Skip update mpam resource usage metrics, metric: %s, group: %s", metricType, labels.groupName)
 	}
 
@@ -158,12 +157,12 @@ func (c *mpamCollector) updateResUsageMetrics(ch chan<- prometheus.Metric, mpamG
 	for _, dir := range targetDirs {
 		path := filepath.Join(*resctlMountPath, mpamGroupRelPath, dirPathForMPAMGroupData, dir, filename)
 		if _, err := os.Stat(path); err != nil {
-			c.logger.Error("failed to stat file", "path", path, "err", err)
+			c.logger.Error("failed to stat file, skipping", "path", path, "err", err)
 			continue
 		}
 		resUsage, err := os.ReadFile(path)
 		if err != nil {
-			c.logger.Error("failed to read file", "path", path, "err", err)
+			c.logger.Error("failed to read file, skipping", "path", path, "err", err)
 			continue
 		}
 		strValue := strings.TrimSpace(string(resUsage))
@@ -175,7 +174,6 @@ func (c *mpamCollector) updateResUsageMetrics(ch chan<- prometheus.Metric, mpamG
 		// set the dir name as id for the metric
 		ch <- prometheus.MustNewConstMetric(
 			metricType, prometheus.GaugeValue, float64(resUsageData), labels.groupName, labels.cpuList, labels.mode, dir)
-		c.logger.Info("add metric", "metric", metricType, "value", resUsageData, "labels", labels)
 	}
 	return nil
 }
