@@ -121,7 +121,7 @@ main() {
     local failed_projects=()
 
     # Build and test kunpeng-tap and kae-device-plugin
-    for project in "kunpeng-tap" "kae-device-plugin"; do
+    for project in "kunpeng-tap" "kae-device-plugin" "kunpeng-perf-monitor"; do
         if ! run_project_checks "$project" "$project" false; then
             failed_projects+=("$project")
         fi

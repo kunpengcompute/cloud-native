@@ -8,7 +8,7 @@ BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT := $(shell git rev-parse HEAD)
 
 # Sub-projects
-SUBPROJECTS := k8s-mpam-controller kunpeng-tap
+SUBPROJECTS := k8s-mpam-controller kunpeng-tap kunpeng-perf-monitor
 
 # Build directories
 BUILD_DIR := build
@@ -84,6 +84,7 @@ build: ## Build all projects.
 	$(MAKE) -C Boostkit_CloudNative/K8S mpam-build
 	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-build
 	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-build
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-perf-monitor-build
 	@echo "All projects built successfully"
 
 .PHONY: clean
@@ -92,6 +93,7 @@ clean: ## Clean build artifacts for all projects.
 	$(MAKE) -C Boostkit_CloudNative/K8S mpam-clean
 	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-clean
 	$(MAKE) -C Boostkit_CloudNative/K8S kae-device-plugin-clean
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-perf-monitor-clean
 	rm -rf $(BUILD_DIR) $(DIST_DIR)
 	@echo "Clean completed"
 
@@ -247,3 +249,25 @@ kunpeng-tap-rpm-test: ## Test kunpeng-tap RPM package.
 .PHONY: kunpeng-tap-rpm-clean
 kunpeng-tap-rpm-clean: ## Clean kunpeng-tap RPM build artifacts.
 	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-rpm-clean
+
+##@ Kunpeng Performance Monitor
+
+.PHONY: kunpeng-perf-monitor-build
+kunpeng-perf-monitor-build: ## Build kunpeng-perf-monitor project.
+	@echo "Building kunpeng-perf-monitor..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-perf-monitor-build
+
+.PHONY: kunpeng-perf-monitor-test
+kunpeng-perf-monitor-test: ## Test kunpeng-perf-monitor project.
+	@echo "Testing kunpeng-perf-monitor..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-perf-monitor-test
+
+.PHONY: kunpeng-perf-monitor-clean
+kunpeng-perf-monitor-clean: ## Clean kunpeng-perf-monitor build artifacts.
+	@echo "Cleaning kunpeng-perf-monitor..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-perf-monitor-clean
+
+.PHONY: kunpeng-perf-monitor-docker
+kunpeng-perf-monitor-docker: ## Build kunpeng-perf-monitor docker image.
+	@echo "Building kunpeng-perf-monitor docker image..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-perf-monitor-docker

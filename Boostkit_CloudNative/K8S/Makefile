@@ -15,7 +15,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 .PHONY: all
-all: mpam-build kunpeng-tap-build kae-device-plugin-build
+all: mpam-build kunpeng-tap-build kae-device-plugin-build kunpeng-perf-monitor-build
 
 ##@ General
 
@@ -222,7 +222,7 @@ kae-device-plugin-tidy: ## Tidy kae-device-plugin go modules.
 ##@ Combined Operations
 
 .PHONY: build
-build: mpam-build kunpeng-tap-build kae-device-plugin-build ## Build all projects.
+build: mpam-build kunpeng-tap-build kae-device-plugin-build kunpeng-perf-monitor-build ## Build all projects.
 
 .PHONY: clean
 clean: mpam-clean kunpeng-tap-clean kae-device-plugin-clean ## Clean all projects.
@@ -267,3 +267,21 @@ kunpeng-tap-rpm-test: ## Test kunpeng-tap RPM package.
 .PHONY: kunpeng-tap-rpm-clean
 kunpeng-tap-rpm-clean: ## Clean kunpeng-tap RPM build artifacts.
 	$(MAKE) -f Makefile.kunpeng-tap rpm-clean
+
+##@ Kunpeng Performance Monitor
+
+.PHONY: kunpeng-perf-monitor-build
+kunpeng-perf-monitor-build: ## Build kunpeng-perf-monitor project.
+	$(MAKE) -f Makefile.kunpeng-perf-monitor build
+
+.PHONY: kunpeng-perf-monitor-test
+kunpeng-perf-monitor-test: ## Test kunpeng-perf-monitor project.
+	$(MAKE) -f Makefile.kunpeng-perf-monitor test
+
+.PHONY: kunpeng-perf-monitor-clean
+kunpeng-perf-monitor-clean: ## Clean kunpeng-perf-monitor build artifacts.
+	$(MAKE) -f Makefile.kunpeng-perf-monitor clean
+
+.PHONY: kunpeng-perf-monitor-docker
+kunpeng-perf-monitor-docker: ## Build kunpeng-perf-monitor docker image.
+	$(MAKE) -f Makefile.kunpeng-perf-monitor docker-build
