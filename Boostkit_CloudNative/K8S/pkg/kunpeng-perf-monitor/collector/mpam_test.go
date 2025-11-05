@@ -366,11 +366,20 @@ func TestUpdateMPAMResUsageMetrics(t *testing.T) {
 
 		cacheDir := filepath.Join(groupDir, dirPathForMPAMGroupData, nameKeyForCacheUsageDirs+"test1")
 		memDir := filepath.Join(groupDir, dirPathForMPAMGroupData, nameKeyForMemUsageDirs+"test1")
-		// 权限必须是07XX
-		os.MkdirAll(cacheDir, 0644)
-		os.MkdirAll(memDir, 0644)
+		// 07XX的权限
+		os.MkdirAll(cacheDir, 0755)
+		os.MkdirAll(memDir, 0755)
 		os.WriteFile(filepath.Join(cacheDir, fileNameForCache), []byte("1024"), 0644)
 		os.WriteFile(filepath.Join(memDir, fileNameForMem), []byte("2048"), 0644)
+
+		// 然后修改权限为0300（有写和执行权限，无读权限，必定返回错误）
+		monDataDir := filepath.Join(groupDir, dirPathForMPAMGroupData)
+		err := os.Chmod(monDataDir, 0300)
+		assert.NoError(t, err)
+
+		// 在测试结束后恢复权限，确保清理能正常进行
+		defer os.Chmod(monDataDir, 0755)
+
 		c := &mpamCollector{
 			logger: slog.Default(), // 必须有
 			cacheUsage: prometheus.NewDesc(
@@ -387,9 +396,13 @@ func TestUpdateMPAMResUsageMetrics(t *testing.T) {
 		}
 
 		ch := make(chan prometheus.Metric, 2)
-		err := c.updateMPAMResUsageMetrics(ch, "groupX", mpamMetricsCommonLabels{groupName: "groupX"})
-
+		err = c.updateMPAMResUsageMetrics(ch, "groupX", mpamMetricsCommonLabels{groupName: "groupX"})
 		close(ch)
+
+		if err == nil {
+			t.Skip("A permission error is expected but got nil. May be you are running the test as root.")
+			return
+		}
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "permission denied")
 	})

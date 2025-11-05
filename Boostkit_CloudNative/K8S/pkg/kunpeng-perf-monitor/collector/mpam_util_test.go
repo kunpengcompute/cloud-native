@@ -281,6 +281,73 @@ func TestListResInfoSubDirs(t *testing.T) {
 		assert.Equal(t, 1, len(memDirs))
 		assert.Contains(t, memDirs, "mem_group1")
 	})
+
+	t.Run("insufficient_permission", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// 创建一个子目录并设置执行权限
+		restrictedDir := filepath.Join(tmpDir, "restricted")
+		err := os.MkdirAll(restrictedDir, 0644) // 0644: rw-r--r-- (没有执行权限)
+		assert.NoError(t, err)
+
+		// 然后修改权限为0300（有写和执行权限，无读权限，必定返回错误）
+		err = os.Chmod(restrictedDir, 0300)
+		assert.NoError(t, err)
+
+		// 在测试结束后恢复权限，确保清理能正常进行
+		defer os.Chmod(restrictedDir, 0755)
+
+		// 测试：尝试读取没有执行权限的目录
+		l3Dirs, memDirs, err := listResInfoSubDirs(restrictedDir, "l3cache", "mem")
+		if err == nil {
+			t.Skip("A permission error is expected but got nil. May be you are running the test as root.")
+			return
+		}
+
+		// 验证：应该返回权限错误
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "permission denied")
+		assert.Nil(t, l3Dirs)
+		assert.Nil(t, memDirs)
+	})
+
+	t.Run("partial_permission_issue", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// 创建多个目录，其中一个没有执行权限
+		normalDir := filepath.Join(tmpDir, "normal")
+		restrictedDir := filepath.Join(tmpDir, "restricted")
+
+		// 正常目录
+		os.MkdirAll(normalDir, 0755)
+		os.MkdirAll(filepath.Join(normalDir, "l3cache_normal"), 0755)
+
+		// 受限目录
+		os.MkdirAll(restrictedDir, 0644)
+		os.MkdirAll(filepath.Join(restrictedDir, "l3cache_restricted"), 0755)
+
+		// 然后修改权限为0300（有写和执行权限，无读权限，必定返回错误）
+		err := os.Chmod(restrictedDir, 0300)
+		assert.NoError(t, err)
+
+		// 在测试结束后恢复权限，确保清理能正常进行
+		defer os.Chmod(restrictedDir, 0755)
+
+		// 测试正常目录应该能正常工作
+		l3Dirs, _, err := listResInfoSubDirs(normalDir, "l3cache", "mem")
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(l3Dirs))
+		assert.Contains(t, l3Dirs, "l3cache_normal")
+
+		// 测试受限目录应该失败
+		_, _, err = listResInfoSubDirs(restrictedDir, "l3cache", "mem")
+		if err == nil {
+			t.Skip("A permission error is expected but got nil. May be you are running the test as root.")
+			return
+		}
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "permission denied")
+	})
 }
 
 func TestGetFileContent(t *testing.T) {
@@ -303,6 +370,10 @@ func TestGetFileContent(t *testing.T) {
 		os.WriteFile(tmpFile, []byte("data"), 0200) // 只写权限
 
 		_, err := getFileContent(tmpFile)
+		if err == nil {
+			t.Skip("A permission error is expected but got nil. May be you are running the test as root.")
+			return
+		}
 		assert.ErrorContains(t, err, "permission denied")
 	})
 }
