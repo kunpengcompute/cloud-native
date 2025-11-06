@@ -108,7 +108,7 @@ func NewMPAMCollector(logger *slog.Logger) (Collector, error) {
 // getMPAMGroups() traverse the resctrl dir to get all mpam groups.
 // It returns a map of mpam group name to mpam group path relative to resctl mount path.
 func (c *mpamCollector) getMPAMGroups() (map[string]string, error) {
-	mpamGroups, err := getAllTargetDirs(*resctlMountPath, DirNameInAGroup)
+	mpamGroups, err := getAllTargetDirs(*resctlMountPath, DirNameInAGroup, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mpam groups: %w", err)
 	}

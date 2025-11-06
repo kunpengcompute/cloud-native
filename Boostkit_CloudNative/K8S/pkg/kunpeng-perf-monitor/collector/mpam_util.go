@@ -24,28 +24,40 @@ import (
 
 // configItemData: the configData for a configItem
 // e.g. configData [1:16777215 122:16777215 243:16777215 364:16777215] for configItem "L3"
-type ConfigItemData map[string]int
+type ConfigItemData map[string]float64
 
 // ConfigData stores the parsed data in a mpam resource config file, including configItem (the keys) and configItemData (the values).
 // configItem examples: "MBHDL" "MBPRI" "MBMIN" "MB" "L3PRI" "L3"
 type ConfigData map[string]ConfigItemData
 
-func strToInt(str string) (int, error) {
+func strToFloat64(str string, isInt bool) (float64, error) {
+	str = strings.TrimSpace(str)
 	if str == "" {
-		return 0, fmt.Errorf("failed to parse int: empty string")
+		return 0, fmt.Errorf("failed to parse int/float: empty string")
 	}
-	base := 10
-	if strings.ContainsAny(str, "abcdefABCDEF") {
-		base = 16
+
+	if isInt {
+		// convert intStr to int64 then to float64
+		base := 10
+		if strings.ContainsAny(str, "abcdefABCDEF") {
+			base = 16
+		}
+		value, err := strconv.ParseInt(str, base, 64)
+		if err != nil {
+			return 0, fmt.Errorf("failed to parse int from string: %s", str)
+		}
+		return float64(value), nil
+	} else {
+		// if str is not intStr, then treat it as floatStr
+		value, err := strconv.ParseFloat(str, 64)
+		if err != nil {
+			return 0, fmt.Errorf("failed to parse float64 from string: %s", str)
+		}
+		return value, nil
 	}
-	value, err := strconv.ParseInt(str, base, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse int from string: %s", str)
-	}
-	return int(value), nil
 }
 
-func addToConfigData(configData *ConfigData, item string, key string, value int) (err error) {
+func addToConfigData(configData *ConfigData, item string, key string, value float64) (err error) {
 	if configData == nil {
 		return fmt.Errorf("configData is nil")
 	}
@@ -96,9 +108,9 @@ func parseLine(line string, configData1 *ConfigData, configKey1 string, configDa
 		valueStr := strings.TrimSpace(kv[1])
 
 		// convert the value to int64
-		value, err := strToInt(valueStr)
+		value, err := strToFloat64(valueStr, true)
 		if err != nil {
-			return fmt.Errorf("failed to convert the string to int: %s", valueStr)
+			return fmt.Errorf("failed to convert the string to float64: %s, error: %w", valueStr, err)
 		}
 
 		if strings.Contains(item, configKey1) {
@@ -144,12 +156,11 @@ func getMPAMConfigData(filename string, configKey1 string, configKey2 string) (c
 	return configData1, configData2, nil
 }
 
-// getAllTargetDirs() scans the rootDirPath recursively to find all the dirs whose name is TargetSubDir,
-// and return a map of target_dir_name to target_dir_path relative to rootDirPath.
-// The target_dir_name is the name of the parent dir of the TargetSubDir dir.
-// For dir structure below, the result should be:
+// getAllTargetDirs() scans the <rootDirPath> recursively to find all TargetSubDirOrFiles whose name is <TargetSubDirOrFile>,
+// and returns a map of <target_dir_name> to <target_dir_path> relative to rootDirPath.
+// The <target_dir_name> is the name of the parent dir of the <TargetSubDirOrFile>.
+// For dir structure below ("l3_cache"s are dirs), if <targetIsDir> is true and <TargetSubDirOrFile> is "l3_cache", the result should be:
 //  {"group1" "relative-path/to/group1", "group2" "relative-path/to/group2"}
-//
 /*
 tmpRoot/
  ├── group1/
@@ -157,16 +168,17 @@ tmpRoot/
  └── group2/
 	└── l3_cache/
 */
-func getAllTargetDirs(rootDirPath string, TargetSubDir string) (map[string]string, error) {
+// If "l3_cache"s above are files, and <targetIsDir> is false, the result remains the same as before.
+func getAllTargetDirs(rootDirPath string, TargetSubDirOrFile string, targetIsDir bool) (map[string]string, error) {
 	targetDirs := make(map[string]string)
 
 	err := filepath.WalkDir(rootDirPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		// when we find a TargetSubDir dir,
-		// we get the name and path of the parent dir
-		if d.IsDir() && d.Name() == TargetSubDir {
+		// when we find a TargetSubDirOrFile ,
+		// we get the name and relative path of the parent dir
+		if d.IsDir() == targetIsDir && d.Name() == TargetSubDirOrFile {
 			parentDirPath := filepath.Dir(path)
 			baseName := filepath.Base(parentDirPath)
 			targetDirPath, err := filepath.Rel(rootDirPath, parentDirPath)
