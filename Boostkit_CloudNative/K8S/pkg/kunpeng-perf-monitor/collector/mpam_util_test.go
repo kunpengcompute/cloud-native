@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStrToInt(t *testing.T) {
+func TestStrToFloat64ForIntStr(t *testing.T) {
 	testCases := []struct {
 		name        string
 		input       string
-		expected    int
+		expected    float64
 		expectError bool
 	}{
 		{"decimal_normal", "1234", 1234, false},
@@ -24,11 +24,38 @@ func TestStrToInt(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := strToInt(tc.input)
+			result, err := strToFloat64(tc.input, true)
 
 			if tc.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "failed to parse int")
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expected, result)
+			}
+		})
+	}
+}
+
+func TestStrToFloat64ForFloatStr(t *testing.T) {
+	testCases := []struct {
+		name        string
+		input       string
+		expected    float64
+		expectError bool
+	}{
+		{"float_normal", "1234", 1234, false},
+		{"float_invalid_char", "12g4", 0, true},
+		{"empty_string", "", 0, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := strToFloat64(tc.input, false)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to parse")
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expected, result)
@@ -50,7 +77,7 @@ func TestAddToConfigData(t *testing.T) {
 
 		// 验证无错误且值正确
 		assert.NoError(t, err)
-		assert.Equal(t, 1000, (*data)["network"]["throughput"])
+		assert.Equal(t, float64(1000), (*data)["network"]["throughput"])
 
 		// 验证map长度
 		assert.Len(t, *data, 1)
@@ -62,7 +89,7 @@ func TestAddToConfigData(t *testing.T) {
 		err := addToConfigData(data, "memory", "bandwidth", 256)
 
 		assert.NoError(t, err)
-		assert.Equal(t, 256, (*data)["memory"]["bandwidth"])
+		assert.Equal(t, float64(256), (*data)["memory"]["bandwidth"])
 	})
 
 	t.Run("empty_item_name", func(t *testing.T) {
@@ -78,7 +105,7 @@ func TestAddToConfigData(t *testing.T) {
 		err := addToConfigData(data, "cache", "L3", 4096)
 
 		assert.NoError(t, err)
-		assert.Equal(t, 4096, (*data)["cache"]["L3"])
+		assert.Equal(t, float64(4096), (*data)["cache"]["L3"])
 	})
 }
 
@@ -130,10 +157,10 @@ func TestParseLine(t *testing.T) {
 	}
 
 	// 验证有效配置的解析结果
-	assert.Equal(t, 100, (*config1)["L3cache"]["1"]) // 0x100转换为十进制256
-	assert.Equal(t, 200, (*config1)["L3cache"]["2"])
-	assert.Equal(t, 16777215, (*config1)["L3cache"]["3"]) // 0x100转换为十进制256
-	assert.Equal(t, 65535, (*config1)["L3cache"]["4"])
+	assert.Equal(t, float64(100), (*config1)["L3cache"]["1"]) // "100"转换为十进制float64(100)
+	assert.Equal(t, float64(200), (*config1)["L3cache"]["2"])
+	assert.Equal(t, float64(16777215), (*config1)["L3cache"]["3"])
+	assert.Equal(t, float64(65535), (*config1)["L3cache"]["4"])
 }
 
 // 辅助函数创建临时测试文件
@@ -155,8 +182,8 @@ func TestGetMPAMConfigData(t *testing.T) {
 
 		config1, config2, err := getMPAMConfigData(tmpfile, "cache", "mem")
 		assert.NoError(t, err)
-		assert.Equal(t, 100, (*config1)["L3cache"]["1"])
-		assert.Equal(t, 200, (*config2)["mem"]["2"])
+		assert.Equal(t, float64(100), (*config1)["L3cache"]["1"])
+		assert.Equal(t, float64(200), (*config2)["mem"]["2"])
 	})
 
 	t.Run("file_not_exist", func(t *testing.T) {
@@ -184,7 +211,7 @@ func TestGetMPAMConfigData(t *testing.T) {
 	})
 }
 
-func TestGetAllTargetDirs(t *testing.T) {
+func TestGetAllTargetDirWhenIsDirIsTrue(t *testing.T) {
 	t.Run("normal_case", func(t *testing.T) {
 		tmpRoot := t.TempDir()
 
@@ -197,7 +224,7 @@ func TestGetAllTargetDirs(t *testing.T) {
 		os.MkdirAll(filepath.Join(tmpRoot, "group1", "l3_cache"), 0755)
 		os.MkdirAll(filepath.Join(tmpRoot, "group2", "l3_cache"), 0755)
 
-		result, err := getAllTargetDirs(tmpRoot, "l3_cache")
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(result))
 		assert.Contains(t, result, "group1")
@@ -208,13 +235,13 @@ func TestGetAllTargetDirs(t *testing.T) {
 		tmpRoot := t.TempDir()
 		os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755)
 
-		result, err := getAllTargetDirs(tmpRoot, "l3_cache")
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true)
 		assert.NoError(t, err)
 		assert.Empty(t, result)
 	})
 
 	t.Run("invalid_root_path", func(t *testing.T) {
-		_, err := getAllTargetDirs("/non/existent/path", "l3_cache")
+		_, err := getAllTargetDirs("/non/existent/path", "l3_cache", true)
 		assert.ErrorContains(t, err, "no such file")
 	})
 
@@ -230,7 +257,65 @@ func TestGetAllTargetDirs(t *testing.T) {
 		os.MkdirAll(filepath.Join(tmpRoot, "parent", "child1", "l3_cache"), 0755)
 		os.MkdirAll(filepath.Join(tmpRoot, "parent", "child2", "l3_cache"), 0755)
 
-		result, err := getAllTargetDirs(tmpRoot, "l3_cache")
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(result))
+		assert.Contains(t, result, "child1")
+		assert.Contains(t, result, "child2")
+	})
+}
+
+func TestGetAllTargetDirWhenIsDirIsFalse(t *testing.T) {
+	t.Run("normal_case", func(t *testing.T) {
+		tmpRoot := t.TempDir()
+
+		// 创建测试目录结构
+		// tmpRoot/
+		// ├── group1/
+		// │   └── l3_cache/
+		// └── group2/
+		//     └── l3_cache/
+		os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755)
+		os.MkdirAll(filepath.Join(tmpRoot, "group2"), 0755)
+		os.Create(filepath.Join(tmpRoot, "group1", "l3_cache"))
+		os.Create(filepath.Join(tmpRoot, "group2", "l3_cache"))
+
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(result))
+		assert.Contains(t, result, "group1")
+		assert.Contains(t, result, "group2")
+	})
+
+	t.Run("no_target_subfile", func(t *testing.T) {
+		tmpRoot := t.TempDir()
+		os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755)
+
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false)
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("invalid_root_path", func(t *testing.T) {
+		_, err := getAllTargetDirs("/non/existent/path", "l3_cache", false)
+		assert.ErrorContains(t, err, "no such file")
+	})
+
+	t.Run("nested_structure", func(t *testing.T) {
+		tmpRoot := t.TempDir()
+		// 创建嵌套目录结构
+		// tmpRoot/
+		// └── parent/
+		//     ├── child1/
+		//     │   └── l3_cache/
+		//     └── child2/
+		//         └── l3_cache/
+		os.MkdirAll(filepath.Join(tmpRoot, "parent", "child1"), 0755)
+		os.MkdirAll(filepath.Join(tmpRoot, "parent", "child2"), 0755)
+		os.Create(filepath.Join(tmpRoot, "parent", "child1", "l3_cache"))
+		os.Create(filepath.Join(tmpRoot, "parent", "child2", "l3_cache"))
+
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(result))
 		assert.Contains(t, result, "child1")
