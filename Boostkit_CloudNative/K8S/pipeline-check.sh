@@ -72,19 +72,24 @@ run_project_checks() {
     local project=$1
     local makefile_target=$2
     local skip_test=${3:-false}
+    # Create temporary files for build and test output
+    local build_output=$(mktemp)
+    local test_output=$(mktemp)
 
     log_section "Processing Project: $project"
 
     # Run build
     log_info "Running build for $project..."
-    if make "${makefile_target}-build" > /dev/null 2>&1; then
+    if make "${makefile_target}-build" > "$build_output" 2>&1; then
         log_info "✓ Build passed for $project"
         ((PASSED++))
     else
         log_error "✗ Build failed for $project"
+        cat "$build_output" >&2
         ((FAILED++))
         return 1
     fi
+    rm -f "$build_output"
 
     # Run test (skip if requested)
     if [ "$skip_test" = true ]; then
@@ -93,14 +98,16 @@ run_project_checks() {
     fi
 
     log_info "Running tests for $project..."
-    if make "${makefile_target}-test" > /dev/null 2>&1; then
+    if make "${makefile_target}-test" > "$test_output" 2>&1; then
         log_info "✓ Tests passed for $project"
         ((PASSED++))
     else
         log_error "✗ Tests failed for $project"
+        cat "$test_output" >&2
         ((FAILED++))
         return 1
     fi
+    rm -f "$test_output"
 }
 
 # Main execution
