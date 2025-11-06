@@ -252,17 +252,20 @@ func (c *mpamCollector) Update(ch chan<- prometheus.Metric) error {
 	for mpamGroupName, mpamGroupRelPath := range mpamGroups {
 		labels, err := c.getLabels(mpamGroupName, mpamGroupRelPath)
 		if err != nil {
-			return fmt.Errorf("failed to get labels: %w", err)
+			c.logger.Error("failed to get labels for the group, skipping", "group", mpamGroupName, "err", err)
+			continue
 		}
 
 		err = c.updateMPAMResUsageMetrics(ch, mpamGroupRelPath, labels)
 		if err != nil {
-			return fmt.Errorf("failed to update resource usage metrics: %w", err)
+			c.logger.Error("failed to update resource usage metrics for the group, skipping", "group", mpamGroupName, "err", err)
+			continue
 		}
 
 		err = c.updateMPAMResConfigMetrics(ch, mpamGroupRelPath, labels)
 		if err != nil {
-			return fmt.Errorf("failed to update resource config metrics: %w", err)
+			c.logger.Error("failed to update resource config metrics for the group, skipping", "group", mpamGroupName, "err", err)
+			continue
 		}
 
 	}
