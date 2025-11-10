@@ -1,4 +1,4 @@
-# KAE Device Plugin Makefile
+# Kunpeng Performance Monitor Makefile
 
 # Project configuration
 PROJECT_NAME := kunpeng-perf-monitor
@@ -42,6 +42,7 @@ version: ## Show version information.
 .PHONY: deps
 deps: ## Download dependencies.
 	@echo "Downloading dependencies..."
+	bash libkperf.sh get_libkperf_ready $(CURDIR)
 	go get -d -v ./cmd/kunpeng-perf-monitor ./pkg/kunpeng-perf-monitor/...
 	@echo "Dependencies downloaded"
 
@@ -60,7 +61,8 @@ vet: ## Run go vet.
 .PHONY: test
 test: ## Run tests.
 	@echo "Running tests..."
-	go test ./pkg/kunpeng-perf-monitor/... -v
+	LD_LIBRARY_PATH=$(CURDIR)/pkg/kunpeng-perf-monitor/libkperf/lib:$$LD_LIBRARY_PATH \
+	go test ./pkg/kunpeng-perf-monitor/collector/... -v
 	@echo "Tests completed"
 
 .PHONY: tidy
@@ -75,21 +77,22 @@ tidy: ## Tidy go modules.
 build: deps ## Build the project.
 	@echo "Building $(PROJECT_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
+	CGO_ENABLED=1 go build $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
 	@echo "$(PROJECT_NAME) built successfully"
-	@echo "Binary installed to $(GOPATH_BIN)/kunpeng-perf-monitor"
+	@echo "Binary installed to $(BUILD_DIR)/kunpeng-perf-monitor"
 
 .PHONY: build-local
 build-local: deps ## Build binary to local bin directory.
 	@echo "Building $(PROJECT_NAME) locally..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
+	CGO_ENABLED=1 go build $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
 	@echo "$(PROJECT_NAME) built locally in $(BUILD_DIR)/kunpeng-perf-monitor"
 
 .PHONY: clean
 clean: ## Clean build artifacts.
 	@echo "Cleaning $(PROJECT_NAME)..."
-	rm -f $(GOPATH_BIN)/kunpeng-perf-monitor
+	# rm -f $(GOPATH_BIN)/kunpeng-perf-monitor
+	bash libkperf.sh rm_libkperf_files $(CURDIR)
 	rm -rf $(BUILD_DIR)
 	@echo "Clean completed"
 
@@ -123,7 +126,7 @@ docker-clean: ## Clean docker images.
 .PHONY: install
 install: build ## Install binary to system.
 	@echo "Installing $(PROJECT_NAME) to system..."
-	sudo cp $(GOPATH_BIN)/kunpeng-perf-monitor /usr/local/bin/
+	sudo cp $(BUILD_DIR)/kunpeng-perf-monitor /usr/local/bin/
 	sudo chmod +x /usr/local/bin/kunpeng-perf-monitor
 	@echo "Installation completed"
 
