@@ -29,6 +29,10 @@ import (
 const namespace = "kunpeng_node"
 
 var (
+	cgroupMountPath = kingpin.Flag("collector.cgroup.path", "cgroup mountpoint.").Default("/sys/fs/cgroup").String()
+)
+
+var (
 	scrapeDurationDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "scrape", "collector_duration_seconds"),
 		"kunpeng_performance_montor: Duration of a collector scrape.",
