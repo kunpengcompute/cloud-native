@@ -3,7 +3,7 @@
 # shell script to get libkperf files for kunpeng-perf-monitor
 set -ex
 
-verbose=true # no details for command execution by default
+verbose=false # no details for command execution by default
 get_dependencies=true # get libkperf dependencies by default
 
 # 定义一个函数来处理命令执行和输出控制
