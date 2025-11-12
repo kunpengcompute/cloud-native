@@ -85,7 +85,7 @@ spec:
       hostIPC: true
       containers:
       - name: k8s-mpam-controller-agent
-        image: k8s-mpam-controller:0.1
+        image: k8s-mpam-controller:0.1.0
         securityContext:
           capabilities:
             add:

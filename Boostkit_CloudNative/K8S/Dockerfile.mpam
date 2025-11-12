@@ -1,5 +1,5 @@
 # Build k8s-mpam-controller
-FROM golang:1.23.6 as builder
+FROM golang:1.25.0 as builder
 
 ENV PATH="/usr/local/go/bin:$PATH"
 ENV CGO_ENABLE=1

@@ -169,18 +169,9 @@ func getMinBandwidth() bool {
 }
 
 func checkDataIsValid(data []string, cfgItem string) bool {
-	if len(data) > 4 {
-		return false
-	}
-
 	for _, numa_data := range data {
 		cfg := strings.Split(numa_data, "=")
 		if len(cfg) != 2 {
-			return false
-		}
-
-		numa_id, err := strconv.Atoi(cfg[0])
-		if err != nil || numa_id > 3 {
 			return false
 		}
 
@@ -232,7 +223,7 @@ func checkConfig(rcdata string) bool {
 	var found = false
 	s := bufio.NewScanner(schemata)
 	for s.Scan() {
-		if strings.Split(s.Text(), ":")[0] == config[0] {
+		if strings.TrimSpace(strings.Split(s.Text(), ":")[0]) == config[0] {
 			found = true
 			break
 		}
@@ -283,6 +274,7 @@ func generateFullConf(mpamconf interface{}) []interface{} {
 	}
 	for index, cfg := range mpamFullCfg {
 		cfgItem := strings.Split(cfg.(interface{}).(string), ":")[0]
+		cfgItem = strings.TrimSpace(cfgItem)
 		for _, rcConf := range rc {
 			rcdata, ok := rcConf.(interface{}).(string)
 			if !ok {
@@ -294,7 +286,7 @@ func generateFullConf(mpamconf interface{}) []interface{} {
 				continue
 			}
 			if checkConfig(rcdata) {
-				fullData := createFullData(rcdata, cfg.(interface{}).(string))
+				fullData := createFullData(rcdata)
 				mpamFullCfg[index] = fullData
 			} else {
 				klog.Errorf("config %v is not right, please check config", rcdata)
@@ -306,23 +298,13 @@ func generateFullConf(mpamconf interface{}) []interface{} {
 	return mpamFullCfg
 }
 
-func createFullData(rcdata, cfg string) string {
+func createFullData(rcdata string) string {
 	curCfg := strings.Split(strings.Split(rcdata, ":")[1], ";")
-	fullCfg := strings.Split(strings.Split(cfg, ":")[1], ";")
-
-	for _, numaCfg := range curCfg {
-		numaId, err := strconv.Atoi(strings.Split(numaCfg, "=")[0])
-		if err != nil {
-			klog.Errorf("createFullData error, please check config")
-			return rcdata
-		}
-		fullCfg[numaId] = numaCfg
-	}
 
 	finalCfg := strings.Split(rcdata, ":")[0] + ":"
-	for id, numaCfg := range fullCfg {
+	for id, numaCfg := range curCfg {
 		finalCfg += numaCfg
-		if id != len(fullCfg)-1 {
+		if id != len(curCfg)-1 {
 			finalCfg += ";"
 		}
 	}

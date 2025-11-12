@@ -89,6 +89,8 @@ type Attr struct {
 	NumaNodeDir string
 	// NumaNum stores numa number on physical machine
 	NumaNum int
+	// L3IdList stores l3 cache id list
+	L3IdList []int
 	// L3PercentDynamic stores l3 percent for dynamic cache limit setting
 	// the value could be changed
 	L3PercentDynamic int
