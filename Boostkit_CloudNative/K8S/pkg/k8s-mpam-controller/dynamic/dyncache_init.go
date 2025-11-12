@@ -53,7 +53,7 @@ func (cl *limitSet) setDir() error {
 	return nil
 }
 
-func (cl *limitSet) writeResctrlSchemata(numaNum int) error {
+func (cl *limitSet) writeResctrlSchemata(numaNum int, l3IdList []int) error {
 	// get cbm mask like "fffff" means 20 cache way
 	maskFile := filepath.Join(filepath.Dir(cl.dir), "info", "L3", "cbm_mask")
 	llc, err := calcLimitedCacheValue(maskFile, cl.l3Percent)
@@ -68,8 +68,11 @@ func (cl *limitSet) writeResctrlSchemata(numaNum int) error {
 	var content string
 	var l3List, mbList []string
 	for i := range numaNum {
-		l3List = append(l3List, fmt.Sprintf("%d=%s", i, llc))
 		mbList = append(mbList, fmt.Sprintf("%d=%d", i, cl.mbPercent))
+	}
+	// In MPAM, the L3 cache is not controlled based on NUMA on some machines and needs to be configured separately.
+	for _, l3Id := range l3IdList {
+		l3List = append(l3List, fmt.Sprintf("%d=%s", l3Id, llc))
 	}
 	l3 := fmt.Sprintf("L3:%s\n", strings.Join(l3List, ";"))
 	mb := fmt.Sprintf("MB:%s\n", strings.Join(mbList, ";"))
@@ -153,7 +156,13 @@ func (c *DynCache) initDynCache() error {
 		return fmt.Errorf("failed to get NUMA nodes number: %s", err)
 	}
 
+	l3IdList, err := getL3IdList(filepath.Join(c.config.DefaultResctrlDir, schemataFileName))
+	if err != nil {
+		return fmt.Errorf("failed to get L3 cache id list: %s", err)
+	}
+
 	c.Attr.NumaNum = numaNum
+	c.Attr.L3IdList = l3IdList
 	c.Attr.L3PercentDynamic = c.config.L3Percent.Low
 	c.Attr.MemBandPercentDynamic = c.config.MemBandPercent.Low
 
@@ -162,12 +171,56 @@ func (c *DynCache) initDynCache() error {
 	}
 
 	dynamicMPAM := c.newCacheLimitSet(levelDynamic, c.Attr.L3PercentDynamic, c.Attr.MemBandPercentDynamic)
-	if err := dynamicMPAM.writeResctrlSchemata(c.Attr.NumaNum); err != nil {
+	if err := dynamicMPAM.writeResctrlSchemata(c.Attr.NumaNum, c.Attr.L3IdList); err != nil {
 		return err
 	}
 
 	klog.Infof("init DynCache directory successfully")
 	return nil
+}
+
+func getL3IdList(schemataPath string) ([]int, error) {
+	schemata, err := util.ReadFile(schemataPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s: %v", schemataPath, err)
+	}
+
+	lines := strings.Split(string(schemata), "\n")
+	var l3Line string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "L3:") {
+			l3Line = line
+			break
+		}
+	}
+
+	if l3Line == "" {
+		return nil, fmt.Errorf("mpam schemata file %s does not contain L3 line, schemata: %s, please check", schemataPath, string(schemata))
+	}
+
+	var l3IdList []int
+	data := strings.TrimPrefix(l3Line, "L3:")
+
+	fields := strings.Split(data, ";")
+	for _, f := range fields {
+		if f == "" {
+			continue
+		}
+		parts := strings.SplitN(f, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		id, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+		if err != nil {
+			continue
+		}
+		l3IdList = append(l3IdList, id)
+	}
+
+	return l3IdList, nil
 }
 
 func (c *DynCache) setMPAMConfig() error {

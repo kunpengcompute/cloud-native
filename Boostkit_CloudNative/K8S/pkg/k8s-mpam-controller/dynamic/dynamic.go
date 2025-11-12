@@ -37,7 +37,7 @@ func (c *DynCache) startDynamic() {
 				p.Name, cacheMiss)
 
 			if err := c.flush(limiter, stepLess); err != nil {
-				klog.Errorf(err.Error())
+				klog.Errorf("%v", err)
 			}
 			return
 		}
@@ -48,7 +48,7 @@ func (c *DynCache) startDynamic() {
 
 	if needMore {
 		if err := c.flush(limiter, stepMore); err != nil {
-			klog.Errorf(err.Error())
+			klog.Errorf("%v", err)
 		}
 	}
 }
@@ -113,7 +113,7 @@ func (c *DynCache) flush(limitSet *limitSet, step int) error {
 }
 
 func (c *DynCache) doFlush(limitSet *limitSet) error {
-	if err := limitSet.writeResctrlSchemata(c.Attr.NumaNum); err != nil {
+	if err := limitSet.writeResctrlSchemata(c.Attr.NumaNum, c.Attr.L3IdList); err != nil {
 		return fmt.Errorf("adjust dynamic cache limit to l3:%v mb:%v error: %v",
 			limitSet.l3Percent, limitSet.mbPercent, err)
 	}
