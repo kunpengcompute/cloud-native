@@ -3,7 +3,7 @@
 # shell script to get libkperf files for kunpeng-perf-monitor
 set -ex
 
-verbose=false # no details for command execution by default
+verbose=true # output details for command execution by default
 get_dependencies=true # get libkperf dependencies by default
 
 # 定义一个函数来处理命令执行和输出控制
@@ -13,6 +13,25 @@ run_cmd() {
     else
         "$@" > /dev/null 2>&1
     fi
+}
+
+# clean package cache
+clean_package_cache() {
+    local pkg_manager="$1"
+    echo "Cleaning $pkg_manager cache..."
+    if [[ "$pkg_manager" == "apt" ]]; then
+        run_cmd apt clean
+        run_cmd apt autoremove -y
+        # clean apt lists directory to save more space
+        rm -rf /var/lib/apt/lists/*
+    elif [[ "$pkg_manager" == "yum" ]]; then
+        run_cmd yum clean all
+        run_cmd yum autoremove -y
+        # clean yum cache directory to save more space
+        rm -rf /var/cache/yum/*
+    fi
+    # clean generic temporary files
+    rm -rf /tmp/* /var/tmp/*
 }
 
 # prerequisites for libkperf:
@@ -37,6 +56,9 @@ get_libkperf_dependencies() {
 
     # Install dependencies
     run_cmd $pkg_manager install -y make cmake python3 gcc git $numa_pkg $glibc_pkg
+
+    # remove package cache
+    clean_package_cache "$pkg_manager"
 }
 
 get_libkperf_ready() {
