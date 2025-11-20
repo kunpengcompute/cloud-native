@@ -62,15 +62,16 @@ get_libkperf_dependencies() {
 }
 
 get_libkperf_ready() {
-    local workdir="$1"
-    if [[ -d "$workdir/pkg/kunpeng-perf-monitor/libkperf" ]]; then
-        echo "libkperf files already exist in $workdir/pkg/kunpeng-perf-monitor/libkperf"
-        echo "skip getting libkperf files"
-        return 0
-    fi
-
+    # download libkperf dependencies
     if [[ "$get_dependencies" == true ]]; then
         get_libkperf_dependencies
+    fi
+
+    local workdir="$1"
+    # remove old libkperf files
+    if [[ -d "$workdir/pkg/kunpeng-perf-monitor/libkperf" ]]; then
+        echo "libkperf files already exist in $workdir/pkg/kunpeng-perf-monitor/libkperf, removing..."
+        run_cmd rm -rf "$workdir/pkg/kunpeng-perf-monitor/libkperf"
     fi
 
     if [[ -d "$workdir/tmp/libkperf" ]]; then
@@ -97,7 +98,6 @@ rm_libkperf_files() {
     local workdir="$1"
     # rm the directories related to libkperf
     rm -rf "$workdir/tmp"
-    rm -rf "$workdir/pkg/kunpeng-perf-monitor/libkperf"
 }
 
 if [[ "$1" == "get_libkperf_ready" ]]; then
