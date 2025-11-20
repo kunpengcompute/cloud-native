@@ -225,10 +225,10 @@ kae-device-plugin-tidy: ## Tidy kae-device-plugin go modules.
 build: mpam-build kunpeng-tap-build kae-device-plugin-build kunpeng-perf-monitor-build ## Build all projects.
 
 .PHONY: clean
-clean: mpam-clean kunpeng-tap-clean kae-device-plugin-clean ## Clean all projects.
+clean: mpam-clean kunpeng-tap-clean kae-device-plugin-clean kunpeng-perf-monitor-clean## Clean all projects.
 
 .PHONY: docker
-docker: mpam-docker kunpeng-tap-docker-build kae-device-plugin-docker ## Build all docker images.
+docker: mpam-docker kunpeng-tap-docker-build kae-device-plugin-docker kunpeng-perf-monitor-docker ## Build all docker images.
 
 .PHONY: fmt
 fmt: mpam-fmt kunpeng-tap-fmt kae-device-plugin-fmt ## Format code for all projects.
@@ -237,7 +237,7 @@ fmt: mpam-fmt kunpeng-tap-fmt kae-device-plugin-fmt ## Format code for all proje
 vet: mpam-vet kunpeng-tap-vet kae-device-plugin-vet ## Run go vet for all projects.
 
 .PHONY: test
-test: mpam-test kunpeng-tap-test kae-device-plugin-test ## Run tests for all projects.
+test: mpam-test kunpeng-tap-test kae-device-plugin-test kunpeng-perf-monitor-test ## Run tests for all projects.
 
 .PHONY: tidy
 tidy: mpam-tidy kunpeng-tap-tidy kae-device-plugin-tidy ## Tidy go modules for all projects.

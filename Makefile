@@ -66,6 +66,7 @@ test: ## Run tests for all projects.
 	@echo "Running tests for all projects..."
 	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kunpeng-tap test
 	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kae-device-plugin test
+	$(MAKE) -C Boostkit_CloudNative/K8S -f Makefile.kunpeng-perf-monitor test
 	@echo "All tests completed"
 
 .PHONY: tidy
@@ -214,6 +215,7 @@ docker-build: ## Build docker images for all projects.
 	@echo "Building docker images for all projects..."
 	$(MAKE) -C Boostkit_CloudNative/K8S mpam-docker
 	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-docker-build
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-perf-monitor-docker
 
 ##@ CI/CD
 
