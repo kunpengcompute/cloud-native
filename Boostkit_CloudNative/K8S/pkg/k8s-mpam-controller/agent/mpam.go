@@ -133,7 +133,7 @@ func cleanResctrlGroup(groups []string) {
 func updateResctrlGroup(dir, data string) {
 	// create resctrl group if it doesn't exist
 	if _, err := os.Lstat(dir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			klog.Errorf("failed to create directory %v: %v", dir, err)
 			return
 		}
@@ -212,7 +212,7 @@ func checkConfig(rcdata string) bool {
 	}
 
 	schemataFile := filepath.Join(resctrlRoot, resctrlSchemataFile)
-	var perm os.FileMode = 0644
+	var perm os.FileMode = 0600
 	schemata, err := os.OpenFile(schemataFile, os.O_RDONLY, perm)
 	if err != nil {
 		klog.Errorf("failed to open %q: %v", schemataFile, err)
@@ -250,7 +250,7 @@ func generateFullConf(mpamconf interface{}) []interface{} {
 	var mpamFullCfg []interface{}
 
 	schemataFile := filepath.Join(resctrlRoot, resctrlSchemataFile)
-	var perm os.FileMode = 0644
+	var perm os.FileMode = 0600
 	schemata, err := os.OpenFile(schemataFile, os.O_RDONLY, perm)
 	if err != nil {
 		klog.Errorf("failed to open %q: %v", schemataFile, err)
@@ -370,7 +370,7 @@ func applyConfig(data *configData) {
 func readPids(tasksFile string) ([]string, error) {
 	var pids []string
 
-	f, err := os.OpenFile(tasksFile, os.O_RDONLY, 0644)
+	f, err := os.OpenFile(tasksFile, os.O_RDONLY, 0600)
 	if err != nil {
 		klog.Errorf("failed to open %q: %v", tasksFile, err)
 		return nil, fmt.Errorf("failed to open %q: %v", tasksFile, err)
@@ -391,7 +391,7 @@ func readPids(tasksFile string) ([]string, error) {
 
 // writePids writes pids to a restctrl tasks file
 func writePids(tasksFile string, pids []string) {
-	f, err := os.OpenFile(tasksFile, os.O_WRONLY, 0644)
+	f, err := os.OpenFile(tasksFile, os.O_WRONLY, 0600)
 	if err != nil {
 		klog.Errorf("failed to write pids to %q: %v", tasksFile, err)
 		return
