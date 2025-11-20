@@ -97,7 +97,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(options.PolicyManagerEndpoint), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(options.PolicyManagerEndpoint), 0750); err != nil {
 		setupLog.Error(err, "failed to mkdir", "filepath", filepath.Dir(options.PolicyManagerEndpoint))
 		os.Exit(1)
 	}

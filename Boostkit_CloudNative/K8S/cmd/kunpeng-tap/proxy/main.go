@@ -72,7 +72,7 @@ func main() {
 		klog.Fatalf("failed to unlink %v: %v", options.RuntimeProxyEndpoint, err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(options.RuntimeProxyEndpoint), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(options.RuntimeProxyEndpoint), 0750); err != nil {
 		klog.Fatalf("failed to mkdir %v: %v", filepath.Dir(options.RuntimeProxyEndpoint), err)
 	}
 

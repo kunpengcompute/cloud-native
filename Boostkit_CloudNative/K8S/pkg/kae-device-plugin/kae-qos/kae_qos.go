@@ -158,7 +158,7 @@ func setDeviceKaeQos(resourceType string, device string, qos string) error {
 
 	// The KAE QoS is set by "echo [pci] [value] > alg_qos"
 	writeData := fmt.Sprintf("%s %s", device, qos)
-	if err := os.WriteFile(qosFile, []byte(writeData), 0644); err != nil {
+	if err := os.WriteFile(qosFile, []byte(writeData), 0600); err != nil {
 		return fmt.Errorf("write qos file %s failed: %v", qosFile, err)
 	}
 
