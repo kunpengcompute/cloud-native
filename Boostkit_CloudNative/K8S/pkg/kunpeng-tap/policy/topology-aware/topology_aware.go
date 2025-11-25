@@ -21,6 +21,7 @@ import (
 	"sort"
 	"sync"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/cpuset"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/cache"
@@ -153,6 +154,18 @@ func (p *TopologyAwarePolicy) PreCreateContainerHook(ctx policy.HookContext) (*p
 	if !ok {
 		klog.ErrorS(nil, "Invalid context type for PreCreateContainerHook")
 		return nil, fmt.Errorf("invalid context type: expected *policy.ContainerContext")
+	}
+
+	// 解析 QoS 类型，过滤 BestEffort 类型的 Pod/Container
+	qos := policy.ParseCgroupForQOSClass(containerCtx.Request.CgroupParent)
+	if qos == v1.PodQOSBestEffort {
+		klog.InfoS("Skip BestEffort QoS container",
+			"pod", containerCtx.Request.PodMeta.Name,
+			"namespace", containerCtx.Request.PodMeta.Namespace,
+			"container", containerCtx.Request.ContainerMeta.Name,
+			"qos", qos)
+		// 不对 BestEffort 类型的容器进行资源分配
+		return nil, nil
 	}
 
 	// 使用 defer 确保在函数结束时更新指标

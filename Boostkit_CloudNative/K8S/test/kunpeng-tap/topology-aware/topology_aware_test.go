@@ -1749,5 +1749,87 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 				ginkgo.GinkgoWriter.Printf("✅ Test Case 6 completed successfully\n\n")
 			})
 		})
+
+		ginkgo.Context("QoS Filtering", func() {
+			ginkgo.It("should skip BestEffort QoS containers", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Test Case: QoS Filtering - BestEffort Containers ===\n")
+
+				// Create a BestEffort container context with besteffort cgroup path
+				containerCtx := createBasicContainerContext("besteffort-container", "pod-besteffort-123", "besteffort-pod", "default")
+				// Set cgroup parent to indicate BestEffort QoS
+				containerCtx.Request.CgroupParent = "kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod123.slice"
+
+				ginkgo.GinkgoWriter.Printf("Testing BestEffort container with cgroup: %s\n", containerCtx.Request.CgroupParent)
+
+				// Try to allocate resources for BestEffort container
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+
+				// Should not return error, but allocation should be nil (skipped)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).To(gomega.BeNil())
+
+				ginkgo.GinkgoWriter.Printf("✅ BestEffort container correctly skipped (allocation is nil)\n")
+			})
+
+			ginkgo.It("should process Burstable QoS containers", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Test Case: QoS Filtering - Burstable Containers ===\n")
+
+				// Create a Burstable container context with burstable cgroup path
+				containerCtx := createBasicContainerContext("burstable-container", "pod-burstable-123", "burstable-pod", "default")
+				// Set cgroup parent to indicate Burstable QoS
+				containerCtx.Request.CgroupParent = "kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod123.slice"
+
+				ginkgo.GinkgoWriter.Printf("Testing Burstable container with cgroup: %s\n", containerCtx.Request.CgroupParent)
+
+				// Try to allocate resources for Burstable container
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+
+				// Should successfully allocate resources
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+				gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
+
+				ginkgo.GinkgoWriter.Printf("✅ Burstable container correctly processed: CPU set = %s\n", allocation.Resources.CpusetCpus)
+
+				// Clean up
+				releaseCtx := createContainerContextWithID(
+					containerCtx.Request.ContainerMeta.ID,
+					containerCtx.Request.ContainerMeta.Name,
+					containerCtx.Request.PodMeta.UID,
+				)
+				_, err = topologyPolicy.PostStopContainerHook(releaseCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("should process Guaranteed QoS containers", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Test Case: QoS Filtering - Guaranteed Containers ===\n")
+
+				// Create a Guaranteed container context with guaranteed cgroup path
+				containerCtx := createBasicContainerContext("guaranteed-container", "pod-guaranteed-123", "guaranteed-pod", "default")
+				// Set cgroup parent to indicate Guaranteed QoS (no burstable/besteffort in path)
+				containerCtx.Request.CgroupParent = "kubepods.slice/kubepods-pod123.slice"
+
+				ginkgo.GinkgoWriter.Printf("Testing Guaranteed container with cgroup: %s\n", containerCtx.Request.CgroupParent)
+
+				// Try to allocate resources for Guaranteed container
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+
+				// Should successfully allocate resources
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+				gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
+
+				ginkgo.GinkgoWriter.Printf("✅ Guaranteed container correctly processed: CPU set = %s\n", allocation.Resources.CpusetCpus)
+
+				// Clean up
+				releaseCtx := createContainerContextWithID(
+					containerCtx.Request.ContainerMeta.ID,
+					containerCtx.Request.ContainerMeta.Name,
+					containerCtx.Request.PodMeta.UID,
+				)
+				_, err = topologyPolicy.PostStopContainerHook(releaseCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
 	})
 })
