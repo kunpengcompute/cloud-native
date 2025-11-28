@@ -12,7 +12,7 @@ BUILD_DIR := bin
 DOCKER_IMAGE := kae-device-plugin:$(VERSION)
 
 # Build flags
-LDFLAGS=-ldflags "-s -w"
+LDFLAGS=-ldflags "-s -w -bindnow"
 
 
 
@@ -76,7 +76,7 @@ tidy: ## Tidy go modules.
 build: deps ## Build the project.
 	@echo "Building $(PROJECT_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/kae-device-plugin ./cmd/kae-device-plugin
+	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/kae-device-plugin ./cmd/kae-device-plugin
 	@echo "$(PROJECT_NAME) built successfully"
 	@echo "Binary installed to $(GOPATH_BIN)/kae-device-plugin"
 
@@ -84,7 +84,7 @@ build: deps ## Build the project.
 build-local: deps ## Build binary to local bin directory.
 	@echo "Building $(PROJECT_NAME) locally..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/kae-device-plugin ./cmd/kae-device-plugin
+	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/kae-device-plugin ./cmd/kae-device-plugin
 	@echo "$(PROJECT_NAME) built locally in $(BUILD_DIR)/kae-device-plugin"
 
 .PHONY: clean
