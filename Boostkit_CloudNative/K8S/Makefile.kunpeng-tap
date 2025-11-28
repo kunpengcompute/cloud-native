@@ -33,7 +33,10 @@ MANAGER_SRC=./cmd/kunpeng-tap/manager
 PROXY_SRC=./cmd/kunpeng-tap/proxy
 
 # Build flags
-LDFLAGS=-ldflags "-s -w -X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.Version=$(Version) -X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.Built=$(BUILD_TIME) -X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.GitCommit=$(GitCommit)"
+LDFLAGS=-ldflags "-bindnow -s -w \
+-X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.Version=$(Version) \
+-X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.Built=$(BUILD_TIME) \
+-X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.GitCommit=$(GitCommit)"
 
 .PHONY: all
 all: build
@@ -73,21 +76,21 @@ tidy: ## Tidy go modules.
 build: fmt vet ## Build manager and proxy binaries.
 	@echo "Building kunpeng-tap manager..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/$(MANAGER_BINARY) $(MANAGER_SRC)
+	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/$(MANAGER_BINARY) $(MANAGER_SRC)
 	@echo "Building kunpeng-tap proxy..."
-	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/$(PROXY_BINARY) $(PROXY_SRC)
+	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/$(PROXY_BINARY) $(PROXY_SRC)
 
 .PHONY: build-manager
 build-manager: fmt vet ## Build manager binary.
 	@echo "Building kunpeng-tap manager..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/$(MANAGER_BINARY) $(MANAGER_SRC)
+	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/$(MANAGER_BINARY) $(MANAGER_SRC)
 
 .PHONY: build-proxy
 build-proxy: fmt vet ## Build proxy binary.
 	@echo "Building kunpeng-tap proxy..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BUILD_DIR)/$(PROXY_BINARY) $(PROXY_SRC)
+	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/$(PROXY_BINARY) $(PROXY_SRC)
 
 .PHONY: clean
 clean: ## Clean build artifacts.
