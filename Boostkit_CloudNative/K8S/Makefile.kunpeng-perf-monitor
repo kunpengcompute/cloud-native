@@ -12,7 +12,8 @@ BUILD_DIR := bin
 DOCKER_IMAGE := kunpeng-perf-monitor:$(VERSION)
 
 # Build flags
-LDFLAGS=-ldflags "-s -w"
+CGO_CFLAGS := "-fstack-protector-strong -D_FORTIFY_SOURCE=2 -O2"
+LDFLAGS := "-s -w -bindnow"
 
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
@@ -77,7 +78,7 @@ tidy: ## Tidy go modules.
 build: deps ## Build the project.
 	@echo "Building $(PROJECT_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=1 go build $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
+	CGO_CFLAGS=$(CGO_CFLAGS) CGO_ENABLED=1 go build -buildmode=pie -ldflags $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
 	@echo "$(PROJECT_NAME) built successfully"
 	@echo "Binary installed to $(BUILD_DIR)/kunpeng-perf-monitor"
 
@@ -85,7 +86,7 @@ build: deps ## Build the project.
 build-local: deps ## Build binary to local bin directory.
 	@echo "Building $(PROJECT_NAME) locally..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=1 go build $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
+	CGO_CFLAGS=$(CGO_CFLAGS) CGO_ENABLED=1 go build -buildmode=pie -ldflags $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
 	@echo "$(PROJECT_NAME) built locally in $(BUILD_DIR)/kunpeng-perf-monitor"
 
 .PHONY: clean
