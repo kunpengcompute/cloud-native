@@ -272,7 +272,7 @@ kunpeng-tap-rpm-clean: ## Clean kunpeng-tap RPM build artifacts.
 
 .PHONY: kunpeng-perf-monitor-build
 kunpeng-perf-monitor-build: ## Build kunpeng-perf-monitor project.
-	$(MAKE) -f Makefile.kunpeng-perf-monitor build
+	$(MAKE) -f Makefile.kunpeng-perf-monitor build-static
 
 .PHONY: kunpeng-perf-monitor-test
 kunpeng-perf-monitor-test: ## Test kunpeng-perf-monitor project.
