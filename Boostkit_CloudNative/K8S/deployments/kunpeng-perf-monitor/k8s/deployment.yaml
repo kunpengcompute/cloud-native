@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: DaemonSet # 每个节点运行一个实例
+metadata:
+  name: kunpeng-perf-monitor
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: kunpeng-perf-monitor
+  template:
+    metadata:
+      labels:
+        app: kunpeng-perf-monitor
+    spec:
+      containers:
+      - name: kunpeng-perf-monitor
+        image: kunpeng-perf-monitor:1.0
+        imagePullPolicy: IfNotPresent
+        args:
+        - "--web.listen-address=:9100"  # 监听所有接口，而非仅127.0.0.1
+        # - "--no-collector.pmu"  # 禁用PMU采集器
+        # - "--no-collector.psi"  # 禁用PSI采集器
+        # - "--no-collector.mpam"  # 禁用MPAM采集器
+        ports:
+        - containerPort: 9100
+          protocol: TCP
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: 
+            - "SYS_ADMIN"  # PMU采集器需要SYS_ADMIN能力
+            drop:
+            - ALL  # 删除其他特权能力
+          readOnlyRootFilesystem: true  # 根文件系统只读
+          runAsUser: 0  # PMU采集器必须以root运行
+          # runAsNonRoot: true  # 如果要强制非root运行，注释掉runAsUser: 0 并启用此项
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: resctrl
+          mountPath: /sys/fs/resctrl
+          mountPropagation: HostToContainer
+          readOnly: true
+        - name: cgroup
+          mountPath: /sys/fs/cgroup
+          mountPropagation: HostToContainer
+          readOnly: true
+        - name: cpu-devices
+          mountPath: /sys/devices/system/cpu
+          readOnly: true
+        - name: event-devices
+          mountPath: /sys/bus/event_source/devices
+          readOnly: true
+      volumes:
+      - name: resctrl                      # 挂载resctrl文件系统，用于MPAM采集器
+        hostPath:
+          path: /sys/fs/resctrl
+          type: Directory
+      - name: cgroup                       # 挂载cgroup文件系统，用于PSI采集器
+        hostPath:
+          path: /sys/fs/cgroup
+          type: Directory
+      - name: cpu-devices
+        hostPath:
+          path: /sys/devices/system/cpu
+          type: Directory
+      - name: event-devices
+        hostPath:
+          path: /sys/bus/event_source/devices
+          type: Directory
