@@ -185,7 +185,7 @@ func NewPSICollector(logger *slog.Logger) (Collector, error) {
 // It returns a map of psi cgroup name to psi cgroup path relative to cgroupSearchPath.
 func (c *psiCollector) getPSICgroups() (PSICgroup map[string]string, err error) {
 	// use psiCgroupFeatureFile "cpu.pressure" to locate psi cgroups
-	PSICgroup, err = getAllTargetDirs(c.cgroupSearchPath, psiCgroupFeatureFile, false)
+	PSICgroup, err = getAllTargetDirs(c.cgroupSearchPath, psiCgroupFeatureFile, false, c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PSI cgroups: %w", err)
 	}

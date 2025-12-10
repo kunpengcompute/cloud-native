@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -212,6 +213,8 @@ func TestGetMPAMConfigData(t *testing.T) {
 }
 
 func TestGetAllTargetDirWhenIsDirIsTrue(t *testing.T) {
+	logger := slog.Default()
+
 	t.Run("normal_case", func(t *testing.T) {
 		tmpRoot := t.TempDir()
 
@@ -224,7 +227,7 @@ func TestGetAllTargetDirWhenIsDirIsTrue(t *testing.T) {
 		os.MkdirAll(filepath.Join(tmpRoot, "group1", "l3_cache"), 0755)
 		os.MkdirAll(filepath.Join(tmpRoot, "group2", "l3_cache"), 0755)
 
-		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true)
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(result))
 		assert.Contains(t, result, "group1")
@@ -235,13 +238,13 @@ func TestGetAllTargetDirWhenIsDirIsTrue(t *testing.T) {
 		tmpRoot := t.TempDir()
 		os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755)
 
-		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true)
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true, logger)
 		assert.NoError(t, err)
 		assert.Empty(t, result)
 	})
 
 	t.Run("invalid_root_path", func(t *testing.T) {
-		_, err := getAllTargetDirs("/non/existent/path", "l3_cache", true)
+		_, err := getAllTargetDirs("/non/existent/path", "l3_cache", true, logger)
 		assert.ErrorContains(t, err, "no such file")
 	})
 
@@ -257,7 +260,7 @@ func TestGetAllTargetDirWhenIsDirIsTrue(t *testing.T) {
 		os.MkdirAll(filepath.Join(tmpRoot, "parent", "child1", "l3_cache"), 0755)
 		os.MkdirAll(filepath.Join(tmpRoot, "parent", "child2", "l3_cache"), 0755)
 
-		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true)
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(result))
 		assert.Contains(t, result, "child1")
@@ -266,6 +269,7 @@ func TestGetAllTargetDirWhenIsDirIsTrue(t *testing.T) {
 }
 
 func TestGetAllTargetDirWhenIsDirIsFalse(t *testing.T) {
+	logger := slog.Default()
 	t.Run("normal_case", func(t *testing.T) {
 		tmpRoot := t.TempDir()
 
@@ -280,7 +284,7 @@ func TestGetAllTargetDirWhenIsDirIsFalse(t *testing.T) {
 		os.Create(filepath.Join(tmpRoot, "group1", "l3_cache"))
 		os.Create(filepath.Join(tmpRoot, "group2", "l3_cache"))
 
-		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false)
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(result))
 		assert.Contains(t, result, "group1")
@@ -291,13 +295,13 @@ func TestGetAllTargetDirWhenIsDirIsFalse(t *testing.T) {
 		tmpRoot := t.TempDir()
 		os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755)
 
-		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false)
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false, logger)
 		assert.NoError(t, err)
 		assert.Empty(t, result)
 	})
 
 	t.Run("invalid_root_path", func(t *testing.T) {
-		_, err := getAllTargetDirs("/non/existent/path", "l3_cache", false)
+		_, err := getAllTargetDirs("/non/existent/path", "l3_cache", false, logger)
 		assert.ErrorContains(t, err, "no such file")
 	})
 
@@ -315,7 +319,7 @@ func TestGetAllTargetDirWhenIsDirIsFalse(t *testing.T) {
 		os.Create(filepath.Join(tmpRoot, "parent", "child1", "l3_cache"))
 		os.Create(filepath.Join(tmpRoot, "parent", "child2", "l3_cache"))
 
-		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false)
+		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(result))
 		assert.Contains(t, result, "child1")
