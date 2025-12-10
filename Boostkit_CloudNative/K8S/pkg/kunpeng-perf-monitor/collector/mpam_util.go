@@ -16,6 +16,7 @@ package collector
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -169,12 +170,19 @@ tmpRoot/
 	└── l3_cache/
 */
 // If "l3_cache"s above are files, and <targetIsDir> is false, the result remains the same as before.
-func getAllTargetDirs(rootDirPath string, TargetSubDirOrFile string, targetIsDir bool) (map[string]string, error) {
-	targetDirs := make(map[string]string)
+func getAllTargetDirs(rootDirPath string, TargetSubDirOrFile string,
+	targetIsDir bool, logger *slog.Logger) (map[string]string, error) {
 
+	if _, err := os.Stat(rootDirPath); err != nil {
+		return nil, fmt.Errorf("failed to stat path %s: %w", rootDirPath, err)
+	}
+
+	targetDirs := make(map[string]string)
 	err := filepath.WalkDir(rootDirPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return err
+			// when failed to access a dir, skip it
+			logger.Error("failed to access directory", "path", path, "err", err)
+			return filepath.SkipDir
 		}
 		// when we find a TargetSubDirOrFile ,
 		// we get the name and relative path of the parent dir
@@ -183,7 +191,8 @@ func getAllTargetDirs(rootDirPath string, TargetSubDirOrFile string, targetIsDir
 			baseName := filepath.Base(parentDirPath)
 			targetDirPath, err := filepath.Rel(rootDirPath, parentDirPath)
 			if err != nil {
-				return fmt.Errorf("failed to get relative path: %w", err)
+				logger.Error("failed to get relative path", "parentDirPath", parentDirPath, "rootDirPath", rootDirPath, "err", err)
+				return filepath.SkipDir
 			}
 			targetDirs[baseName] = targetDirPath
 		}
