@@ -59,7 +59,7 @@ vet: ## Run go vet.
 	@echo "Go vet completed"
 
 .PHONY: test
-test: ## Run tests.
+test: deps ## Run tests.
 	@echo "Running tests..."
 	LD_LIBRARY_PATH=$(CURDIR)/pkg/kunpeng-perf-monitor/libkperf/lib:$$LD_LIBRARY_PATH \
 	go test ./pkg/kunpeng-perf-monitor/collector/... -v
