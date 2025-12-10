@@ -89,6 +89,13 @@ build-local: deps ## Build binary to local bin directory.
 	CGO_CFLAGS=$(CGO_CFLAGS) CGO_ENABLED=1 go build -buildmode=pie -ldflags $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
 	@echo "$(PROJECT_NAME) built locally in $(BUILD_DIR)/kunpeng-perf-monitor"
 
+.PHONY: build-static
+build-static: deps ## Build binary statically to local bin directory.
+	@echo "Building $(PROJECT_NAME) statically..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_CFLAGS=$(CGO_CFLAGS) CGO_ENABLED=1 go build -buildmode=pie -ldflags $(LDFLAGS) -tags static -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
+	@echo "$(PROJECT_NAME) built statically in $(BUILD_DIR)/kunpeng-perf-monitor"
+
 .PHONY: clean
 clean: ## Clean build artifacts.
 	@echo "Cleaning $(PROJECT_NAME)..."
