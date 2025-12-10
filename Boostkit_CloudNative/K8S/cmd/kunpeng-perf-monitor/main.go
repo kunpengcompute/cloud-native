@@ -213,9 +213,10 @@ func main() {
 	logger.Info("Starting kunpeng_performance_montor", "version", version.Info())
 	logger.Info("Build context", "build_context", version.BuildContext())
 	if user, err := user.Current(); err == nil && user.Uid == "0" {
-		logger.Warn("Kunpeng performance montor is running as root user. This exporter is designed to run as unprivileged user, root is not required.")
+		logger.Warn("Kunpeng performance montor is running as root user. " +
+			"Root is required only when the PMU collector is enabled. " +
+			"If not, running as unprivileged user is recommended.")
 	}
-
 	http.Handle(*metricsPath, newHandler(!*disableExporterMetrics, *maxRequests, logger))
 	if *metricsPath != "/" {
 		landingConfig := web.LandingConfig{

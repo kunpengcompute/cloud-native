@@ -80,7 +80,7 @@ build: deps ## Build the project.
 	@mkdir -p $(BUILD_DIR)
 	CGO_CFLAGS=$(CGO_CFLAGS) CGO_ENABLED=1 go build -buildmode=pie -ldflags $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-perf-monitor ./cmd/kunpeng-perf-monitor
 	@echo "$(PROJECT_NAME) built successfully"
-	@echo "Binary installed to $(BUILD_DIR)/kunpeng-perf-monitor"
+	@echo "Binary built in $(BUILD_DIR)/kunpeng-perf-monitor"
 
 .PHONY: build-local
 build-local: deps ## Build binary to local bin directory.
