@@ -1,0 +1,125 @@
+# Note: RBAC resources removed as NRI plugin does not require Kubernetes API access
+# The plugin communicates with container runtime via NRI socket only
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kunpeng-tap-nri
+  namespace: kunpeng-tap
+  labels:
+    app: kunpeng-tap-nri
+    component: nri-plugin
+spec:
+  selector:
+    matchLabels:
+      app: kunpeng-tap-nri
+  template:
+    metadata:
+      labels:
+        app: kunpeng-tap-nri
+        component: nri-plugin
+    spec:
+      serviceAccountName: default
+      priorityClassName: system-node-critical
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              # 排除带有 control-plane 标签的节点 (新版 k8s)
+              - key: node-role.kubernetes.io/control-plane
+                operator: DoesNotExist
+              # 排除带有 master 标签的节点 (旧版 k8s兼容)
+              - key: node-role.kubernetes.io/master
+                operator: DoesNotExist
+      volumes:
+      - name: nri-socket
+        hostPath:
+          path: /var/run/nri
+          type: DirectoryOrCreate
+      - name: topology-cache
+        hostPath:
+          path: /var/lib/kunpeng-tap/topology-cache
+          type: DirectoryOrCreate
+      - name: proc
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: sys
+        hostPath:
+          path: /sys
+          type: Directory
+      containers:
+      - name: kunpeng-tap-nri
+        image: kunpeng-tap-nri:latest
+        imagePullPolicy: IfNotPresent
+        # Use integrated startup script from Dockerfile
+        args:
+          - "--container-runtime-mode=NRI"
+          - "--nri-socket-path=/var/run/nri/nri.sock"
+          - "--resource-policy=topology-aware"
+          - "-v=2"
+        securityContext:
+          capabilities:
+            add:
+            - SYS_RESOURCE
+            - SYS_PTRACE
+        env:
+        - name: NRI_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NRI_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NRI_SOCKET_PATH
+          value: "/var/run/nri/nri.sock"
+        - name: RESOURCE_POLICY
+          value: "topology-aware"
+        - name: LOG_LEVEL
+          value: "2"
+        - name: CACHE_DIR
+          value: "/topology_cache"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: nri-socket
+          mountPath: /var/run/nri
+        - name: topology-cache
+          mountPath: /topology_cache
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "pgrep -f '/opt/nri/plugins/kunpeng-tap' > /dev/null || exit 1"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "test -S /var/run/nri/nri.sock && pgrep -f '/opt/nri/plugins/kunpeng-tap' > /dev/null || exit 1"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3

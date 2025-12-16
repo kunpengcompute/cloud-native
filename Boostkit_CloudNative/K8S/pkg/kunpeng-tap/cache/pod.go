@@ -17,11 +17,12 @@ package cache
 import (
 	"strings"
 
-	"kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-tap/policy-manager/v1alpha1"
-
+	"github.com/containerd/nri/pkg/api"
 	v1 "k8s.io/api/core/v1"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-tap/policy-manager/v1alpha1"
 )
 
 // Create a pod from a run request.
@@ -56,6 +57,84 @@ func (p *pod) fromDockerRunRequest(pInfo *v1alpha1.PodSandboxHookRequest) error 
 	}
 
 	return nil
+}
+
+// Create a pod from NRI PodSandbox.
+func (p *pod) fromNriPodSandbox(pod *api.PodSandbox, status *PodStatus) error {
+	p.containers = make(map[string]string)
+	p.UID = pod.Uid
+	p.Name = pod.Name
+	p.Namespace = pod.Namespace
+	p.Labels = pod.Labels
+	p.Annotations = pod.Annotations
+	p.State = PodState(int32(PodStateReady))
+
+	// Extract cgroup parent from Linux pod sandbox
+	if pod.Linux != nil {
+		p.CgroupParent = pod.Linux.CgroupParent
+
+		// Convert NRI Linux resources to v1alpha1.LinuxContainerResources
+		if pod.Linux.PodResources != nil {
+			p.LinuxReq = p.convertNriLinuxResources(pod.Linux.PodResources)
+		} else if pod.Linux.Resources != nil {
+			// Fallback to legacy resources field
+			p.LinuxReq = p.convertNriLinuxResources(pod.Linux.Resources)
+		}
+	}
+
+	// Use provided status if available
+	if status != nil {
+		if status.CgroupParent != "" {
+			p.CgroupParent = status.CgroupParent
+		}
+	}
+
+	p.Resources = v1.ResourceRequirements{}
+
+	klog.InfoS("NRI PodSandbox", "podUid", pod.Uid, "podName", pod.Name)
+
+	// Discover QoS class from cgroup parent
+	if err := p.discoverQOSClass(); err != nil {
+		klog.ErrorS(err, "Failed to discover QoS class for NRI pod")
+	}
+
+	return nil
+}
+
+// convertNriLinuxResources converts NRI LinuxResources to v1alpha1.LinuxContainerResources
+func (p *pod) convertNriLinuxResources(nriRes *api.LinuxResources) *v1alpha1.LinuxContainerResources {
+	if nriRes == nil {
+		return nil
+	}
+
+	resources := &v1alpha1.LinuxContainerResources{}
+
+	// Convert CPU resources
+	if cpu := nriRes.GetCpu(); cpu != nil {
+		if period := cpu.GetPeriod(); period != nil {
+			resources.CpuPeriod = int64(period.Value)
+		}
+		if quota := cpu.GetQuota(); quota != nil {
+			resources.CpuQuota = quota.Value
+		}
+		if shares := cpu.GetShares(); shares != nil {
+			resources.CpuShares = int64(shares.Value)
+		}
+		resources.CpusetCpus = cpu.GetCpus()
+		resources.CpusetMems = cpu.GetMems()
+	}
+
+	// Convert Memory resources
+	if memory := nriRes.GetMemory(); memory != nil {
+		if limit := memory.GetLimit(); limit != nil {
+			resources.MemoryLimitInBytes = limit.Value
+		}
+	}
+
+	// Note: OomScoreAdj is typically not set at pod level
+	resources.OomScoreAdj = 0
+
+	return resources
 }
 
 // Get the normal containers of a pod.

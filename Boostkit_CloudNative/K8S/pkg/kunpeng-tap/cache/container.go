@@ -17,11 +17,12 @@ package cache
 import (
 	"sort"
 
-	"kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-tap/policy-manager/v1alpha1"
-
+	"github.com/containerd/nri/pkg/api"
 	v1 "k8s.io/api/core/v1"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-tap/policy-manager/v1alpha1"
 )
 
 // Create a container for a create request.
@@ -58,6 +59,103 @@ func (c *container) fromDockerRunRequest(req *v1alpha1.ContainerResourceHookRequ
 		pod.containers[c.Name] = c.ID
 	}
 
+	return nil
+}
+
+// Create container from NRI Container.
+func (c *container) fromNriContainer(nriContainer *api.Container) error {
+	c.PodID = nriContainer.PodSandboxId
+
+	pod, ok := c.cache.Pods[c.PodID]
+	if !ok {
+		return cacheError("can't find cached pod %s for NRI container", c.PodID)
+	}
+
+	c.ID = nriContainer.Id
+	c.Name = nriContainer.Name
+	c.Namespace = pod.Namespace
+
+	// Convert NRI container state to internal state
+	c.State = c.convertNriContainerState(nriContainer.State)
+
+	c.Resources = pod.Resources // Use pod resources as base
+
+	// Convert NRI Linux container resources
+	if nriContainer.Linux != nil && nriContainer.Linux.Resources != nil {
+		c.LinuxReq = c.convertNriLinuxResources(nriContainer.Linux.Resources)
+	}
+
+	klog.InfoS("NRI Container", "container id", c.ID, "name", c.Name)
+
+	// Update pod's container mapping
+	if _, ok := pod.containers[c.Name]; !ok {
+		pod.containers[c.Name] = c.ID
+	}
+
+	return nil
+}
+
+// convertNriContainerState converts NRI ContainerState to internal ContainerState
+func (c *container) convertNriContainerState(nriState api.ContainerState) ContainerState {
+	switch nriState {
+	case api.ContainerState_CONTAINER_CREATED:
+		return ContainerStateCreated
+	case api.ContainerState_CONTAINER_PAUSED:
+		// Map paused to created since we don't have a specific paused state
+		return ContainerStateCreated
+	case api.ContainerState_CONTAINER_RUNNING:
+		return ContainerStateRunning
+	case api.ContainerState_CONTAINER_STOPPED:
+		return ContainerStateExited
+	default:
+		return ContainerStateCreating
+	}
+}
+
+// convertNriLinuxResources converts NRI LinuxResources to v1alpha1.LinuxContainerResources
+func (c *container) convertNriLinuxResources(nriRes *api.LinuxResources) *v1alpha1.LinuxContainerResources {
+	if nriRes == nil {
+		return nil
+	}
+
+	resources := &v1alpha1.LinuxContainerResources{}
+
+	// Convert CPU resources
+	if cpu := nriRes.GetCpu(); cpu != nil {
+		if period := cpu.GetPeriod(); period != nil {
+			resources.CpuPeriod = int64(period.Value)
+		}
+		if quota := cpu.GetQuota(); quota != nil {
+			resources.CpuQuota = quota.Value
+		}
+		if shares := cpu.GetShares(); shares != nil {
+			resources.CpuShares = int64(shares.Value)
+		}
+		resources.CpusetCpus = cpu.GetCpus()
+		resources.CpusetMems = cpu.GetMems()
+	}
+
+	// Convert Memory resources
+	if memory := nriRes.GetMemory(); memory != nil {
+		if limit := memory.GetLimit(); limit != nil {
+			resources.MemoryLimitInBytes = limit.Value
+		}
+	}
+
+	// Note: OomScoreAdj might be available in container level
+	resources.OomScoreAdj = 0
+
+	return resources
+}
+
+// fromBasicInfo creates a container with basic information (for NRI containers)
+func (c *container) fromBasicInfo(containerID string) error {
+	c.ID = containerID
+	c.Name = containerID // Use ID as name if no other info available
+	c.State = ContainerStateCreating
+	c.CacheID = containerID
+
+	klog.InfoS("Created container from basic info", "id", containerID)
 	return nil
 }
 

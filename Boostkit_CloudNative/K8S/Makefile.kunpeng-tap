@@ -17,7 +17,7 @@ CONTAINER_TOOL ?= docker
 
 BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GitCommit=$(shell git rev-parse HEAD)
-Version="0.1.0"
+Version="0.3.0"
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 SHELL = /usr/bin/env bash -o pipefail
@@ -185,12 +185,83 @@ docker-buildx: ## Build and push docker image for cross-platform support
 	- $(CONTAINER_TOOL) buildx rm kunpeng-tap-builder
 	rm Dockerfile.cross
 
+##@ NRI Container Deployment
+
+# NRI image configuration
+NRI_IMG ?= kunpeng-tap-nri:latest
+NRI_NAMESPACE ?= kunpeng-tap
+
+.PHONY: nri-build-image
+nri-build-image: ## Build NRI container image using pre-compiled binary.
+	@echo "Building NRI container image for ARM64..."
+	@echo "Image tag: $(NRI_IMG)"
+	@echo "Dockerfile: hack/kunpeng-tap/Dockerfile.nri"
+	cp bin/kunpeng-tap ./ && \
+	$(CONTAINER_TOOL) build \
+		--platform linux/arm64 \
+		-f hack/kunpeng-tap/Dockerfile.nri \
+		-t $(NRI_IMG) \
+		. && \
+	rm -f ./kunpeng-tap
+	@echo "NRI image built successfully: $(NRI_IMG)"
+
+.PHONY: nri-deploy
+nri-deploy: ## Deploy NRI plugin as DaemonSet to Kubernetes.
+	@echo "Deploying NRI plugin to Kubernetes..."
+	@echo "Creating namespace $(NRI_NAMESPACE)..."
+	-kubectl create namespace $(NRI_NAMESPACE)
+	@echo "Applying DaemonSet configuration..."
+	kubectl apply -f config/kunpeng-tap/nri-plugin/daemonset.yaml
+	kubectl get daemonset -n kunpeng-tap
+	kubectl get pods -n kunpeng-tap
+	@echo "NRI plugin deployed successfully"
+
+.PHONY: nri-status
+nri-status: ## Check NRI plugin deployment status.
+	@echo "Checking NRI plugin deployment status..."
+	kubectl get namespace $(NRI_NAMESPACE) 2>/dev/null || echo "Namespace $(NRI_NAMESPACE) not found"
+	kubectl get daemonset -n $(NRI_NAMESPACE) -l app=kunpeng-tap-nri 2>/dev/null || echo "DaemonSet not found"
+	kubectl get pods -n $(NRI_NAMESPACE) -l app=kunpeng-tap-nri -o wide 2>/dev/null || echo "Pods not found"
+
+.PHONY: nri-logs
+nri-logs: ## Show NRI plugin logs.
+	@echo "Showing NRI plugin logs..."
+	kubectl logs -n $(NRI_NAMESPACE) -l app=kunpeng-tap-nri --tail=50
+
+.PHONY: nri-logs-follow
+nri-logs-follow: ## Follow NRI plugin logs.
+	@echo "Following NRI plugin logs (Ctrl+C to stop)..."
+	kubectl logs -n $(NRI_NAMESPACE) -l app=kunpeng-tap-nri -f
+
+.PHONY: nri-undeploy
+nri-undeploy: ## Remove NRI plugin from Kubernetes.
+	@echo "Removing NRI plugin from Kubernetes..."
+	-kubectl delete -f config/kunpeng-tap/nri-plugin/daemonset.yaml
+	-kubectl delete namespace $(NRI_NAMESPACE)
+	@echo "NRI plugin removed successfully"
+
+.PHONY: nri-restart
+nri-restart: ## Restart NRI plugin pods.
+	@echo "Restarting kunpeng-tap service for NRI runtime..."
+	@echo "Checking kubectl connectivity..."
+	@kubectl cluster-info > /dev/null 2>&1 || (echo "Error: Cannot connect to Kubernetes cluster" && exit 1)
+	@echo "Deleting existing NRI daemonset (if exists)..."
+	kubectl delete -f config/kunpeng-tap/nri-plugin/daemonset.yaml
+	@echo "Applying NRI daemonset configuration..."
+	kubectl apply -f config/kunpeng-tap/nri-plugin/daemonset.yaml
+	@echo "Waiting for NRI pods to be ready..."
+	kubectl rollout status daemonset/kunpeng-tap-nri -n kunpeng-tap
+	@echo "NRI service restarted successfully..."
+
+
+
+
 ##@ Dependencies
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
-	mkdir -p $(LOCALBIN) 
+	mkdir -p $(LOCALBIN)
 ##@ RPM Packaging
 
 .PHONY: rpm-build

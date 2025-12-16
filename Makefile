@@ -193,6 +193,30 @@ kunpeng-tap-status-service: ## Show kunpeng-tap service status.
 kunpeng-tap-uninstall-service: ## Uninstall kunpeng-tap service.
 	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-uninstall-service
 
+.PHONY: kunpeng-tap-build-nri
+kunpeng-tap-build-nri: ## Build kunpeng-tap NRI plugin.
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-build-nri
+
+.PHONY: kunpeng-tap-deploy-nri
+kunpeng-tap-deploy-nri: ## Install kunpeng-tap service for NRI runtime.
+	@echo "Installing kunpeng-tap service for NRI runtime..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-nri-deploy
+
+.PHONY: kunpeng-tap-undeploy-nri
+kunpeng-tap-undeploy-nri: ## Uninstall kunpeng-tap service for NRI runtime.
+	@echo "Uninstalling kunpeng-tap service for NRI runtime..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-nri-undeploy
+
+.PHONY: kunpeng-tap-restart-nri
+kunpeng-tap-restart-nri: ## Restart kunpeng-tap service for NRI runtime.
+	@echo "Restarting kunpeng-tap service for NRI runtime..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-nri-restart
+
+.PHONY: kunpeng-tap-logs-nri
+kunpeng-tap-logs-nri: ## Show kunpeng-tap service logs for NRI runtime.
+	@echo "Showing kunpeng-tap service logs for NRI runtime..."
+	$(MAKE) -C Boostkit_CloudNative/K8S kunpeng-tap-nri-logs
+
 ##@ Distribution
 
 .PHONY: dist

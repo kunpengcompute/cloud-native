@@ -474,10 +474,15 @@ def cleanup_test_resources():
     3. 查询所有带 test-label 的 Deployment（兜底清理）
     4. 合并去重后统一删除
 
+    增强功能：
+    - 彻底清理故障恢复测试相关的状态变量
+    - 确保测试之间不会出现状态污染
+
     这样可以确保：
     - 混合部署测试中的所有"已有容器"被清理
     - 即使 test_context 被意外修改也能清理
     - 避免测试之间的资源干扰
+    - 故障恢复测试的状态不会污染其他测试
     """
     namespace = test_context.get('namespace', 'default')
     deployments_to_delete = set()  # 使用 set 去重
@@ -540,13 +545,38 @@ def cleanup_test_resources():
     else:
         print("📋 没有需要清理的 Deployment")
 
-    # 重置测试上下文
+    # 重置测试上下文 - 增强版本，彻底清理所有状态
     test_context['deployments'] = []
     test_context['pods'] = []
     test_context['resource_config'] = {}
     test_context['test_label'] = None
+    test_context['replica_count'] = 0
+    test_context['qos_type'] = None
+    test_context['machine_config'] = None
+    
+    # 清理故障恢复测试相关的状态变量（防止状态污染）
+    failure_recovery_keys = [
+        'is_after_restart',
+        'numa_distribution_before_restart',
+        'stable_numa_distribution_before',
+        'numa_distribution_test_label',
+        'stable_numa_distribution_test_label'
+    ]
+    
+    cleaned_keys = []
+    for key in failure_recovery_keys:
+        if key in test_context:
+            del test_context[key]
+            cleaned_keys.append(key)
+    
+    if cleaned_keys:
+        print(f"🧹 清理故障恢复测试状态: {cleaned_keys}")
+    
+    # 清理其他可能的状态变量
     if 'env_vars' in test_context:
         test_context['env_vars'] = {}
     if 'annotations' in test_context:
         test_context['annotations'] = {}
+    
+    print("✅ 测试上下文已完全重置，确保无状态污染")
 

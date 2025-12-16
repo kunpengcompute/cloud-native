@@ -21,9 +21,11 @@ import "time"
 const (
 	DefaultRuntimeProxyEndpoint         = "/var/run/kunpeng/tap-runtime-proxy.sock"
 	DefaultDockerRuntimeServiceEndpoint = "/var/run/docker.sock"
+	DefaultNRISocketPath                = "/var/run/nri/nri.sock"
 
 	ContainerRuntimeModeContainerd = "Containerd"
 	ContainerRuntimeModeDocker     = "Docker"
+	ContainerRuntimeModeNRI        = "NRI"
 	DefaultContainerRuntimeMode    = ContainerRuntimeModeDocker
 
 	TopologyAwarePolicy   = "topology-aware"
@@ -42,6 +44,7 @@ var (
 	RuntimeProxyEndpoint     string
 	ContainerRuntimeEndpoint string
 	ContainerRuntimeMode     string
+	NRISocketPath            string
 	ResourcePolicy           string
 	GracefulTimeout          time.Duration
 	MetricsAddr              string
