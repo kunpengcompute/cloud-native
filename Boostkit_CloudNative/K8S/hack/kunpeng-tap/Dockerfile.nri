@@ -1,0 +1,63 @@
+# Dockerfile for kunpeng-tap NRI plugin (ARM64 only)
+# Multi-stage build: Stage 1 compiles, Stage 2 packages
+
+#############################################
+# Stage 1: Build stage - compile the binary
+#############################################
+FROM golang:1.25-alpine AS builder
+
+# Install build dependencies
+RUN apk update && apk add --no-cache bash git make  && rm -rf /var/cache/apk/*
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy go mod files first for better layer caching
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the kunpeng-tap binary
+RUN make -f Makefile.kunpeng-tap build
+
+#############################################
+# Stage 2: Runtime stage - minimal image
+#############################################
+FROM alpine:3.18
+
+# Environment variables with defaults
+ENV NRI_SOCKET_PATH=/var/run/nri/nri.sock
+ENV RESOURCE_POLICY=topology-aware
+ENV LOG_LEVEL=2
+
+# Install runtime dependencies and create directories in one layer
+RUN apk update && apk add --no-cache bash ca-certificates file tzdata && \
+    rm -rf /var/cache/apk/* && \
+    mkdir -p /opt/nri/plugins /etc/nri/conf.d /var/run/nri /topology_cache
+
+# Copy compiled binary from builder stage (not from host)
+COPY --from=builder /workspace/bin/kunpeng-tap /opt/nri/plugins/kunpeng-tap
+
+# Make binary executable and verify
+RUN chmod +x /opt/nri/plugins/kunpeng-tap && \
+    file /opt/nri/plugins/kunpeng-tap && \
+    /opt/nri/plugins/kunpeng-tap --version || echo "Binary verification complete"
+
+# Set working directory
+WORKDIR /opt/nri/plugins
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD pgrep -f '/opt/nri/plugins/kunpeng-tap' > /dev/null || exit 1
+
+# Set entrypoint directly to kunpeng-tap binary
+ENTRYPOINT ["/opt/nri/plugins/kunpeng-tap"]
+
+# Labels
+LABEL maintainer="Kunpeng Boostkit Team"
+LABEL description="Kunpeng-tap NRI plugin for topology-aware resource management"
+LABEL version="v0.3.0"

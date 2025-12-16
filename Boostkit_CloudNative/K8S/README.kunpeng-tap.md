@@ -1,212 +1,270 @@
-# Kunpeng-TAP 编译和部署指南
+# Kunpeng-TAP 部署指南
 
-## 概述
+## 📖 概述
 
 Kunpeng-TAP 是一个为鲲鹏处理器优化的容器拓扑感知调度组件，支持 NUMA 感知和拓扑感知的容器资源分配策略。
 
-## 项目结构
+### 🚀 快速开始
 
-```
-├── cmd/kunpeng-tap/
-│   ├── manager/          # TAP 管理器
-│   └── proxy/            # TAP 代理
-├── pkg/kunpeng-tap/
-│   ├── cache/            # 缓存管理
-│   ├── policy/           # 调度策略
-│   ├── server/           # 服务器实现
-│   ├── monitoring/       # 监控指标
-│   └── version/          # 版本信息
-├── api/kunpeng-tap/      # API 定义
-├── test/kunpeng-tap/     # 测试代码
-└── hack/kunpeng-tap/     # 部署脚本
-```
+**选择适合您的部署方式：**
 
-## 编译
+- **🏢 生产环境** → RPM 包部署（传统系统服务）
+- **☁️ 容器化环境** → NRI 容器化部署（推荐）
 
-### 前置条件
+---
 
-- Go 1.23.6 或更高版本
-- Linux 环境（推荐 Ubuntu 18.04+）
+## 🎯 Quick Start
 
-### 使用 Makefile 编译
+### 方式一：NRI 容器化部署（推荐）
+
+- Linux 操作系统（推荐 OpenEuler 22.03及更高版本）
+- 仅适用于containerd >= v1.7.0
+- Go 1.25.0 或更高版本（用于编译）
+- containerd 开启 NRI 支持
 
 ```bash
-# 查看所有可用命令
-make -f Makefile.kunpeng-tap help
+# 1. 环境检查
+containerd --version  # 确认版本 >= 1.7.0
 
+# 2. 构建镜像
+make -f Makefile.kunpeng-tap nri-build-image
+
+# 3. 部署到集群
+make -f Makefile.kunpeng-tap nri-deploy
+
+# 4. 验证部署
+make -f Makefile.kunpeng-tap nri-status
+```
+
+### 方式二：系统服务部署
+
+**适用于传统 Linux 环境**
+
+#### 环境要求
+- Linux 操作系统（推荐 OpenEuler 22.03及更高版本）
+- 已安装的容器运行时（Docker 或 Containerd）
+- Go 1.25.0 或更高版本（用于编译）
+- systemd 权限（用于安装系统服务）
+
+```bash
+# 1. 环境检查
+docker --version  # 或 containerd --version
+go version        # 确认编译环境
+
+# 2. 编译项目
+make -f Makefile.kunpeng-tap build
+
+# 3. 安装服务（根据容器运行时选择）
+sudo make -f Makefile.kunpeng-tap install-service-docker
+# 或
+sudo make -f Makefile.kunpeng-tap install-service-containerd
+
+# 4. 启动服务
+sudo make -f Makefile.kunpeng-tap start-service
+
+# 5. 验证服务
+sudo make -f Makefile.kunpeng-tap status-service
+```
+
+---
+
+## 📋 环境要求
+
+### 基础要求
+- **操作系统**: Linux（推荐 Ubuntu 18.04+）
+- **Go 版本**: 1.23.6 或更高版本
+
+### NRI 部署额外要求
+- **Kubernetes**: 版本 >= 1.24
+- **containerd**: 版本 >= v1.7.0
+- **NRI 支持**: 已启用 NRI 的容器运行时环境
+
+---
+
+## 🏗️ 详细部署指南
+
+### 方式一：NRI 容器化部署（Kubernetes）
+
+#### 1. 环境准备
+
+```bash
+# 检查容器运行时版本
+containerd --version  # 确保 >= 1.7.0
+
+# 检查 NRI 支持
+ls -la /var/run/nri/    # 确认 NRI socket 目录存在
+```
+
+#### 2. 镜像构建
+
+```bash
+# 构建 NRI 专用镜像
+make -f Makefile.kunpeng-tap nri-build-image
+
+# 自定义镜像标签（可选）
+make -f Makefile.kunpeng-tap nri-build-image NRI_IMG=my-registry/kunpeng-tap-nri:v1.0.0
+```
+
+#### 3. 集群部署
+
+```bash
+# 部署到 Kubernetes 集群
+make -f Makefile.kunpeng-tap nri-deploy
+
+# 验证部署状态
+make -f Makefile.kunpeng-tap nri-status
+```
+
+#### 4. 运维管理
+
+```bash
+# 查看插件状态
+make -f Makefile.kunpeng-tap nri-status
+
+# 查看运行日志
+make -f Makefile.kunpeng-tap nri-logs
+
+# 重启插件（重新部署）
+make -f Makefile.kunpeng-tap nri-restart
+
+# 卸载插件
+make -f Makefile.kunpeng-tap nri-undeploy
+```
+
+### 方式二：系统服务部署（传统环境）
+
+#### 1. 编译项目
+
+```bash
 # 编译所有组件
 make -f Makefile.kunpeng-tap build
 
-# 仅编译管理器
-make -f Makefile.kunpeng-tap build-manager
-
-# 仅编译代理
-make -f Makefile.kunpeng-tap build-proxy
-
-# 清理编译产物
+# 清理旧版本
 make -f Makefile.kunpeng-tap clean
 ```
 
-### 手动编译
+#### 2. 服务安装
 
 ```bash
-# 编译管理器
-go build -o bin/kunpeng-tap-manager ./cmd/kunpeng-tap/manager
-
-# 编译代理
-go build -o bin/kunpeng-tap-proxy ./cmd/kunpeng-tap/proxy
-```
-
-## 开发
-
-### 代码格式化和检查
-
-```bash
-# 格式化代码
-make -f Makefile.kunpeng-tap fmt
-
-# 代码静态检查
-make -f Makefile.kunpeng-tap vet
-
-# 整理依赖
-make -f Makefile.kunpeng-tap tidy
-```
-
-### 运行测试
-
-```bash
-# 运行单元测试
-make -f Makefile.kunpeng-tap test
-
-# 运行端到端测试
-make -f Makefile.kunpeng-tap test-e2e
-```
-
-### 本地运行
-
-```bash
-# 运行管理器
-make -f Makefile.kunpeng-tap run-manager
-
-# 运行代理
-make -f Makefile.kunpeng-tap run-proxy
-```
-
-## 部署
-
-### 系统服务部署
-
-#### Docker 运行时环境
-
-```bash
-# 安装服务（Docker 运行时）
+# Docker 环境
 sudo make -f Makefile.kunpeng-tap install-service-docker
 
-# 启动服务
-sudo make -f Makefile.kunpeng-tap start-service
-
-# 查看服务状态
-sudo make -f Makefile.kunpeng-tap status-service
-```
-
-#### Containerd 运行时环境
-
-```bash
-# 安装服务（Containerd 运行时）
+# Containerd 环境
 sudo make -f Makefile.kunpeng-tap install-service-containerd
-
-# 启动服务
-sudo make -f Makefile.kunpeng-tap start-service
 ```
 
-### 服务管理
+#### 3. 服务管理
 
 ```bash
 # 启动服务
 sudo make -f Makefile.kunpeng-tap start-service
+
+# 查看状态
+sudo make -f Makefile.kunpeng-tap status-service
 
 # 停止服务
 sudo make -f Makefile.kunpeng-tap stop-service
-
-# 重启服务
-sudo make -f Makefile.kunpeng-tap restart-service
-
-# 查看服务状态
-sudo make -f Makefile.kunpeng-tap status-service
 
 # 卸载服务
 sudo make -f Makefile.kunpeng-tap uninstall-service
 ```
 
-## 容器化部署
+### 方式三：RPM 包部署（生产环境）
 
-### 构建 Docker 镜像
+**推荐用于生产环境的标准化部署**
 
-```bash
-# 构建镜像
-make -f Makefile.kunpeng-tap docker-build
+详细安装指南请参考：**[📖 RPM 部署指南](./hack/kunpeng-tap/README.md)**
 
-# 推送镜像
-make -f Makefile.kunpeng-tap docker-push
+---
 
-# 多架构构建
-make -f Makefile.kunpeng-tap docker-buildx
-```
+## ⚙️ 配置选项
 
-## 配置
+### 核心参数
 
-### 代理配置选项
+| 参数 | 描述 | 默认值 | 适用场景 |
+|------|------|--------|----------|
+| `--container-runtime-mode` | 运行时模式 | - | `Docker/Containerd/NRI` |
+| `--resource-policy` | 资源策略 | `topology-aware` | `numa-aware/topology-aware` |
 
-- `--runtime-proxy-endpoint`: 运行时代理端点（默认：/var/run/kunpeng-tap/runtimeproxy.sock）
-- `--container-runtime-service-endpoint`: 容器运行时服务端点
-- `--container-runtime-mode`: 容器运行时模式（Docker|Containerd）
-- `--resource-policy`: 资源策略（numa-aware|topology-aware）
-- `--enable-memory-topology`: 启用内存拓扑感知
+## 🔧 运维管理
 
-### 管理器配置选项
-
-- `--policy-manager-endpoint`: 策略管理器端点
-- `--container-runtime-service-endpoint`: 容器运行时服务端点
-- `--resource-policy`: 资源策略
-
-## 监控
-
-Kunpeng-TAP 提供 Prometheus 指标，默认在 `:9091/metrics` 端点暴露。
-
-## 故障排除
-
-### 常见问题
-
-1. **编译失败**
-   - 确保 Go 版本 >= 1.23.6
-   - 运行 `make -f Makefile.kunpeng-tap tidy` 更新依赖
-
-2. **服务启动失败**
-   - 检查容器运行时是否正常运行
-   - 确保有足够的权限访问容器运行时套接字
-
-3. **权限问题**
-   - 确保以 root 权限运行服务安装命令
-   - 检查 systemd 服务文件权限
-
-### 日志查看
+### 查看运行状态
 
 ```bash
-# 查看服务日志
-sudo journalctl -u kunpeng-tap.service -f
+# NRI 模式状态检查
+make -f Makefile.kunpeng-tap nri-status
 
-# 查看服务状态
+# 系统服务状态检查
 sudo systemctl status kunpeng-tap.service
 ```
 
-## 版本信息
+### 日志管理
 
 ```bash
-# 查看版本信息
-./bin/kunpeng-tap --version
-./bin/kunpeng-tap-manager --version
+# NRI 插件日志（推荐）
+make -f Makefile.kunpeng-tap nri-logs
+
+# 系统服务日志
+sudo journalctl -u kunpeng-tap.service -f
 ```
 
-## 贡献
+### 更新与维护
 
-欢迎提交 Issue 和 Pull Request 来改进 Kunpeng-TAP。 
+```bash
+# 更新 NRI 插件
+make -f Makefile.kunpeng-tap nri-restart
+
+# 重启系统服务
+sudo systemctl restart kunpeng-tap.service
+```
+
+---
+
+## 🚨 故障排除
+
+### 常见问题诊断
+
+#### 1. NRI 插件启动失败
+```bash
+# 检查版本要求
+containerd --version    # 应该 >= 1.7.0
+
+# 检查 NRI 环境
+ls -la /var/run/nri/    # socket 目录应该存在
+
+# 检查节点类型
+kubectl get nodes --show-labels
+```
+
+#### 2. 服务权限问题
+```bash
+# 检查系统权限
+sudo systemctl status containerd
+
+# 查看详细日志
+sudo journalctl -u containerd | grep -i nri
+```
+
+#### 3. 编译问题
+```bash
+# 确认环境
+go version    # 应该 >= 1.23.6
+
+# 清理重建
+make -f Makefile.kunpeng-tap clean
+make -f Makefile.kunpeng-tap tidy
+make -f Makefile.kunpeng-tap build
+```
+
+### 获取帮助
+
+- **环境检查**: `make -f Makefile.kunpeng-tap nri-status`
+- **日志诊断**: `make -f Makefile.kunpeng-tap nri-logs`
+- **服务重启**: `make -f Makefile.kunpeng-tap nri-restart`
+
+---
+
+## 📚 扩展信息
+
+- **详细 RPM 部署**: [📖 RPM 部署指南](./hack/kunpeng-tap/README.md)
+- **问题反馈**: 提交 Issue 或 Pull Request 

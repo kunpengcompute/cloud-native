@@ -38,8 +38,8 @@ import (
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server/containerd"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server/dispatcher"
-	dispatch "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server/dispatcher"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server/docker"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server/nri"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version"
 )
 
@@ -50,7 +50,9 @@ func main() {
 	flag.StringVar(&options.ContainerRuntimeEndpoint, "container-runtime-service-endpoint", options.DefaultDockerRuntimeServiceEndpoint,
 		"container runtime service endpoint.")
 	flag.StringVar(&options.ContainerRuntimeMode, "container-runtime-mode", options.DefaultContainerRuntimeMode,
-		"container engine(Containerd|Docker).")
+		"container engine(Containerd|Docker|NRI).")
+	flag.StringVar(&options.NRISocketPath, "nri-socket-path", options.DefaultNRISocketPath,
+		"NRI socket path (only used when container-runtime-mode is NRI).")
 	flag.StringVar(&options.ResourcePolicy, "resource-policy", options.DefaultResourcePolicy,
 		"container resource policy(numa-aware|topology-aware).")
 	flag.DurationVar(&options.GracefulTimeout, "graceful-timeout", options.DefaultGracefulTimeout,
@@ -99,15 +101,20 @@ func main() {
 	default:
 		klog.Fatalf("unknown resource policy %v", options.ResourcePolicy)
 	}
-	dispatcher := dispatch.NewDispatcher(p, cache)
+	dispatcher := dispatcher.NewDispatcher(p, cache)
 
 	var proxyServer server.ProxyServer
 
+	// Setup runtime proxy endpoint and create proxy server based on container runtime mode
 	switch options.ContainerRuntimeMode {
 	case options.ContainerRuntimeModeContainerd:
 		proxyServer = NewContainerdProxyServer(dispatcher, cache)
 	case options.ContainerRuntimeModeDocker:
 		proxyServer = NewDockerProxyServer(dispatcher, cache)
+	case options.ContainerRuntimeModeNRI:
+		// NRI mode works as a plugin, no proxy socket needed
+		klog.InfoS("NRI mode: skipping proxy socket setup", "nriSocketPath", options.NRISocketPath)
+		proxyServer = NewNriProxyServer(p, cache, options.NRISocketPath)
 	default:
 		klog.Fatalf("unknown runtime engine backend %v", options.ContainerRuntimeMode)
 	}
@@ -186,4 +193,14 @@ func NewDockerProxyServer(dispatcher dispatcher.Dispatcher, cache cache.Cache) s
 		dockerClient,
 		dispatcher,
 	))
+}
+
+// NewNriProxyServer creates a NRI proxy server.
+func NewNriProxyServer(hookManager policy.HookManager, cache cache.Cache, nriSocketPath string) server.ProxyServer {
+	klog.InfoS("Creating NRI proxy server", "socketPath", nriSocketPath)
+	proxyServer, err := nri.NewNriServer(cache, hookManager, nriSocketPath)
+	if err != nil {
+		klog.Fatalf("Failed to create NRI proxy server: %v", err)
+	}
+	return proxyServer
 }

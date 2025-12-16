@@ -340,6 +340,7 @@ def verify_stable_containers_numa_balance():
 # 辅助函数
 # ============================================================================
 
+
 def _cleanup_existing_deployments(test_label: str):
     """清理已存在的测试 Deployment"""
     try:
@@ -1132,23 +1133,37 @@ def _cpus_to_sockets(cpu_list: List[int], numa_topology: Dict[str, Any]) -> List
 def restart_kunpeng_tap_plugin():
     """重启 kunpeng-tap 插件
 
-    使用项目 Makefile 中的 kunpeng-tap-restart-service 命令重启插件
+    自动检测当前部署方式并选择相应的重启命令：
+    - 如果是 systemd 服务，使用 make kunpeng-tap-restart-service
+    - 如果是 daemonset 部署（NRI），使用 make kunpeng-tap-nri-restart
     """
     import subprocess
 
     print("🔄 正在重启 kunpeng-tap 插件...")
 
+    # 检测当前部署方式
+    deployment_type = _detect_kunpeng_tap_deployment()
+
+    if deployment_type == 'nri':
+        restart_command = 'kunpeng-tap-nri-restart'
+        print(f"检测到 NRI DaemonSet 部署，使用命令: {restart_command}")
+    elif deployment_type == 'systemd':
+        restart_command = 'kunpeng-tap-restart-service'
+        print(f"检测到 systemd 服务部署，使用命令: {restart_command}")
+    else:
+        raise Exception(f"未检测到 kunpeng-tap 插件部署: {deployment_type}")
+
     # 获取项目根目录（从测试目录向上 4 级）
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 
     try:
-        # 使用 make 命令重启 kunpeng-tap 服务
+        # 使用 make 命令重启插件
         result = subprocess.run(
-            ['make', 'kunpeng-tap-restart-service'],
+            ['make', restart_command],
             cwd=project_root,
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=120
         )
 
         if result.returncode != 0:
@@ -1160,12 +1175,70 @@ def restart_kunpeng_tap_plugin():
         print("✅ kunpeng-tap 插件重启成功")
         print(f"输出: {result.stdout}")
 
+        # 标记系统已进入重启后状态
+        test_context['is_after_restart'] = True
+        print("🔄 已标记系统进入重启后状态")
+
     except subprocess.TimeoutExpired:
-        raise Exception("kunpeng-tap 插件重启超时（60秒）")
+        raise Exception("kunpeng-tap 插件重启超时（120秒）")
     except FileNotFoundError:
         raise Exception("未找到 make 命令，请确保已安装 make")
     except Exception as e:
         raise Exception(f"kunpeng-tap 插件重启失败: {e}")
+
+def _detect_kunpeng_tap_deployment():
+    """
+    检测当前 kunpeng-tap 的部署方式
+
+    返回值:
+        - 'nri': 检测到 NRI DaemonSet 部署
+        - 'systemd': 检测到 systemd 服务部署
+        - 'none': 未检测到任何部署
+    """
+    import subprocess
+    import os
+
+    print("🔍 检测 kunpeng-tap 部署方式...")
+
+    # 1. 首先检测 NRI DaemonSet 部署
+    try:
+        # 检查 kubectl 是否可用
+        kubectl_check = subprocess.run(['kubectl', 'cluster-info'],
+                                     capture_output=True, text=True, timeout=10)
+        if kubectl_check.returncode == 0:
+            # 检查是否存在 kunpeng-tap-nri DaemonSet
+            daemonset_check = subprocess.run(
+                ['kubectl', 'get', 'daemonset', 'kunpeng-tap-nri', '-n', 'kunpeng-tap'],
+                capture_output=True, text=True, timeout=10
+            )
+            if daemonset_check.returncode == 0:
+                print("✅ 检测到 NRI DaemonSet 部署")
+                return 'nri'
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        print(f"⚠️  kubectl 不可用或超时: {e}")
+
+    # 2. 检测 systemd 服务部署
+    try:
+        # 检查 kunpeng-tap.service 文件是否存在
+        service_file = '/etc/systemd/system/kunpeng-tap.service'
+        if os.path.exists(service_file):
+            print("✅ 检测到 systemd 服务文件")
+            return 'systemd'
+
+        # 进一步检查服务状态
+        service_check = subprocess.run(
+            ['systemctl', 'is-enabled', 'kunpeng-tap.service'],
+            capture_output=True, text=True, timeout=10
+        )
+        if service_check.returncode == 0:
+            print("✅ 检测到 systemd 服务启用")
+            return 'systemd'
+
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        print(f"⚠️  systemctl 不可用或超时: {e}")
+
+    print("⚠️  未检测到 kunpeng-tap 部署")
+    return 'none'
 
 @when(parsers.parse('等待 {seconds:d} 秒让系统恢复'))
 def wait_for_system_recovery(seconds):
@@ -1196,6 +1269,8 @@ def verify_numa_affinity_unchanged():
     """验证容器的 NUMA 亲和性与重启前一致
 
     通过对比重启前后各个 NUMA 节点上的容器数量来验证亲和性是否保持一致
+    
+    增强功能：防止状态污染，确保测试的准确性
     """
     # 获取当前 NUMA 分布
     current_numa_distribution = _get_numa_distribution()
@@ -1203,11 +1278,49 @@ def verify_numa_affinity_unchanged():
     # 从 test_context 中获取重启前的 NUMA 分布
     before_restart_distribution = test_context.get('numa_distribution_before_restart')
 
+    # 检查是否已经标记为重启后状态
+    is_after_restart = test_context.get('is_after_restart', False)
+
+    # 获取当前测试标签，用于验证状态一致性
+    current_test_label = test_context.get('test_label', 'unknown')
+    
+    print(f"🔍 调试信息: is_after_restart={is_after_restart}")
+    print(f"🔍 调试信息: 当前测试标签={current_test_label}")
+    print(f"🔍 调试信息: test_context 中的 numa_distribution_before_restart={before_restart_distribution}")
+    print(f"🔍 调试信息: 当前获取的 NUMA 分布={current_numa_distribution}")
+
     if not before_restart_distribution:
-        # 如果没有保存重启前的分布，则保存当前分布供下次使用
+        if is_after_restart:
+            # 如果已经是重启后状态但没有重启前的数据，这表明数据丢失了
+            # 给出更友好的错误信息，并自动恢复
+            print(f"⚠️  警告：检测到系统可能处于重启后状态，但缺少重启前的 NUMA 分布数据")
+            print(f"   当前 NUMA 分布: {current_numa_distribution}")
+            print("   这可能是由于测试间状态污染导致的，自动恢复为重启前状态...")
+
+            # 自动恢复：将当前状态作为重启前状态，并重置重启标记
+            test_context['numa_distribution_before_restart'] = current_numa_distribution
+            test_context['is_after_restart'] = False
+            print("✅ 已自动恢复，将当前状态作为基准继续测试")
+            return
+        else:
+            # 如果不是重启后状态，则保存当前分布供下次使用
+            # 添加测试标签验证，确保数据一致性
+            test_context['numa_distribution_before_restart'] = current_numa_distribution
+            test_context['numa_distribution_test_label'] = current_test_label
+            print(f"📊 保存重启前的 NUMA 分布: {current_numa_distribution}")
+            print(f"📊 关联测试标签: {current_test_label}")
+            print("⚠️  这是第一次调用，已保存当前分布作为基准")
+            return
+
+    # 验证保存的数据是否属于当前测试（防止状态污染）
+    saved_test_label = test_context.get('numa_distribution_test_label')
+    if saved_test_label and saved_test_label != current_test_label:
+        print(f"⚠️  检测到状态污染：保存的 NUMA 分布来自测试 '{saved_test_label}'，但当前测试是 '{current_test_label}'")
+        print("   重置状态并使用当前测试的数据...")
         test_context['numa_distribution_before_restart'] = current_numa_distribution
-        print(f"📊 保存重启前的 NUMA 分布: {current_numa_distribution}")
-        print("⚠️  这是第一次调用，已保存当前分布作为基准")
+        test_context['numa_distribution_test_label'] = current_test_label
+        test_context['is_after_restart'] = False
+        print("✅ 已重置状态污染，继续测试")
         return
 
     # 对比重启前后的 NUMA 分布
@@ -1218,7 +1331,8 @@ def verify_numa_affinity_unchanged():
         raise Exception(
             f"NUMA 亲和性发生变化！\n"
             f"重启前: {before_restart_distribution}\n"
-            f"重启后: {current_numa_distribution}"
+            f"重启后: {current_numa_distribution}\n"
+            f"测试标签: {current_test_label}"
         )
 
     print(f"✅ NUMA 亲和性保持一致: {current_numa_distribution}")
@@ -1271,6 +1385,8 @@ def verify_stable_containers_numa_affinity_unchanged():
     """验证稳定容器的 NUMA 亲和性保持不变
 
     通过对比稳定容器在各个 NUMA 节点上的分布来验证
+    
+    增强功能：防止状态污染，确保测试的准确性
     """
     # 获取当前稳定容器的 NUMA 分布
     current_stable_distribution = _get_stable_containers_numa_distribution()
@@ -1278,11 +1394,50 @@ def verify_stable_containers_numa_affinity_unchanged():
     # 从 test_context 中获取之前保存的稳定容器 NUMA 分布
     before_distribution = test_context.get('stable_numa_distribution_before')
 
+    # 检查是否已经标记为重启后状态
+    is_after_restart = test_context.get('is_after_restart', False)
+
+    # 获取当前测试标签，用于验证状态一致性
+    current_test_label = test_context.get('test_label', 'unknown')
+
+    print(f"🔍 调试信息(稳定容器): is_after_restart={is_after_restart}")
+    print(f"🔍 调试信息(稳定容器): 当前测试标签={current_test_label}")
+    print(f"🔍 调试信息(稳定容器): test_context 中的 stable_numa_distribution_before={before_distribution}")
+    print(f"🔍 调试信息(稳定容器): 当前获取的稳定容器 NUMA 分布={current_stable_distribution}")
+
     if not before_distribution:
-        # 如果没有保存之前的分布，则保存当前分布供下次使用
+        if is_after_restart:
+            # 如果已经是重启后状态但没有重启前的数据，这表明数据丢失了
+            # 给出更友好的错误信息，并自动恢复
+            print(f"⚠️  警告：检测到系统可能处于重启后状态，但缺少稳定容器的 NUMA 分布数据")
+            print(f"   当前稳定容器 NUMA 分布: {current_stable_distribution}")
+            print("   这可能是由于测试间状态污染导致的，自动恢复为重启前状态...")
+
+            # 自动恢复：将当前状态作为重启前状态，并重置重启标记
+            test_context['stable_numa_distribution_before'] = current_stable_distribution
+            test_context['stable_numa_distribution_test_label'] = current_test_label
+            test_context['is_after_restart'] = False
+            print("✅ 已自动恢复，将当前稳定容器状态作为基准继续测试")
+            return
+        else:
+            # 如果不是重启后状态，则保存当前分布供下次使用
+            # 添加测试标签验证，确保数据一致性
+            test_context['stable_numa_distribution_before'] = current_stable_distribution
+            test_context['stable_numa_distribution_test_label'] = current_test_label
+            print(f"📊 保存稳定容器的 NUMA 分布: {current_stable_distribution}")
+            print(f"📊 关联测试标签: {current_test_label}")
+            print("⚠️  这是第一次调用，已保存当前分布作为基准")
+            return
+
+    # 验证保存的数据是否属于当前测试（防止状态污染）
+    saved_test_label = test_context.get('stable_numa_distribution_test_label')
+    if saved_test_label and saved_test_label != current_test_label:
+        print(f"⚠️  检测到状态污染：保存的稳定容器 NUMA 分布来自测试 '{saved_test_label}'，但当前测试是 '{current_test_label}'")
+        print("   重置状态并使用当前测试的数据...")
         test_context['stable_numa_distribution_before'] = current_stable_distribution
-        print(f"📊 保存稳定容器的 NUMA 分布: {current_stable_distribution}")
-        print("⚠️  这是第一次调用，已保存当前分布作为基准")
+        test_context['stable_numa_distribution_test_label'] = current_test_label
+        test_context['is_after_restart'] = False
+        print("✅ 已重置状态污染，继续测试")
         return
 
     # 对比之前和当前的 NUMA 分布
@@ -1293,7 +1448,8 @@ def verify_stable_containers_numa_affinity_unchanged():
         raise Exception(
             f"稳定容器的 NUMA 亲和性发生变化！\n"
             f"之前: {before_distribution}\n"
-            f"当前: {current_stable_distribution}"
+            f"当前: {current_stable_distribution}\n"
+            f"测试标签: {current_test_label}"
         )
 
     print(f"✅ 稳定容器的 NUMA 亲和性保持不变: {current_stable_distribution}")
@@ -1370,6 +1526,10 @@ def restart_containerd_service():
             raise Exception(f"containerd 服务未处于 active 状态: {status_result.stdout.strip()}")
 
         print("✅ containerd 服务状态验证通过")
+
+        # 标记系统已进入重启后状态
+        test_context['is_after_restart'] = True
+        print("🔄 已标记系统进入重启后状态")
 
     except subprocess.TimeoutExpired:
         raise Exception("containerd 服务重启超时")

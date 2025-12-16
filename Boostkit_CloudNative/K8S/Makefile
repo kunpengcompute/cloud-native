@@ -268,6 +268,36 @@ kunpeng-tap-rpm-test: ## Test kunpeng-tap RPM package.
 kunpeng-tap-rpm-clean: ## Clean kunpeng-tap RPM build artifacts.
 	$(MAKE) -f Makefile.kunpeng-tap rpm-clean
 
+##@ Kunpeng TAP NRI Container Deployment
+
+.PHONY: kunpeng-tap-build-nri
+kunpeng-tap-build-nri: ## Build NRI container image using standard Dockerfile.
+	$(MAKE) -f Makefile.kunpeng-tap nri-build-image
+
+.PHONY: kunpeng-tap-nri-deploy
+kunpeng-tap-nri-deploy: ## Deploy NRI plugin as DaemonSet to Kubernetes.
+	$(MAKE) -f Makefile.kunpeng-tap nri-deploy
+
+.PHONY: kunpeng-tap-nri-status
+kunpeng-tap-nri-status: ## Check NRI plugin deployment status.
+	$(MAKE) -f Makefile.kunpeng-tap nri-status
+
+.PHONY: kunpeng-tap-nri-logs
+kunpeng-tap-nri-logs: ## Show NRI plugin logs.
+	$(MAKE) -f Makefile.kunpeng-tap nri-logs
+
+.PHONY: kunpeng-tap-nri-logs-follow
+kunpeng-tap-nri-logs-follow: ## Follow NRI plugin logs.
+	$(MAKE) -f Makefile.kunpeng-tap nri-logs-follow
+
+.PHONY: kunpeng-tap-nri-restart
+kunpeng-tap-nri-restart: ## Restart NRI plugin pods.
+	$(MAKE) -f Makefile.kunpeng-tap nri-restart
+
+.PHONY: kunpeng-tap-nri-undeploy
+kunpeng-tap-nri-undeploy: ## Remove NRI plugin from Kubernetes.
+	$(MAKE) -f Makefile.kunpeng-tap nri-undeploy
+
 ##@ Kunpeng Performance Monitor
 
 .PHONY: kunpeng-perf-monitor-build

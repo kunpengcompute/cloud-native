@@ -294,6 +294,32 @@ func (pm *policyManager) PreRemoveContainerHook(ctx context.Context, req *v1alph
 		PodCgroupParent:      req.GetPodCgroupParent(),
 		ContainerEnvs:        req.GetContainerEnvs(),
 	}
+
+	containerCtx := &ContainerContext{
+		Request: ContainerRequest{
+			ContainerMeta: ContainerMeta{
+				ID: req.ContainerMeta.Id,
+			},
+		},
+	}
+
+	// Execute the hook for each registered policy
+	var allocs []*Allocation
+	for _, policy := range pm.ListPolicies() {
+		alloc, err := policy.PostStopContainerHook(containerCtx)
+		if err != nil {
+			klog.ErrorS(err, "Policy hook execution failed", "policy", policy.Name(), "hook", "PreRemoveContainerHook")
+			continue
+		}
+
+		if alloc != nil {
+			allocs = append(allocs, alloc)
+		}
+	}
+
+	// Merge all allocations into the response
+	mergeAllocations(allocs, resp)
+
 	klog.V(5).InfoS("Sending PreRemoveContainerHook response",
 		"pod", req.PodMeta,
 		"container", req.ContainerMeta,

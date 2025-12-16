@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/containerd/nri/pkg/api"
 	"github.com/docker/docker/client"
 	v1 "k8s.io/api/core/v1"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -411,6 +412,9 @@ func (cch *cache) InsertPod(id string, msg interface{}, status *PodStatus) (Pod,
 	case *v1alpha1.PodSandboxHookRequest:
 		klog.V(5).InfoS("inserting pod", "id", id, "name", msg.(*v1alpha1.PodSandboxHookRequest).PodMeta.Name)
 		err = p.fromDockerRunRequest(msg.(*v1alpha1.PodSandboxHookRequest))
+	case *api.PodSandbox:
+		klog.InfoS("inserting pod from NRI", "id", id, "name", msg.(*api.PodSandbox).Name)
+		err = p.fromNriPodSandbox(msg.(*api.PodSandbox), status)
 	default:
 		err = fmt.Errorf("cannot create pod from message %T", msg)
 	}
@@ -469,8 +473,13 @@ func (cch *cache) InsertContainer(containerId string, msg interface{}) (Containe
 	case *v1alpha1.ContainerResourceHookRequest:
 		klog.InfoS("Inserting container", "id", containerId, "name", msg.(*v1alpha1.ContainerResourceHookRequest).ContainerMeta.Name)
 		err = c.fromDockerRunRequest(msg.(*v1alpha1.ContainerResourceHookRequest))
+	case *api.Container:
+		klog.InfoS("Inserting container from NRI", "id", containerId, "name", msg.(*api.Container).Name)
+		err = c.fromNriContainer(msg.(*api.Container))
 	default:
-		err = fmt.Errorf("cannot create container from message %T", msg)
+		// Fallback for unknown types
+		klog.InfoS("Inserting container from unknown type", "id", containerId, "type", fmt.Sprintf("%T", msg))
+		err = c.fromBasicInfo(containerId)
 	}
 
 	if err != nil {
