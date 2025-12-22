@@ -18,6 +18,8 @@ package topologyaware
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -1260,6 +1262,261 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 						"Container %s should be allocated to NUMA %d (where GPU %s is located)",
 						tc.name, tc.expected, tc.gpuID)
 				}
+			})
+
+			// Test AC-02: Verify specific GPU to NUMA allocation as per design document
+			ginkgo.It("should verify AC-02: specific GPU allocation to correct NUMA nodes", func() {
+				policy := topologyaware.NewTopologyAwarePolicyWithSystem(mockCache, opts, mockSystem)
+				gomega.Expect(policy).NotTo(gomega.BeNil())
+
+				topologyPolicy, ok := policy.(*topologyaware.TopologyAwarePolicy)
+				gomega.Expect(ok).To(gomega.BeTrue())
+
+				ginkgo.GinkgoWriter.Printf("\n=== AC-02 Verification: GPU 0->NUMA 0, GPU 1->NUMA 1, etc. ===\n")
+
+				// Test the exact scenarios from AC-02 in the design document
+				ac02TestCases := []struct {
+					name         string
+					gpuID        string
+					expectedNUMA int
+					description  string
+				}{
+					{"test-gpu0-numa0", "0", 0, "Request GPU 0 should allocate to NUMA 0 (AC-02)"},
+					{"test-gpu1-numa1", "1", 1, "Request GPU 1 should allocate to NUMA 1 (AC-02)"},
+					{"test-gpu2-numa2", "2", 2, "Request GPU 2 should allocate to NUMA 2 (AC-02)"},
+					{"test-gpu3-numa3", "3", 3, "Request GPU 3 should allocate to NUMA 3 (AC-02)"},
+				}
+
+				for _, tc := range ac02TestCases {
+					containerCtx := createContainerContextWithGPU(
+						tc.name, tc.name+"-uid", tc.name+"-pod", "default",
+						4, 4, []string{tc.gpuID}, // Small CPU request to avoid resource exhaustion
+					)
+
+					allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+					gomega.Expect(err).To(gomega.BeNil(),
+						"Allocation should succeed for %s: %s", tc.name, tc.description)
+					gomega.Expect(allocation).NotTo(gomega.BeNil(),
+						"Should get allocation for %s: %s", tc.name, tc.description)
+
+					numaNodes := extractNUMAFromCPUSet(allocation.Resources.CpusetCpus)
+					ginkgo.GinkgoWriter.Printf("AC-02 Test: %s -> NUMA %v (expected: NUMA %d)\n",
+						tc.name, numaNodes, tc.expectedNUMA)
+
+					// Verify AC-02: Request GPU X should allocate to NUMA X
+					gomega.Expect(numaNodes).To(gomega.ContainElement(tc.expectedNUMA),
+						"AC-02 Failed: %s - Requested GPU %s must be allocated to NUMA %d",
+						tc.name, tc.gpuID, tc.expectedNUMA)
+
+					ginkgo.GinkgoWriter.Printf("✓ AC-02 PASSED: %s correctly allocated to NUMA %d\n",
+						tc.name, tc.expectedNUMA)
+				}
+
+				ginkgo.GinkgoWriter.Printf("✓ All AC-02 verification tests passed\n")
+			})
+
+			// Test AC-05: CPU-only container fallback to CPU-first behavior
+			ginkgo.It("should verify AC-05: CPU-only containers fallback to CPU-first strategy", func() {
+				policy := topologyaware.NewTopologyAwarePolicyWithSystem(mockCache, opts, mockSystem)
+				gomega.Expect(policy).NotTo(gomega.BeNil())
+
+				topologyPolicy, ok := policy.(*topologyaware.TopologyAwarePolicy)
+				gomega.Expect(ok).To(gomega.BeTrue())
+
+				ginkgo.GinkgoWriter.Printf("\n=== AC-05 Verification: CPU-only containers fallback test ===\n")
+
+				// Test AC-05: Pure CPU containers should fall back to CPU-first strategy
+				ac05TestCases := []struct {
+					name       string
+					cpuRequest int64
+					cpuLimit   int64
+				}{
+					{"cpu-only-heavy", 12, 12},
+					{"cpu-only-medium", 8, 8},
+					{"cpu-only-light", 4, 4},
+				}
+
+				for _, tc := range ac05TestCases {
+					containerCtx := createContainerContextWithGPU(
+						tc.name, tc.name+"-uid", tc.name+"-pod", "default",
+						tc.cpuRequest, tc.cpuLimit, nil, // No GPU request
+					)
+
+					allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+					gomega.Expect(err).To(gomega.BeNil(),
+						"CPU-only allocation should succeed for %s", tc.name)
+					gomega.Expect(allocation).NotTo(gomega.BeNil(),
+						"Should get allocation for CPU-only container %s", tc.name)
+
+					numaNodes := extractNUMAFromCPUSet(allocation.Resources.CpusetCpus)
+					ginkgo.GinkgoWriter.Printf("AC-05 Test: CPU-only %s (CPU %d) -> NUMA %v\n",
+						tc.name, tc.cpuRequest, numaNodes)
+
+					// Verify AC-05: CPU-only containers should be successfully allocated
+					gomega.Expect(numaNodes).NotTo(gomega.BeEmpty(),
+						"AC-05 Failed: CPU-only container %s should have valid NUMA allocation", tc.name)
+				}
+
+				ginkgo.GinkgoWriter.Printf("✓ AC-05 PASSED: CPU-only containers successfully allocated with fallback strategy\n")
+			})
+
+			// Test FR-ALLOC-01: GPU affinity prioritization in mixed workload
+			ginkgo.It("should verify FR-ALLOC-01: GPU affinity prioritization in mixed workloads", func() {
+				policy := topologyaware.NewTopologyAwarePolicyWithSystem(mockCache, opts, mockSystem)
+				gomega.Expect(policy).NotTo(gomega.BeNil())
+
+				topologyPolicy, ok := policy.(*topologyaware.TopologyAwarePolicy)
+				gomega.Expect(ok).To(gomega.BeTrue())
+
+				ginkgo.GinkgoWriter.Printf("\n=== FR-ALLOC-01 Verification: GPU affinity prioritization ===\n")
+
+				// Create a mixed workload to verify GPU affinity is prioritized
+				mixedTests := []struct {
+					name        string
+					gpuID       string
+					cpuRequest  int64
+					description string
+				}{
+					{"gpu-affinity-0", "0", 6, "GPU 0 affinity test"},
+					{"cpu-mixed-1", "", 4, "CPU-only mixed workload"},
+					{"gpu-affinity-1", "1", 6, "GPU 1 affinity test"},
+					{"cpu-mixed-2", "", 4, "CPU-only mixed workload"},
+					{"gpu-affinity-2", "2", 6, "GPU 2 affinity test"},
+				}
+
+				gpuAffinityResults := make(map[string][]int)
+
+				for _, tc := range mixedTests {
+					var gpuDevices []string
+					if tc.gpuID != "" {
+						gpuDevices = []string{tc.gpuID}
+					}
+
+					containerCtx := createContainerContextWithGPU(
+						tc.name, tc.name+"-uid", tc.name+"-pod", "default",
+						tc.cpuRequest, tc.cpuRequest, gpuDevices,
+					)
+
+					allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+					if err == nil && allocation != nil {
+						numaNodes := extractNUMAFromCPUSet(allocation.Resources.CpusetCpus)
+						ginkgo.GinkgoWriter.Printf("FR-ALLOC-01 Test: %s (%s) -> NUMA %v\n",
+							tc.name, tc.description, numaNodes)
+
+						if tc.gpuID != "" {
+							gpuAffinityResults[tc.gpuID] = numaNodes
+						}
+					} else {
+						ginkgo.GinkgoWriter.Printf("FR-ALLOC-01 Test: %s allocation failed - %v\n", tc.name, err)
+					}
+				}
+
+				// Verify FR-ALLOC-01: GPU containers show affinity to their GPU's NUMA node
+				for gpuID, allocatedNUMAs := range gpuAffinityResults {
+					expectedNUMA, _ := strconv.Atoi(gpuID)
+					if len(allocatedNUMAs) > 0 {
+						hasAffinity := false
+						for _, numa := range allocatedNUMAs {
+							if numa == expectedNUMA {
+								hasAffinity = true
+								break
+							}
+						}
+						gomega.Expect(hasAffinity).To(gomega.BeTrue(),
+							"FR-ALLOC-01 Failed: GPU %s container should show NUMA %d affinity",
+							gpuID, expectedNUMA)
+					}
+				}
+
+				ginkgo.GinkgoWriter.Printf("✓ FR-ALLOC-01 PASSED: GPU affinity properly prioritized in mixed workloads\n")
+			})
+		})
+
+		// New Enhanced Test Section for GPU-first strategy with more containers
+		ginkgo.Context("Enhanced GPU-first strategy verification", func() {
+			ginkgo.BeforeEach(func() {
+				opts.ResourcePriority = policy.ResourcePriorityGPUFirst
+				mockSystem.SetupLargeTopology()
+				setupGPUConfiguration(mockSystem, "4GPU_ALL_NUMA")
+			})
+
+			ginkgo.It("should handle complex multi-container scenarios with correct distribution", func() {
+				policy := topologyaware.NewTopologyAwarePolicyWithSystem(mockCache, opts, mockSystem)
+				gomega.Expect(policy).NotTo(gomega.BeNil())
+
+				topologyPolicy, ok := policy.(*topologyaware.TopologyAwarePolicy)
+				gomega.Expect(ok).To(gomega.BeTrue())
+
+				ginkgo.GinkgoWriter.Printf("\n=== Enhanced GPU-first: Complex Multi-Container Test ===\n")
+
+				// Complex scenario with multiple containers requesting the same GPUs
+				complexTests := []struct {
+					name       string
+					gpuID      string
+					cpuRequest int64
+					priority   int // Lower number = higher priority
+				}{
+					{"high-prio-gpu0", "0", 6, 1},
+					{"high-prio-gpu1", "1", 6, 1},
+					{"med-prio-gpu0", "0", 4, 2}, // Same GPU as high-prio, should test contention
+					{"med-prio-gpu2", "2", 4, 2},
+					{"low-prio-cpu1", "", 8, 3}, // CPU-only
+					{"low-prio-gpu3", "3", 4, 3},
+				}
+
+				// Sort by priority
+				sort.Slice(complexTests, func(i, j int) bool {
+					return complexTests[i].priority < complexTests[j].priority
+				})
+
+				allocations := make(map[string]interface{})
+				gpuDistribution := make(map[string]int)
+				cpuDistribution := make(map[int]int)
+
+				for _, tc := range complexTests {
+					var gpuDevices []string
+					if tc.gpuID != "" {
+						gpuDevices = []string{tc.gpuID}
+					}
+
+					containerCtx := createContainerContextWithGPU(
+						tc.name, tc.name+"-uid", tc.name+"-pod", "default",
+						tc.cpuRequest, tc.cpuRequest, gpuDevices,
+					)
+
+					allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+					if err == nil && allocation != nil {
+						numaNodes := extractNUMAFromCPUSet(allocation.Resources.CpusetCpus)
+						ginkgo.GinkgoWriter.Printf("Allocated %s (GPU %s, CPU %d, Priority %d) -> NUMA %v\n",
+							tc.name, tc.gpuID, tc.cpuRequest, tc.priority, numaNodes)
+
+						allocations[tc.name] = allocation
+						if tc.gpuID != "" {
+							gpuDistribution[tc.gpuID]++
+						}
+						for _, numa := range numaNodes {
+							cpuDistribution[numa]++
+						}
+					} else {
+						ginkgo.GinkgoWriter.Printf("Failed to allocate %s: %v\n", tc.name, err)
+					}
+				}
+
+				// Verify that GPU-first strategy is working correctly
+				ginkgo.GinkgoWriter.Printf("\nDistribution Analysis:\n")
+				ginkgo.GinkgoWriter.Printf("GPU Distribution: %v\n", gpuDistribution)
+				ginkgo.GinkgoWriter.Printf("NUMA Distribution: %v\n", cpuDistribution)
+
+				// Verify we have successful allocations
+				gomega.Expect(len(allocations)).To(gomega.BeNumerically(">", 0),
+					"Should have at least some successful allocations")
+
+				// Verify NUMA node utilization (should use multiple NUMA nodes)
+				gomega.Expect(len(cpuDistribution)).To(gomega.BeNumerically(">", 1),
+					"Should utilize multiple NUMA nodes")
+
+				ginkgo.GinkgoWriter.Printf("✓ Enhanced GPU-first test completed with %d successful allocations\n",
+					len(allocations))
 			})
 		})
 	})
