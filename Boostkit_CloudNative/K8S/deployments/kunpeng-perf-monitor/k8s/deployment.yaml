@@ -34,7 +34,7 @@ spec:
             - ALL  # 删除其他特权能力
           readOnlyRootFilesystem: true  # 根文件系统只读
           runAsUser: 0  # PMU采集器必须以root运行
-          # runAsNonRoot: true  # 如果要强制非root运行，注释掉runAsUser: 0 并启用此项
+          # runAsNonRoot: true  # 如果要强制非root运行，runAsUser配置非0值（如65532），并启用此项
           seccompProfile:
             type: RuntimeDefault
         volumeMounts:
