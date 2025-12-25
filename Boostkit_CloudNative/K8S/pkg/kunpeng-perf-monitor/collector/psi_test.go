@@ -68,22 +68,22 @@ func TestCheckCgroupVersion(t *testing.T) {
 			errorContains:  "unknown cgroup filesystem",
 		},
 		{
-			name:           "stat command fails with exit error",
+			name:           "cgroup version check command fails with exit error",
 			cgroupPath:     "/sys/fs/cgroup",
 			mockOutput:     nil,
-			mockError:      &exec.ExitError{Stderr: []byte("stat: cannot stat '/sys/fs/cgroup': No such file or directory")},
+			mockError:      &exec.ExitError{Stderr: []byte("df: /sys/fs/cgroup: No such file or directory")},
 			expectedResult: unknownCgroupVersion,
 			expectError:    true,
-			errorContains:  "stat cgroupPath",
+			errorContains:  "failed to execute command: df -T /sys/fs/cgroup",
 		},
 		{
-			name:           "stat command fails with generic error",
+			name:           "cgroup version check command fails with generic error",
 			cgroupPath:     "/sys/fs/cgroup",
 			mockOutput:     nil,
 			mockError:      assert.AnError,
 			expectedResult: unknownCgroupVersion,
 			expectError:    true,
-			errorContains:  "stat cgroupPath",
+			errorContains:  "failed to execute command: df -T /sys/fs/cgroup",
 		},
 		{
 			name:           "empty path",
@@ -128,9 +128,10 @@ func TestCheckCgroupVersion(t *testing.T) {
 			originalExecCommand := execCommand
 
 			// 设置mock的execCommand
+			cgroupVersionCheckCmdArgs := []string{"-T", tt.cgroupPath}
 			execCommand = func(command string, args ...string) ([]byte, error) {
-				require.Equal(t, "stat", command)
-				require.Equal(t, []string{"-fc", "%T", tt.cgroupPath}, args)
+				require.Equal(t, cgroupVersionCheckCmd, command)
+				require.Equal(t, cgroupVersionCheckCmdArgs, args)
 				return tt.mockOutput, tt.mockError
 			}
 
@@ -329,12 +330,12 @@ func TestGetCgroupSearchPath(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	tests := []struct {
-		name           string
-		setupFunc      func(t *testing.T) (cgroupMountPath, expectedPath string, cleanup func())
-		mockStatOutput []byte
-		mockStatError  error
-		expectError    bool
-		errorContains  string
+		name          string
+		setupFunc     func(t *testing.T) (cgroupMountPath, expectedPath string, cleanup func())
+		mockCmdOutput []byte
+		mockCmdError  error
+		expectError   bool
+		errorContains string
 	}{
 		{
 			name: "cgroup v2 with kubepods directory",
@@ -347,8 +348,8 @@ func TestGetCgroupSearchPath(t *testing.T) {
 				}
 				return tmpDir, dirPath, func() {}
 			},
-			mockStatOutput: []byte("cgroup2\n"),
-			expectError:    false,
+			mockCmdOutput: []byte("cgroup2\n"),
+			expectError:   false,
 		},
 		{
 			name: "cgroup v2 with kubepods.slice directory",
@@ -361,8 +362,8 @@ func TestGetCgroupSearchPath(t *testing.T) {
 				}
 				return tmpDir, dirPath, func() {}
 			},
-			mockStatOutput: []byte("cgroup2\n"),
-			expectError:    false,
+			mockCmdOutput: []byte("cgroup2\n"),
+			expectError:   false,
 		},
 		{
 			name: "cgroup v1 with cpu,cpuacct and kubepods directory",
@@ -381,8 +382,8 @@ func TestGetCgroupSearchPath(t *testing.T) {
 				}
 				return tmpDir, dirPath, func() {}
 			},
-			mockStatOutput: []byte("tmpfs\n"),
-			expectError:    false,
+			mockCmdOutput: []byte("tmpfs\n"),
+			expectError:   false,
 		},
 		{
 			name: "cgroup v1 with cpu,cpuacct and kubepods.slice directory",
@@ -401,17 +402,17 @@ func TestGetCgroupSearchPath(t *testing.T) {
 				}
 				return tmpDir, dirPath, func() {}
 			},
-			mockStatOutput: []byte("tmpfs\n"),
-			expectError:    false,
+			mockCmdOutput: []byte("tmpfs\n"),
+			expectError:   false,
 		},
 		{
 			name: "empty cgroupMountPath",
 			setupFunc: func(t *testing.T) (string, string, func()) {
 				return "", "", func() {}
 			},
-			mockStatOutput: nil,
-			expectError:    true,
-			errorContains:  "cgroupMountPath uninitialized",
+			mockCmdOutput: nil,
+			expectError:   true,
+			errorContains: "cgroupMountPath uninitialized",
 		},
 		{
 			name: "nil cgroupMountPath",
@@ -423,20 +424,20 @@ func TestGetCgroupSearchPath(t *testing.T) {
 					cgroupMountPath = originalCgroupMountPath
 				}
 			},
-			mockStatOutput: nil,
-			expectError:    true,
-			errorContains:  "cgroupMountPath uninitialized",
+			mockCmdOutput: nil,
+			expectError:   true,
+			errorContains: "cgroupMountPath uninitialized",
 		},
 		{
-			name: "stat command fails",
+			name: "cgroup version check command fails",
 			setupFunc: func(t *testing.T) (string, string, func()) {
 				tmpDir := t.TempDir()
 				return tmpDir, "", func() {}
 			},
-			mockStatOutput: nil,
-			mockStatError:  assert.AnError,
-			expectError:    true,
-			errorContains:  "failed to check cgroup version",
+			mockCmdOutput: nil,
+			mockCmdError:  assert.AnError,
+			expectError:   true,
+			errorContains: "failed to check cgroup version",
 		},
 		{
 			name: "unknown cgroup filesystem",
@@ -444,9 +445,9 @@ func TestGetCgroupSearchPath(t *testing.T) {
 				tmpDir := t.TempDir()
 				return tmpDir, "", func() {}
 			},
-			mockStatOutput: []byte("ext4\n"),
-			expectError:    true,
-			errorContains:  "failed to check cgroup version",
+			mockCmdOutput: []byte("ext4\n"),
+			expectError:   true,
+			errorContains: "failed to check cgroup version",
 		},
 		{
 			name: "no target directories found",
@@ -455,9 +456,9 @@ func TestGetCgroupSearchPath(t *testing.T) {
 				// 确保目标目录不存在，临时目录是空的
 				return tmpDir, "", func() {}
 			},
-			mockStatOutput: []byte("cgroup2\n"),
-			expectError:    true,
-			errorContains:  "failed to get cgroupSearchPath path",
+			mockCmdOutput: []byte("cgroup2\n"),
+			expectError:   true,
+			errorContains: "failed to get cgroupSearchPath path",
 		},
 	}
 
@@ -472,10 +473,11 @@ func TestGetCgroupSearchPath(t *testing.T) {
 			defer cleanup()
 
 			// 设置mock的execCommand
+			cgroupVersionCheckCmdArgs := []string{"-T", cgroupMountPathStr}
 			execCommand = func(command string, args ...string) ([]byte, error) {
-				require.Equal(t, "stat", command)
-				require.Equal(t, []string{"-fc", "%T", cgroupMountPathStr}, args)
-				return tt.mockStatOutput, tt.mockStatError
+				require.Equal(t, cgroupVersionCheckCmd, command)
+				require.Equal(t, cgroupVersionCheckCmdArgs, args)
+				return tt.mockCmdOutput, tt.mockCmdError
 			}
 
 			// 设置cgroupMountPath
@@ -511,7 +513,7 @@ func TestNewPSICollector(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		setupFunc       func(t *testing.T) (cgroupMountPath string, mockStatOutput []byte, mockStatError error, cleanup func())
+		setupFunc       func(t *testing.T) (cgroupMountPath string, mockCmdOutput []byte, mockCmdError error, cleanup func())
 		expectError     bool
 		errorContains   string
 		expectCollector bool
@@ -645,16 +647,15 @@ func TestNewPSICollector(t *testing.T) {
 			originalCgroupMountPath := cgroupMountPath
 
 			// 执行setup函数获取路径、mock数据和清理函数
-			cgroupMountPathStr, mockStatOutput, mockStatError, cleanup := tt.setupFunc(t)
+			cgroupMountPathStr, mockCmdOutput, mockCmdError, cleanup := tt.setupFunc(t)
 			defer cleanup()
 
 			// 设置mock的execCommand
+			cgroupVersionCheckCmdArgs := []string{"-T", cgroupMountPathStr}
 			execCommand = func(command string, args ...string) ([]byte, error) {
-				require.Equal(t, "stat", command)
-				if cgroupMountPathStr != "" {
-					require.Equal(t, []string{"-fc", "%T", cgroupMountPathStr}, args)
-				}
-				return mockStatOutput, mockStatError
+				require.Equal(t, cgroupVersionCheckCmd, command)
+				require.Equal(t, cgroupVersionCheckCmdArgs, args)
+				return mockCmdOutput, mockCmdError
 			}
 
 			// 设置cgroupMountPath

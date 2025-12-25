@@ -45,6 +45,9 @@ var (
 	additionalPSIResourceFiles = []string{"irq.pressure"}
 
 	targetDirForCgroupDrivers = []string{"kubepods", "kubepods.slice"}
+
+	// vars for cgroup version check
+	cgroupVersionCheckCmd = "df"
 )
 
 type psiCollector struct {
@@ -76,16 +79,16 @@ func checkCgroupVersion(cgroupPath string, logger *slog.Logger) (version int, er
 	// check cgroup version
 	// 使用参数列表而非字符串拼接
 	// 直接调用stat二进制文件而非通过shell
-	output, err := execCommand("stat", "-fc", "%T", cgroupPath)
+	output, err := execCommand(cgroupVersionCheckCmd, "-T", cgroupPath)
 	if err != nil {
-		return unknownCgroupVersion, fmt.Errorf("stat cgroupPath %s failed: %v", cgroupPath, err)
+		return unknownCgroupVersion, fmt.Errorf("failed to execute command: %s -T %s, %v", cgroupVersionCheckCmd, cgroupPath, err)
 	}
 	outputStr := strings.TrimSpace(string(output))
 	if strings.Contains(outputStr, "cgroup2") {
-		logger.Info("cgroup version is cgroup2.")
+		logger.Info("cgroup version is cgroup v2.")
 		return cgroupV2, nil
 	} else if strings.Contains(outputStr, "tmpfs") {
-		logger.Info("cgroup version is cgroup1.")
+		logger.Info("cgroup version is cgroup v1.")
 		return cgroupV1, nil
 	} else {
 		logger.Info("unknown cgroup filesystem", "cgroup filesystem", string(output))
