@@ -31,7 +31,7 @@ clean_package_cache() {
         rm -rf /var/cache/yum/*
     fi
     # clean generic temporary files
-    rm -rf /tmp/* /var/tmp/*
+    # rm -rf /tmp/* /var/tmp/*
 }
 
 # prerequisites for libkperf:
