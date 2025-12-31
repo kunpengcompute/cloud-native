@@ -1,5 +1,5 @@
-FROM alpine:3.20
-LABEL org.opencontainers.image.source='https://gitee.com/kunpeng_compute/kunpeng-cloud-computing'
+FROM busybox:glibc
+LABEL org.opencontainers.image.source='https://gitcode.com/boostkit/cloud-native'
 LABEL version='devel'
 LABEL release='1'
 LABEL name='kae-device-plugin'
