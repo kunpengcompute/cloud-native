@@ -21,9 +21,10 @@ import (
 	"sort"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/cpuset"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/cmd/kunpeng-tap/proxy/options"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/cache"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/policy"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/sysfs/system"
@@ -65,7 +66,7 @@ type TopologyAwarePolicy struct {
 	depth                int
 	allocations          allocations             // container pool assignmentss
 	enableMemoryTopology bool                    // 是否启用内存拓扑感知
-	resourcePriority     policy.ResourcePriority // 资源分配优先级策略
+	resourcePriority     string                  // 资源分配优先级策略
 	metricsManager       *TopologyMetricsManager // 资源树监控管理器
 }
 
@@ -353,7 +354,7 @@ func (p *TopologyAwarePolicy) updateParentResourceUsageByGrant(parent Node, gran
 // findBestAvailablePool finds the best available pool for the request.
 func (p *TopologyAwarePolicy) findBestAvailablePool(request Request, pools []Node) Node {
 	// GPU-First策略下的特殊处理
-	if p.resourcePriority == policy.ResourcePriorityGPUFirst && request.HasGPURequest() {
+	if p.resourcePriority == options.ResourcePriorityGPUFirst && request.HasGPURequest() {
 		if pool := p.findGPUAffinityPool(request, pools); pool != nil {
 			return pool
 		}
@@ -682,7 +683,7 @@ func (p *TopologyAwarePolicy) compareGPUAffinity(request Request, affinity map[i
 	for _, numaID := range numaIDs1 {
 		baseAffinity := affinity[int(numaID)]
 		// GPU-First策略下，增强GPU亲和性权重
-		if p.resourcePriority == policy.ResourcePriorityGPUFirst && baseAffinity > 0 {
+		if p.resourcePriority == options.ResourcePriorityGPUFirst && baseAffinity > 0 {
 			affinity1 += baseAffinity * 100 // 增强权重100倍，确保GPU亲和性优先
 		} else {
 			affinity1 += baseAffinity
@@ -691,7 +692,7 @@ func (p *TopologyAwarePolicy) compareGPUAffinity(request Request, affinity map[i
 	for _, numaID := range numaIDs2 {
 		baseAffinity := affinity[int(numaID)]
 		// GPU-First策略下，增强GPU亲和性权重
-		if p.resourcePriority == policy.ResourcePriorityGPUFirst && baseAffinity > 0 {
+		if p.resourcePriority == options.ResourcePriorityGPUFirst && baseAffinity > 0 {
 			affinity2 += baseAffinity * 100 // 增强权重100倍，确保GPU亲和性优先
 		} else {
 			affinity2 += baseAffinity
@@ -763,7 +764,7 @@ func (p *TopologyAwarePolicy) compare(request Request, scores map[int]Score, aff
 // applyResourcePriorityStrategy applies the configured resource priority strategy
 func (p *TopologyAwarePolicy) applyResourcePriorityStrategy(request Request, affinity map[int]int32, node1, node2 Node) (bool, bool) {
 	switch p.resourcePriority {
-	case policy.ResourcePriorityGPUFirst:
+	case options.ResourcePriorityGPUFirst:
 		// GPU优先策略：先比较GPU亲和性，再比较CPU容量
 		if result, done := p.compareGPUAffinity(request, affinity, node1, node2); done {
 			return result, true
@@ -772,7 +773,7 @@ func (p *TopologyAwarePolicy) applyResourcePriorityStrategy(request Request, aff
 		if result, done := p.compareCPUCapacity(node1, node2); done {
 			return result, true
 		}
-	case policy.ResourcePriorityCPUFirst:
+	case options.ResourcePriorityCPUFirst:
 		fallthrough
 	default:
 		// CPU优先（默认）：先比较CPU容量，再比较GPU亲和性

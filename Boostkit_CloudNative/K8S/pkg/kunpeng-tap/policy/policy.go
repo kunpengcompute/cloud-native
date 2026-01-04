@@ -24,17 +24,8 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-tap/policy-manager/v1alpha1"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/cmd/kunpeng-tap/proxy/options"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/cache"
-)
-
-// ResourcePriority defines the resource allocation priority strategy
-type ResourcePriority string
-
-const (
-	// ResourcePriorityCPUFirst prioritizes CPU resources over GPU resources
-	ResourcePriorityCPUFirst ResourcePriority = "cpu-first"
-	// ResourcePriorityGPUFirst prioritizes GPU resources over CPU resources
-	ResourcePriorityGPUFirst ResourcePriority = "gpu-first"
 )
 
 // PolicyOptions contains configuration options for policies
@@ -42,14 +33,14 @@ type PolicyOptions struct {
 	// EnableMemoryTopology controls whether memory topology awareness is enabled
 	EnableMemoryTopology bool
 	// ResourcePriority controls the resource allocation priority strategy
-	ResourcePriority ResourcePriority
+	ResourcePriority string
 }
 
 // NewPolicyOptions creates a new PolicyOptions with default values
 func NewPolicyOptions() *PolicyOptions {
 	return &PolicyOptions{
 		EnableMemoryTopology: false,
-		ResourcePriority:     ResourcePriorityCPUFirst,
+		ResourcePriority:     options.ResourcePriorityCPUFirst,
 	}
 }
 

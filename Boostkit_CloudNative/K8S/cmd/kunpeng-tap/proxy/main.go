@@ -59,7 +59,8 @@ func main() {
 	d := dispatcher.NewDispatcher(policyManager, cache)
 	proxyServer := createProxyServer(d, policyManager, cache)
 
-	startServer(proxyServer)
+	startMonitor(proxyServer)
+	go proxyServer.Run()
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
@@ -89,7 +90,7 @@ func parseFlags() {
 		"resource allocation priority for topology-aware policy(cpu-first|gpu-first). Default cpu-first")
 	flag.DurationVar(&options.GracefulTimeout, "graceful-timeout", options.DefaultGracefulTimeout,
 		"the duration for which the server gracefully wait for existing connections to finish, default 15s.")
-	flag.StringVar(&options.MetricsAddr, "metrics-bind-address", ":9091", "The address the metrics endpoint binds to. Default :9091")
+	flag.StringVar(&options.MetricsAddr, "metrics-bind-address", "", "The address the metrics endpoint binds to. Default empty (disabled)")
 	flag.BoolVar(&options.Version, "version", false, "The version of kunpeng-tap proxy")
 	flag.BoolVar(&options.EnableMemoryTopology, "enable-memory-topology", false,
 		"Enable memory topology awareness. Default false")
@@ -150,17 +151,7 @@ func createPolicyManager(cache cache.Cache) policy.HookManager {
 func createPolicyOptions() *policy.PolicyOptions {
 	policyOpts := policy.NewPolicyOptions()
 	policyOpts.EnableMemoryTopology = options.EnableMemoryTopology
-
-	switch options.ResourcePriority {
-	case options.ResourcePriorityGPUFirst:
-		policyOpts.ResourcePriority = policy.ResourcePriorityGPUFirst
-		klog.InfoS("Using GPU-first resource allocation strategy")
-	case options.ResourcePriorityCPUFirst:
-		fallthrough
-	default:
-		policyOpts.ResourcePriority = policy.ResourcePriorityCPUFirst
-		klog.InfoS("Using CPU-first resource allocation strategy")
-	}
+	policyOpts.ResourcePriority = options.ResourcePriority
 
 	return policyOpts
 }
@@ -182,11 +173,12 @@ func createProxyServer(d dispatcher.Dispatcher, policyManager policy.HookManager
 	}
 }
 
-// startServer starts the proxy server and monitoring
-func startServer(proxyServer server.ProxyServer) {
-	go monitoring.ExportMetrics()
-	monitoring.ProxyHealthz.Set(1)
-	go proxyServer.Run()
+// startMonitor starts the promethues monitoring server
+func startMonitor(proxyServer server.ProxyServer) {
+	if options.MetricsAddr != "" {
+		go monitoring.ExportMetrics()
+		monitoring.ProxyHealthz.Set(1)
+	}
 }
 
 func NewContainerdProxyServer(dispatcher dispatcher.Dispatcher, cache cache.Cache) server.ProxyServer {

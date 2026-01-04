@@ -26,6 +26,7 @@ import (
 	gomega "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/cmd/kunpeng-tap/proxy/options"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/policy"
 	topologyaware "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/policy/topology-aware"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/sysfs/system"
@@ -36,29 +37,29 @@ var _ = ginkgo.Describe("Resource Priority Configuration Tests", func() {
 	ginkgo.Context("Resource Priority Settings", func() {
 		ginkgo.It("should correctly configure CPU-first priority", func() {
 			opts := policy.NewPolicyOptions()
-			opts.ResourcePriority = policy.ResourcePriorityCPUFirst
-			gomega.Expect(opts.ResourcePriority).To(gomega.Equal(policy.ResourcePriorityCPUFirst))
+			opts.ResourcePriority = options.ResourcePriorityCPUFirst
+			gomega.Expect(opts.ResourcePriority).To(gomega.Equal(options.ResourcePriorityCPUFirst))
 		})
 
 		ginkgo.It("should correctly configure GPU-first priority", func() {
 			opts := policy.NewPolicyOptions()
-			opts.ResourcePriority = policy.ResourcePriorityGPUFirst
-			gomega.Expect(opts.ResourcePriority).To(gomega.Equal(policy.ResourcePriorityGPUFirst))
+			opts.ResourcePriority = options.ResourcePriorityGPUFirst
+			gomega.Expect(opts.ResourcePriority).To(gomega.Equal(options.ResourcePriorityGPUFirst))
 		})
 	})
 
 	ginkgo.Context("Policy Options Defaults", func() {
 		ginkgo.It("should have correct default values", func() {
 			opts := policy.NewPolicyOptions()
-			gomega.Expect(opts.ResourcePriority).To(gomega.Equal(policy.ResourcePriorityCPUFirst))
+			gomega.Expect(opts.ResourcePriority).To(gomega.Equal(options.ResourcePriorityCPUFirst))
 			gomega.Expect(opts.EnableMemoryTopology).To(gomega.BeFalse())
 		})
 	})
 
 	ginkgo.Context("Resource Priority Constants", func() {
 		ginkgo.It("should have correct constant values", func() {
-			gomega.Expect(string(policy.ResourcePriorityCPUFirst)).To(gomega.Equal("cpu-first"))
-			gomega.Expect(string(policy.ResourcePriorityGPUFirst)).To(gomega.Equal("gpu-first"))
+			gomega.Expect(string(options.ResourcePriorityCPUFirst)).To(gomega.Equal("cpu-first"))
+			gomega.Expect(string(options.ResourcePriorityGPUFirst)).To(gomega.Equal("gpu-first"))
 		})
 	})
 })
@@ -192,7 +193,7 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 
 	ginkgo.Describe("CPU-First Priority Strategy", func() {
 		ginkgo.BeforeEach(func() {
-			opts.ResourcePriority = policy.ResourcePriorityCPUFirst
+			opts.ResourcePriority = options.ResourcePriorityCPUFirst
 		})
 
 		ginkgo.Context("with 2 GPUs on NUMA 1 and 3", func() {
@@ -499,7 +500,7 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 
 	ginkgo.Describe("GPU-First Priority Strategy", func() {
 		ginkgo.BeforeEach(func() {
-			opts.ResourcePriority = policy.ResourcePriorityGPUFirst
+			opts.ResourcePriority = options.ResourcePriorityGPUFirst
 		})
 
 		ginkgo.Context("with 2 GPUs on NUMA 1 and 3", func() {
@@ -1174,7 +1175,7 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 	ginkgo.Describe("Mixed Workload Scenarios", func() {
 		ginkgo.Context("CPU-first strategy with mixed workloads", func() {
 			ginkgo.BeforeEach(func() {
-				opts.ResourcePriority = policy.ResourcePriorityCPUFirst
+				opts.ResourcePriority = options.ResourcePriorityCPUFirst
 				mockSystem.SetupLargeTopology()
 				setupGPUConfiguration(mockSystem, "2GPU_NUMA1_3")
 			})
@@ -1219,7 +1220,7 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 
 		ginkgo.Context("GPU-first strategy with mixed workloads", func() {
 			ginkgo.BeforeEach(func() {
-				opts.ResourcePriority = policy.ResourcePriorityGPUFirst
+				opts.ResourcePriority = options.ResourcePriorityGPUFirst
 				mockSystem.SetupLargeTopology()
 				setupGPUConfiguration(mockSystem, "4GPU_ALL_NUMA")
 			})
@@ -1435,7 +1436,7 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 		// New Enhanced Test Section for GPU-first strategy with more containers
 		ginkgo.Context("Enhanced GPU-first strategy verification", func() {
 			ginkgo.BeforeEach(func() {
-				opts.ResourcePriority = policy.ResourcePriorityGPUFirst
+				opts.ResourcePriority = options.ResourcePriorityGPUFirst
 				mockSystem.SetupLargeTopology()
 				setupGPUConfiguration(mockSystem, "4GPU_ALL_NUMA")
 			})
@@ -1532,10 +1533,10 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 				// Test both strategies with the same workload pattern
 				strategies := []struct {
 					name     string
-					priority policy.ResourcePriority
+					priority string
 				}{
-					{"CPU-First", policy.ResourcePriorityCPUFirst},
-					{"GPU-First", policy.ResourcePriorityGPUFirst},
+					{"CPU-First", options.ResourcePriorityCPUFirst},
+					{"GPU-First", options.ResourcePriorityGPUFirst},
 				}
 
 				for _, strategy := range strategies {
@@ -1585,7 +1586,7 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 	ginkgo.Describe("Edge Cases and Validation", func() {
 		ginkgo.Context("Invalid GPU requests", func() {
 			ginkgo.BeforeEach(func() {
-				opts.ResourcePriority = policy.ResourcePriorityGPUFirst
+				opts.ResourcePriority = options.ResourcePriorityGPUFirst
 				mockSystem.SetupLargeTopology()
 				setupGPUConfiguration(mockSystem, "2GPU_NUMA1_3")
 			})
@@ -1620,9 +1621,9 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 			})
 
 			ginkgo.It("should handle system containers consistently regardless of priority strategy", func() {
-				strategies := []policy.ResourcePriority{
-					policy.ResourcePriorityCPUFirst,
-					policy.ResourcePriorityGPUFirst,
+				strategies := []string{
+					options.ResourcePriorityCPUFirst,
+					options.ResourcePriorityGPUFirst,
 				}
 
 				for _, strategy := range strategies {

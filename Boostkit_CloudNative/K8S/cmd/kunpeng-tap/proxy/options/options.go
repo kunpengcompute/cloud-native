@@ -56,5 +56,4 @@ var (
 	MetricsAddr              string
 	Version                  bool
 	EnableMemoryTopology     bool
-	NumaAlignOption          string
 )
