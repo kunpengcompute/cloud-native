@@ -366,50 +366,109 @@ func (p *TopologyAwarePolicy) findBestAvailablePool(request Request, pools []Nod
 }
 
 // findGPUAffinityPool finds a pool with GPU affinity for GPU requests
-func (p *TopologyAwarePolicy) findGPUAffinityPool(request Request, pools []Node) Node {
-	// 阶段1：尝试特定GPU的NUMA节点
-	specificAffinity := p.calculatePoolAffinities(request)
-	if pool := p.findPoolWithAffinity(request, pools, specificAffinity, "specific GPU"); pool != nil {
-		return pool
+// 策略：
+// 1. 确定请求GPU所在的NUMA节点
+// 2. 为该NUMA节点及其子节点设置高优先级
+// 3. 使用现有的排序和选择逻辑，自动选择最优pool（可能是NUMA或更细粒度的子节点）
+func (p *TopologyAwarePolicy) findGPUAffinityPool(request Request, _ []Node) Node {
+	// 获取请求的GPU设备所在的NUMA节点
+	gpuNUMANodes := p.getRequestedGPUNUMANodes(request)
+	if len(gpuNUMANodes) == 0 {
+		return nil
 	}
 
-	// 阶段2：尝试其他GPU的NUMA节点
-	generalAffinity := p.calculateGeneralGPUAffinity()
-	return p.findAlternativeGPUPool(request, pools, generalAffinity, specificAffinity)
-}
+	// 为GPU所在的NUMA节点计算亲和性权重
+	// 这样可以让排序逻辑自动选择最优的pool（NUMA或其子节点）
+	affinity := p.calculateGPUNUMAAffinity(gpuNUMANodes)
 
-// findPoolWithAffinity finds a NUMA-level pool with given affinity
-func (p *TopologyAwarePolicy) findPoolWithAffinity(request Request, pools []Node, affinity map[int]int32, affinityType string) Node {
-	for _, pool := range pools {
-		if !p.isNUMALevelPool(pool) {
-			continue
-		}
+	// 使用现有的排序逻辑对所有pool排序
+	// 高亲和性的pool会排在前面，可能是NUMA本身，也可能是其子节点
+	score, sortedPools := p.sortPoolsByScore(request, affinity)
+	if len(sortedPools) == 0 {
+		return nil
+	}
 
-		poolAffinity := p.calculatePoolAffinityValue(pool, affinity)
-		if poolAffinity > 0 && p.hasCapacity(request, pool) {
-			klog.V(5).InfoS("GPU-First: Found suitable NUMA pool", "bestPool", pool.Name(), "affinity", poolAffinity, "type", affinityType)
-			return pool
+	// 从排序后的pools中找到第一个满足资源条件的pool
+	// 由于已经按亲和性排序，优先选择GPU所在NUMA或其子节点
+	for _, pool := range sortedPools {
+		if p.hasCapacity(request, pool) {
+			// 验证选中的pool是否在GPU所在的NUMA节点或其子节点上
+			poolNUMAIDs := pool.FreeResource().GetNode().GetNUMAIDs()
+			if p.isPoolInGPUNUMANodes(poolNUMAIDs, gpuNUMANodes) {
+				klog.V(4).InfoS("GPU-First: Found optimal pool in GPU NUMA node",
+					"pool", pool.Name(),
+					"poolNUMAIDs", poolNUMAIDs,
+					"gpuNUMANodes", gpuNUMANodes,
+					"score", score[pool.NodeID()].String())
+				return pool
+			}
 		}
 	}
+
+	// GPU所在NUMA节点及其子节点都不满足资源要求
+	klog.V(4).InfoS("GPU-First: GPU NUMA node and its children do not have sufficient capacity, falling back to CPU-first allocation")
 	return nil
 }
 
-// findAlternativeGPUPool finds alternative GPU pools excluding specific GPU pools
-func (p *TopologyAwarePolicy) findAlternativeGPUPool(request Request, pools []Node, generalAffinity, specificAffinity map[int]int32) Node {
-	for _, pool := range pools {
-		if !p.isNUMALevelPool(pool) {
+// getRequestedGPUNUMANodes 获取请求GPU所在的NUMA节点集合
+func (p *TopologyAwarePolicy) getRequestedGPUNUMANodes(request Request) map[system.ID]bool {
+	requestedGPUs := request.GetRequestedGPUDevices()
+	if len(requestedGPUs) == 0 {
+		klog.V(4).InfoS("GPU-First: No specific GPU requested")
+		return nil
+	}
+
+	gpuNUMANodes := make(map[system.ID]bool)
+	for _, gpuID := range p.sys.GPUIDs() {
+		gpu := p.sys.GPU(gpuID)
+		if gpu == nil {
 			continue
 		}
 
-		poolAffinity := p.calculatePoolAffinityValue(pool, generalAffinity)
-		hasSpecificGPU := p.calculatePoolAffinityValue(pool, specificAffinity) > 0
-
-		if poolAffinity > 0 && !hasSpecificGPU && p.hasCapacity(request, pool) {
-			klog.V(5).InfoS("GPU-First: Found suitable alternative GPU NUMA pool", "bestPool", pool.Name(), "affinity", poolAffinity)
-			return pool
+		gpuIDStr := fmt.Sprintf("%d", gpuID)
+		for _, requestedID := range requestedGPUs {
+			if gpuIDStr == requestedID {
+				numaNodeID := gpu.NodeID()
+				gpuNUMANodes[numaNodeID] = true
+				klog.V(4).InfoS("GPU-First: Found requested GPU on NUMA node",
+					"gpuID", gpuID,
+					"numaNode", numaNodeID)
+			}
 		}
 	}
-	return nil
+
+	if len(gpuNUMANodes) == 0 {
+		klog.V(4).InfoS("GPU-First: No matching GPU found")
+	}
+
+	return gpuNUMANodes
+}
+
+// calculateGPUNUMAAffinity 为GPU所在的NUMA节点计算亲和性权重
+func (p *TopologyAwarePolicy) calculateGPUNUMAAffinity(gpuNUMANodes map[system.ID]bool) map[int]int32 {
+	affinity := make(map[int]int32)
+
+	// 为GPU所在的NUMA节点设置高亲和性权重
+	// 权重值设置为1000，确保在排序中优先于其他节点
+	for numaID := range gpuNUMANodes {
+		affinity[int(numaID)] = 1000
+		klog.V(4).InfoS("GPU-First: Set high affinity for GPU NUMA node",
+			"numaNode", numaID,
+			"affinity", 1000)
+	}
+
+	return affinity
+}
+
+// isPoolInGPUNUMANodes 检查pool是否在GPU所在的NUMA节点或其子节点上
+func (p *TopologyAwarePolicy) isPoolInGPUNUMANodes(poolNUMAIDs []system.ID, gpuNUMANodes map[system.ID]bool) bool {
+	// 检查pool的NUMA IDs中是否有任何一个在GPU NUMA节点中
+	for _, numaID := range poolNUMAIDs {
+		if gpuNUMANodes[numaID] {
+			return true
+		}
+	}
+	return false
 }
 
 // findRegularPool finds the best pool using regular allocation logic
@@ -422,19 +481,6 @@ func (p *TopologyAwarePolicy) findRegularPool(request Request, pools []Node) Nod
 	}
 	klog.V(5).InfoS("Best pool", "bestPool", bestPool.Name())
 	return bestPool
-}
-
-// Helper functions
-func (p *TopologyAwarePolicy) isNUMALevelPool(pool Node) bool {
-	return len(pool.FreeResource().GetNode().GetNUMAIDs()) == 1
-}
-
-func (p *TopologyAwarePolicy) calculatePoolAffinityValue(pool Node, affinity map[int]int32) int32 {
-	var poolAffinity int32
-	for _, numaID := range pool.FreeResource().GetNode().GetNUMAIDs() {
-		poolAffinity += affinity[int(numaID)]
-	}
-	return poolAffinity
 }
 
 func (p *TopologyAwarePolicy) hasCapacity(request Request, pool Node) bool {
@@ -510,24 +556,6 @@ func (p *TopologyAwarePolicy) calculateSpecificGPUAffinity(request Request) map[
 	return affinity
 }
 
-// Helper method to calculate general GPU affinity for all nodes with GPUs
-func (p *TopologyAwarePolicy) calculateGeneralGPUAffinity() map[int]int32 {
-	affinity := make(map[int]int32)
-
-	for _, nodeID := range p.sys.NodeIDs() {
-		gpuCount := len(p.sys.NodeGPUs(nodeID))
-		if gpuCount > 0 {
-			affinity[int(nodeID)] += int32(gpuCount * 100)
-			klog.V(3).InfoS("Added general GPU affinity for NUMA node",
-				"numaNode", nodeID,
-				"gpuCount", gpuCount,
-				"weight", gpuCount*100)
-		}
-	}
-
-	return affinity
-}
-
 func (p *TopologyAwarePolicy) calculatePoolAffinities(request Request) map[int]int32 {
 	// 创建一个映射来存储每个NUMA节点的权重
 	affinity := make(map[int]int32)
@@ -543,13 +571,13 @@ func (p *TopologyAwarePolicy) calculatePoolAffinities(request Request) map[int]i
 		"container", containerCtx.Request.ContainerMeta.Name,
 		"requestedDevices", request.GetRequestedGPUDevices())
 
-	// 如果有特定的GPU设备请求，尝试找到这些设备所在的NUMA节点
+	// GPU-first策略：只计算所请求特定GPU的NUMA节点亲和性
+	// 如果没有特定GPU请求，返回空亲和性映射
 	if len(request.GetRequestedGPUDevices()) > 0 {
 		return p.calculateSpecificGPUAffinity(request)
-	} else {
-		// 如果没有特定的GPU设备请求，则增加所有有GPU的NUMA节点的亲和性
-		return p.calculateGeneralGPUAffinity()
 	}
+
+	return affinity
 }
 
 func (p *TopologyAwarePolicy) applyGrant(grant Grant) {
