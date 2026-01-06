@@ -32,6 +32,11 @@ const (
 	NumaAwarePolicy       = "numa-aware"
 	DefaultResourcePolicy = TopologyAwarePolicy
 
+	// Resource priority options for topology-aware policy
+	ResourcePriorityCPUFirst = "cpu-first"
+	ResourcePriorityGPUFirst = "gpu-first"
+	DefaultResourcePriority  = ResourcePriorityCPUFirst
+
 	DefaultGracefulTimeout = time.Second * 15
 
 	SkipTAPLabel = "tap.kunpeng.huawei.com/skip"
@@ -46,6 +51,7 @@ var (
 	ContainerRuntimeMode     string
 	NRISocketPath            string
 	ResourcePolicy           string
+	ResourcePriority         string
 	GracefulTimeout          time.Duration
 	MetricsAddr              string
 	Version                  bool

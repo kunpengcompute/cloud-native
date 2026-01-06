@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-tap/policy-manager/v1alpha1"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/cmd/kunpeng-tap/proxy/options"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/cache"
 )
 
@@ -31,13 +32,15 @@ import (
 type PolicyOptions struct {
 	// EnableMemoryTopology controls whether memory topology awareness is enabled
 	EnableMemoryTopology bool
-	// 将来可以添加更多选项...
+	// ResourcePriority controls the resource allocation priority strategy
+	ResourcePriority string
 }
 
 // NewPolicyOptions creates a new PolicyOptions with default values
 func NewPolicyOptions() *PolicyOptions {
 	return &PolicyOptions{
 		EnableMemoryTopology: false,
+		ResourcePriority:     options.ResourcePriorityCPUFirst,
 	}
 }
 
