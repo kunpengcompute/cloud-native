@@ -214,7 +214,8 @@ func (s *supply) Allocate(req Request) (Grant, error) {
 	return grant, nil
 }
 
-// AllocateCPU allocates CPU capacity from this supply and returns it as a grant.
+// AllocateCPU 从当前 supply 分配 CPU 资源并返回 grant
+// 实际分配使用 request 值，而非 limit（limit 仅用于 Pool 选择时的容量判断）
 func (s *supply) AllocateCPU(req Request) (Grant, error) {
 	grant := newGrant(s.node, req.GetContext(), false, 0)
 
@@ -222,25 +223,29 @@ func (s *supply) AllocateCPU(req Request) (Grant, error) {
 	requestCpu := resource.GetRequests().Cpu().MilliValue()
 	limitCpu := resource.GetLimits().Cpu().MilliValue()
 
-	// requestCpu值的和不超出 TotalSharedCPU
+	// 检查 request 值是否超出总容量
 	totalSharedCPU := s.TotalSharedCPU()
 	if requestCpu+int64(s.GrantedCPUByRequest()) > int64(totalSharedCPU) {
 		return nil, fmt.Errorf("request CPU %d exceeds total shared CPU %d", requestCpu, totalSharedCPU)
 	}
 
-	// limitCpu 值超出 TotalSharedCPU
-	if limitCpu > 0 && int64(totalSharedCPU) < limitCpu {
-		return nil, fmt.Errorf("not enough shared CPU for %d in %s(-%d) of %s",
-			limitCpu, s.sharable.String(), s.grantedShared, s.node.Name())
-	}
+	// 分配 request 值（limit 的容量检查已在 Pool 选择阶段完成）
+	allocatedCpu := int(requestCpu)
+
+	klog.V(5).InfoS("Allocating CPU based on request",
+		"requestCpu", requestCpu,
+		"limitCpu", limitCpu,
+		"allocatedCpu", allocatedCpu,
+		"node", s.node.Name())
 
 	// Update the granted CPU for grant and supply.
-	grant.SetAllocatedCPU(int(limitCpu))
+	grant.SetAllocatedCPU(allocatedCpu)
 	grant.SetAllocatedCPUByRequest(int(requestCpu))
 	grant.SetAllocatedCPUByLimit(int(limitCpu))
 
 	// Update the granted CPU for supply.
-	s.grantedShared += int(limitCpu)
+	// 同时更新 request 和 limit 的记账，用于不同的容量检查场景
+	s.grantedShared += allocatedCpu
 	s.grantedCPUByRequest += int(requestCpu)
 	s.grantedCPUByLimit += int(limitCpu)
 

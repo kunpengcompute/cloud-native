@@ -34,13 +34,17 @@ type PolicyOptions struct {
 	EnableMemoryTopology bool
 	// ResourcePriority controls the resource allocation priority strategy
 	ResourcePriority string
+	// EnableClusterAffinity controls whether cluster-level CPU affinity is enabled
+	// This feature is only effective on 950 model machines
+	EnableClusterAffinity bool
 }
 
 // NewPolicyOptions creates a new PolicyOptions with default values
 func NewPolicyOptions() *PolicyOptions {
 	return &PolicyOptions{
-		EnableMemoryTopology: false,
-		ResourcePriority:     options.ResourcePriorityCPUFirst,
+		EnableMemoryTopology:  options.EnableMemoryTopology,
+		ResourcePriority:      options.ResourcePriorityCPUFirst,
+		EnableClusterAffinity: options.EnableClusterAffinity,
 	}
 }
 

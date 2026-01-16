@@ -94,6 +94,8 @@ func parseFlags() {
 	flag.BoolVar(&options.Version, "version", false, "The version of kunpeng-tap proxy")
 	flag.BoolVar(&options.EnableMemoryTopology, "enable-memory-topology", false,
 		"Enable memory topology awareness. Default false")
+	flag.BoolVar(&options.EnableClusterAffinity, "topology-cluster-affinity", false,
+		"Enable cluster-level CPU affinity for 950 model machines. Default false")
 
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -152,6 +154,7 @@ func createPolicyOptions() *policy.PolicyOptions {
 	policyOpts := policy.NewPolicyOptions()
 	policyOpts.EnableMemoryTopology = options.EnableMemoryTopology
 	policyOpts.ResourcePriority = options.ResourcePriority
+	policyOpts.EnableClusterAffinity = options.EnableClusterAffinity
 
 	return policyOpts
 }

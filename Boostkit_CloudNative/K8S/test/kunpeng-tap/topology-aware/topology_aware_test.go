@@ -18,194 +18,17 @@ package topologyaware
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/policy"
 	topologyaware "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/policy/topology-aware"
 )
 
-// Helper functions for tests
-func stringPtr(s string) *string {
-	return &s
-}
-
-func int64Ptr(i int64) *int64 {
-	return &i
-}
-
-// parseCpuList parses a CPU list string like "0-3,5,7" and returns a slice of CPU IDs
-func parseCpuList(cpuList string) []int {
-	var cpus []int
-	if cpuList == "" {
-		return cpus
-	}
-
-	parts := strings.Split(cpuList, ",")
-	for _, part := range parts {
-		cpus = append(cpus, parseCpuPart(part)...)
-	}
-	return cpus
-}
-
-// parseCpuPart parses a single part of CPU list (either a range like "0-3" or single CPU like "5")
-func parseCpuPart(part string) []int {
-	if strings.Contains(part, "-") {
-		return parseCpuRange(part)
-	}
-	return parseSingleCpu(part)
-}
-
-// parseCpuRange parses a CPU range like "0-3" and returns a slice of CPU IDs
-func parseCpuRange(rangePart string) []int {
-	var cpus []int
-	rangeParts := strings.Split(rangePart, "-")
-	if len(rangeParts) != 2 {
-		return cpus
-	}
-
-	start, err1 := strconv.Atoi(strings.TrimSpace(rangeParts[0]))
-	end, err2 := strconv.Atoi(strings.TrimSpace(rangeParts[1]))
-	if err1 != nil || err2 != nil {
-		return cpus
-	}
-
-	for i := start; i <= end; i++ {
-		cpus = append(cpus, i)
-	}
-	return cpus
-}
-
-// parseSingleCpu parses a single CPU ID like "5" and returns a slice with that CPU ID
-func parseSingleCpu(cpuPart string) []int {
-	var cpus []int
-	cpu, err := strconv.Atoi(strings.TrimSpace(cpuPart))
-	if err == nil {
-		cpus = append(cpus, cpu)
-	}
-	return cpus
-}
-
-// createBasicContainerContext creates a basic ContainerContext for testing
-func createBasicContainerContext(containerName, podUID, podName, namespace string) *policy.ContainerContext {
-	// Create basic resource requirements with minimal CPU and memory
-	cpuQuantity := resource.NewMilliQuantity(1000, resource.DecimalSI)       // 1 CPU
-	memoryQuantity := resource.NewQuantity(100*1024*1024, resource.BinarySI) // 100MB
-
-	return &policy.ContainerContext{
-		Request: policy.ContainerRequest{
-			ContainerMeta: policy.ContainerMeta{
-				Name: containerName,
-				ID:   "containerd://" + containerName + "-id-123",
-			},
-			PodMeta: policy.PodMeta{
-				UID:       podUID,
-				Name:      podName,
-				Namespace: namespace,
-			},
-			Resources: &policy.Resources{
-				EstimatedRequirements: &corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    *cpuQuantity,
-						corev1.ResourceMemory: *memoryQuantity,
-					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    *cpuQuantity,
-						corev1.ResourceMemory: *memoryQuantity,
-					},
-				},
-			},
-		},
-	}
-}
-
-// createContainerContextWithResources creates a ContainerContext with resource specifications
-func createContainerContextWithResources(containerName, podUID, podName, namespace string, cpuQuota, cpuPeriod, cpuShares int64) *policy.ContainerContext {
-	ctx := createBasicContainerContext(containerName, podUID, podName, namespace)
-
-	// Calculate CPU requests and limits based on quota and period
-	cpuCores := float64(cpuQuota) / float64(cpuPeriod)
-	cpuQuantity := resource.NewMilliQuantity(int64(cpuCores*1000), resource.DecimalSI)
-
-	ctx.Request.Resources = &policy.Resources{
-		CpuQuota:  int64Ptr(cpuQuota),
-		CpuPeriod: int64Ptr(cpuPeriod),
-		CpuShares: int64Ptr(cpuShares),
-		EstimatedRequirements: &corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU: *cpuQuantity,
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU: *cpuQuantity,
-			},
-		},
-	}
-	return ctx
-}
-
-// createContainerContextWithID creates a ContainerContext with specific container ID
-func createContainerContextWithID(containerID, containerName, podUID string) *policy.ContainerContext {
-	return &policy.ContainerContext{
-		Request: policy.ContainerRequest{
-			ContainerMeta: policy.ContainerMeta{
-				ID:   containerID,
-				Name: containerName,
-			},
-			PodMeta: policy.PodMeta{
-				UID: podUID,
-			},
-			Resources: &policy.Resources{
-				EstimatedRequirements: &corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{},
-					Limits:   corev1.ResourceList{},
-				},
-			},
-		},
-	}
-}
-
-// createContainerContextWithCPURequests creates a ContainerContext with specific CPU requests and limits
-func createContainerContextWithCPURequests(containerName, podUID, podName, namespace string, requestsCPU, limitsCPU int64) *policy.ContainerContext {
-	requestsQuantity := resource.NewQuantity(requestsCPU, resource.DecimalSI)
-	limitsQuantity := resource.NewQuantity(limitsCPU, resource.DecimalSI)
-
-	return &policy.ContainerContext{
-		Request: policy.ContainerRequest{
-			ContainerMeta: policy.ContainerMeta{
-				Name: containerName,
-				ID:   "containerd://" + containerName + "-id-123",
-			},
-			PodMeta: policy.PodMeta{
-				UID:       podUID,
-				Name:      podName,
-				Namespace: namespace,
-			},
-			Resources: &policy.Resources{
-				EstimatedRequirements: &corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU: *requestsQuantity,
-					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU: *limitsQuantity,
-					},
-				},
-			},
-		},
-	}
-}
-
-// isValidNUMARange checks if the CPU set belongs to one of the expected NUMA ranges
-func isValidNUMARange(cpuSet string) bool {
-	// Support both single-socket (small) and multi-socket (large) topologies
+// isValidNUMANoSMTRange checks if the CPU set belongs to NUMA ranges for SMT disabled topology
+// 96 CPUs total, 4 NUMA nodes, 24 CPUs per NUMA
+func isValidNUMANoSMTRange(cpuSet string) bool {
 	expectedRanges := []string{
-		// Single-socket topology (8 CPUs)
-		"0-7", // Single NUMA node
-
-		// Multi-socket topology (96 CPUs)
 		"0-23",  // NUMA 0
 		"24-47", // NUMA 1
 		"48-71", // NUMA 2
@@ -220,8 +43,87 @@ func isValidNUMARange(cpuSet string) bool {
 	return false
 }
 
-// isValidSocketRange checks if the CPU set belongs to one of the expected Socket ranges
-func isValidSocketRange(cpuSet string) bool {
+// isValidNUMASMTRange checks if the CPU set belongs to NUMA ranges for SMT enabled topology
+// 192 CPUs total, 4 NUMA nodes, 48 CPUs per NUMA
+func isValidNUMASMTRange(cpuSet string) bool {
+	expectedRanges := []string{
+		"0-47",    // NUMA 0
+		"48-95",   // NUMA 1
+		"96-143",  // NUMA 2
+		"144-191", // NUMA 3
+	}
+
+	for _, expectedRange := range expectedRanges {
+		if cpuSet == expectedRange {
+			return true
+		}
+	}
+	return false
+}
+
+// isValidClusterNoSMTRange checks if the CPU set belongs to cluster ranges for SMT disabled topology
+// 96 CPUs total, 12 clusters, 8 CPUs per cluster
+func isValidClusterNoSMTRange(cpuSet string) bool {
+	expectedRanges := []string{
+		// NUMA 0 clusters (0-23)
+		"0-7",   // Cluster 0
+		"8-15",  // Cluster 1
+		"16-23", // Cluster 2
+		// NUMA 1 clusters (24-47)
+		"24-31", // Cluster 3
+		"32-39", // Cluster 4
+		"40-47", // Cluster 5
+		// NUMA 2 clusters (48-71)
+		"48-55", // Cluster 6
+		"56-63", // Cluster 7
+		"64-71", // Cluster 8
+		// NUMA 3 clusters (72-95)
+		"72-79", // Cluster 9
+		"80-87", // Cluster 10
+		"88-95", // Cluster 11
+	}
+
+	for _, expectedRange := range expectedRanges {
+		if cpuSet == expectedRange {
+			return true
+		}
+	}
+	return false
+}
+
+// isValidClusterSMTRange checks if the CPU set belongs to cluster ranges for SMT enabled topology
+// 192 CPUs total, 12 clusters, 16 CPUs per cluster
+func isValidClusterSMTRange(cpuSet string) bool {
+	expectedRanges := []string{
+		// NUMA 0 clusters (0-47)
+		"0-15",  // Cluster 0
+		"16-31", // Cluster 1
+		"32-47", // Cluster 2
+		// NUMA 1 clusters (48-95)
+		"48-63", // Cluster 3
+		"64-79", // Cluster 4
+		"80-95", // Cluster 5
+		// NUMA 2 clusters (96-143)
+		"96-111",  // Cluster 6
+		"112-127", // Cluster 7
+		"128-143", // Cluster 8
+		// NUMA 3 clusters (144-191)
+		"144-159", // Cluster 9
+		"160-175", // Cluster 10
+		"176-191", // Cluster 11
+	}
+
+	for _, expectedRange := range expectedRanges {
+		if cpuSet == expectedRange {
+			return true
+		}
+	}
+	return false
+}
+
+// isValidSocketNoSMTRange checks if the CPU set belongs to Socket ranges for SMT disabled topology
+// 96 CPUs total, 2 sockets, 48 CPUs per socket
+func isValidSocketNoSMTRange(cpuSet string) bool {
 	expectedRanges := []string{
 		"0-47",  // Socket 0 (NUMA 0 + NUMA 1)
 		"48-95", // Socket 1 (NUMA 2 + NUMA 3)
@@ -235,51 +137,55 @@ func isValidSocketRange(cpuSet string) bool {
 	return false
 }
 
-// isValidSystemRange checks if the CPU set covers the entire system
-func isValidSystemRange(cpuSet string) bool {
-	return cpuSet == "0-95" // Entire system range
-}
-
-// createContainerContextWithMemory creates a ContainerContext with CPU and memory specifications
-func createContainerContextWithMemory(containerName, podUID, podName, namespace string, requestsCPU, limitsCPU int64, memoryMB int64) *policy.ContainerContext {
-	requestsCPUQuantity := resource.NewQuantity(requestsCPU, resource.DecimalSI)
-	limitsCPUQuantity := resource.NewQuantity(limitsCPU, resource.DecimalSI)
-	memoryQuantity := resource.NewQuantity(memoryMB*1024*1024, resource.BinarySI) // Convert MB to bytes
-
-	return &policy.ContainerContext{
-		Request: policy.ContainerRequest{
-			ContainerMeta: policy.ContainerMeta{
-				Name: containerName,
-				ID:   "containerd://" + containerName + "-id-123",
-			},
-			PodMeta: policy.PodMeta{
-				UID:       podUID,
-				Name:      podName,
-				Namespace: namespace,
-			},
-			Resources: &policy.Resources{
-				EstimatedRequirements: &corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    *requestsCPUQuantity,
-						corev1.ResourceMemory: *memoryQuantity,
-					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    *limitsCPUQuantity,
-						corev1.ResourceMemory: *memoryQuantity,
-					},
-				},
-			},
-		},
+// isValidSocketSMTRange checks if the CPU set belongs to Socket ranges for SMT enabled topology
+// 192 CPUs total, 2 sockets, 96 CPUs per socket
+func isValidSocketSMTRange(cpuSet string) bool {
+	expectedRanges := []string{
+		"0-95",   // Socket 0 (NUMA 0 + NUMA 1)
+		"96-191", // Socket 1 (NUMA 2 + NUMA 3)
 	}
+
+	for _, expectedRange := range expectedRanges {
+		if cpuSet == expectedRange {
+			return true
+		}
+	}
+	return false
 }
 
-// getAllocationType determines the allocation type based on CPU set
-func getAllocationType(cpuSet string) string {
-	if isValidNUMARange(cpuSet) {
+// isValidSystemNoSMTRange checks if the CPU set covers the entire system for SMT disabled topology
+func isValidSystemNoSMTRange(cpuSet string) bool {
+	return cpuSet == "0-95" // 96 CPUs
+}
+
+// isValidSystemSMTRange checks if the CPU set covers the entire system for SMT enabled topology
+func isValidSystemSMTRange(cpuSet string) bool {
+	return cpuSet == "0-191" // 192 CPUs
+}
+
+// getAllocationTypeNoSMT determines the allocation type based on CPU set for SMT disabled topology (96 CPUs)
+func getAllocationTypeNoSMT(cpuSet string) string {
+	if isValidClusterNoSMTRange(cpuSet) {
+		return "Cluster"
+	} else if isValidNUMANoSMTRange(cpuSet) {
 		return "NUMA"
-	} else if isValidSocketRange(cpuSet) {
+	} else if isValidSocketNoSMTRange(cpuSet) {
 		return "Socket"
-	} else if isValidSystemRange(cpuSet) {
+	} else if isValidSystemNoSMTRange(cpuSet) {
+		return "System"
+	}
+	return "Unknown"
+}
+
+// getAllocationTypeSMT determines the allocation type based on CPU set for SMT enabled topology (192 CPUs)
+func getAllocationTypeSMT(cpuSet string) string {
+	if isValidClusterSMTRange(cpuSet) {
+		return "Cluster"
+	} else if isValidNUMASMTRange(cpuSet) {
+		return "NUMA"
+	} else if isValidSocketSMTRange(cpuSet) {
+		return "Socket"
+	} else if isValidSystemSMTRange(cpuSet) {
 		return "System"
 	}
 	return "Unknown"
@@ -642,7 +548,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 
 					// Verify that the allocated CPUs belong to one of the expected NUMA ranges
 					cpuSet := allocation.Resources.CpusetCpus
-					gomega.Expect(isValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+					gomega.Expect(isValidLargeNUMARange(cpuSet)).To(gomega.BeTrue(),
 						"CPU set %s should match one of the NUMA ranges: 0-23, 24-47, 48-71, 72-95", cpuSet)
 
 					// Log the allocation for debugging
@@ -687,13 +593,13 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 					allocation1, err1 := topologyPolicy.PreCreateContainerHook(containerCtx1)
 					gomega.Expect(err1).To(gomega.BeNil())
 					gomega.Expect(allocation1).NotTo(gomega.BeNil())
-					gomega.Expect(isValidNUMARange(allocation1.Resources.CpusetCpus)).To(gomega.BeTrue())
+					gomega.Expect(isValidLargeNUMARange(allocation1.Resources.CpusetCpus)).To(gomega.BeTrue())
 
 					// Allocate second container
 					allocation2, err2 := topologyPolicy.PreCreateContainerHook(containerCtx2)
 					gomega.Expect(err2).To(gomega.BeNil())
 					gomega.Expect(allocation2).NotTo(gomega.BeNil())
-					gomega.Expect(isValidNUMARange(allocation2.Resources.CpusetCpus)).To(gomega.BeTrue())
+					gomega.Expect(isValidLargeNUMARange(allocation2.Resources.CpusetCpus)).To(gomega.BeTrue())
 
 					// Log allocations for debugging
 					ginkgo.GinkgoWriter.Printf("Container 1 CPU set: %s\n", allocation1.Resources.CpusetCpus)
@@ -726,7 +632,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						gomega.Expect(err).To(gomega.BeNil(), "Failed for test case: %s", tc.name)
 						gomega.Expect(allocation).NotTo(gomega.BeNil(), "Allocation is nil for test case: %s", tc.name)
 						gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty(), "CPU set is empty for test case: %s", tc.name)
-						gomega.Expect(isValidNUMARange(allocation.Resources.CpusetCpus)).To(gomega.BeTrue(),
+						gomega.Expect(isValidLargeNUMARange(allocation.Resources.CpusetCpus)).To(gomega.BeTrue(),
 							"CPU set %s should match NUMA range for test case: %s", allocation.Resources.CpusetCpus, tc.name)
 
 						ginkgo.GinkgoWriter.Printf("Test case '%s' (req=%d, lim=%d): CPU set = %s\n",
@@ -756,7 +662,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(allocation).NotTo(gomega.BeNil())
 					gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
-					gomega.Expect(isValidNUMARange(allocation.Resources.CpusetCpus)).To(gomega.BeTrue())
+					gomega.Expect(isValidLargeNUMARange(allocation.Resources.CpusetCpus)).To(gomega.BeTrue())
 
 					// Since cache is empty, should likely get NUMA 0 (0-23)
 					ginkgo.GinkgoWriter.Printf("First allocation with empty cache: %s\n", allocation.Resources.CpusetCpus)
@@ -787,9 +693,9 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
 						cpuSet := allocation.Resources.CpusetCpus
-						allocationType := getAllocationType(cpuSet)
+						allocationType := getLargeAllocationType(cpuSet)
 
-						gomega.Expect(isValidSocketRange(cpuSet)).To(gomega.BeTrue(),
+						gomega.Expect(isValidLargeSocketRange(cpuSet)).To(gomega.BeTrue(),
 							"CPU set %s should match Socket range (0-47 or 48-95)", cpuSet)
 
 						ginkgo.GinkgoWriter.Printf("✅ Case 1 - Medium Container (25/48): CPU set = %s, Type = %s\n",
@@ -815,9 +721,9 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
 						cpuSet := allocation.Resources.CpusetCpus
-						allocationType := getAllocationType(cpuSet)
+						allocationType := getLargeAllocationType(cpuSet)
 
-						gomega.Expect(isValidSystemRange(cpuSet)).To(gomega.BeTrue(),
+						gomega.Expect(isValidLargeSystemRange(cpuSet)).To(gomega.BeTrue(),
 							"CPU set %s should match System range (0-95)", cpuSet)
 
 						ginkgo.GinkgoWriter.Printf("✅ Case 2 - Large Container (49/50): CPU set = %s, Type = %s\n",
@@ -854,7 +760,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						// Verify that all 4 containers are allocated to different NUMA nodes
 						uniqueNUMAs := make(map[string]bool)
 						for i, cpuSet := range cpuSets {
-							gomega.Expect(isValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeNUMARange(cpuSet)).To(gomega.BeTrue(),
 								"Container %d CPU set %s should be in NUMA range", i+1, cpuSet)
 							uniqueNUMAs[cpuSet] = true
 							ginkgo.GinkgoWriter.Printf("Pre-container-%d: CPU set = %s (NUMA)\n", i+1, cpuSet)
@@ -878,7 +784,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						gomega.Expect(smallAllocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
 						smallCpuSet := smallAllocation.Resources.CpusetCpus
-						gomega.Expect(isValidNUMARange(smallCpuSet)).To(gomega.BeTrue(),
+						gomega.Expect(isValidLargeNUMARange(smallCpuSet)).To(gomega.BeTrue(),
 							"Small container CPU set %s should be in single NUMA range", smallCpuSet)
 
 						ginkgo.GinkgoWriter.Printf("✅ Case 3 - Small Container (4/8): CPU set = %s (NUMA)\n", smallCpuSet)
@@ -914,7 +820,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						// Verify that all 4 containers are allocated to different NUMA nodes
 						uniqueNUMAs := make(map[string]bool)
 						for i, cpuSet := range cpuSets {
-							gomega.Expect(isValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeNUMARange(cpuSet)).To(gomega.BeTrue(),
 								"Container %d CPU set %s should be in NUMA range", i+1, cpuSet)
 							uniqueNUMAs[cpuSet] = true
 							ginkgo.GinkgoWriter.Printf("Pre-container-%d: CPU set = %s (NUMA)\n", i+1, cpuSet)
@@ -938,7 +844,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						gomega.Expect(mediumAllocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
 						mediumCpuSet := mediumAllocation.Resources.CpusetCpus
-						gomega.Expect(isValidSocketRange(mediumCpuSet)).To(gomega.BeTrue(),
+						gomega.Expect(isValidLargeSocketRange(mediumCpuSet)).To(gomega.BeTrue(),
 							"Medium container CPU set %s should be in single Socket range", mediumCpuSet)
 
 						ginkgo.GinkgoWriter.Printf("✅ Case 4 - Medium Container (17/19): CPU set = %s (Socket)\n", mediumCpuSet)
@@ -974,7 +880,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						// Verify that all 4 containers are allocated to different NUMA nodes
 						uniqueNUMAs := make(map[string]bool)
 						for i, cpuSet := range cpuSets {
-							gomega.Expect(isValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeNUMARange(cpuSet)).To(gomega.BeTrue(),
 								"Container %d CPU set %s should be in NUMA range", i+1, cpuSet)
 							uniqueNUMAs[cpuSet] = true
 							ginkgo.GinkgoWriter.Printf("Pre-container-%d: CPU set = %s (NUMA)\n", i+1, cpuSet)
@@ -999,7 +905,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						gomega.Expect(boundaryAllocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
 						boundaryCpuSet := boundaryAllocation.Resources.CpusetCpus
-						gomega.Expect(isValidNUMARange(boundaryCpuSet)).To(gomega.BeTrue(),
+						gomega.Expect(isValidLargeNUMARange(boundaryCpuSet)).To(gomega.BeTrue(),
 							"Boundary medium container CPU set %s should be in single NUMA range", boundaryCpuSet)
 
 						ginkgo.GinkgoWriter.Printf("✅ Case 5 - Boundary Medium Container (12/19): CPU set = %s (NUMA)\n", boundaryCpuSet)
@@ -1035,7 +941,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						// Verify that all 4 containers are allocated to different NUMA nodes
 						uniqueNUMAs := make(map[string]bool)
 						for i, cpuSet := range cpuSets {
-							gomega.Expect(isValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeNUMARange(cpuSet)).To(gomega.BeTrue(),
 								"Container %d CPU set %s should be in NUMA range", i+1, cpuSet)
 							uniqueNUMAs[cpuSet] = true
 							ginkgo.GinkgoWriter.Printf("Pre-container-%d: CPU set = %s (NUMA)\n", i+1, cpuSet)
@@ -1068,7 +974,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 							gomega.Expect(largeSystemAllocation).NotTo(gomega.BeNil())
 							gomega.Expect(largeSystemAllocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 							largeSystemCpuSet := largeSystemAllocation.Resources.CpusetCpus
-							gomega.Expect(isValidSystemRange(largeSystemCpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeSystemRange(largeSystemCpuSet)).To(gomega.BeTrue(),
 								"Large system container CPU set %s should cover entire system range", largeSystemCpuSet)
 							ginkgo.GinkgoWriter.Printf("✅ Case 6 - Large System Container (50/59): CPU set = %s (System)\n", largeSystemCpuSet)
 						}
@@ -1088,7 +994,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 							{"Medium NUMA (20/20)", 20, 20, "NUMA", false},
 							{"Large NUMA (23/23)", 23, 23, "NUMA", false},
 							{"Boundary NUMA-Socket (24/25)", 24, 25, "Socket", true}, // May fail due to resource constraints
-							{"Medium Socket (30/35)", 30, 35, "Socket", false},
+							{"Medium Socket (30/35)", 30, 35, "Socket", true},
 							{"Large Socket (40/45)", 40, 45, "Socket", true},           // May fail due to resource constraints
 							{"Boundary Socket-System (48/49)", 48, 49, "System", true}, // May fail due to resource constraints
 							{"Large System (80/90)", 80, 90, "System", true},           // Likely to fail due to resource constraints
@@ -1120,7 +1026,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 								gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty(), "CPU set is empty for edge case: %s", tc.name)
 
 								cpuSet := allocation.Resources.CpusetCpus
-								allocationType := getAllocationType(cpuSet)
+								allocationType := getLargeAllocationType(cpuSet)
 
 								ginkgo.GinkgoWriter.Printf("Edge case '%s' (req=%d, lim=%d): CPU set = %s, Type = %s\n",
 									tc.name, tc.requestsCPU, tc.limitsCPU, cpuSet, allocationType)
@@ -1147,7 +1053,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 							gomega.Expect(largeSystemAllocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
 							largeSystemCpuSet := largeSystemAllocation.Resources.CpusetCpus
-							gomega.Expect(isValidSystemRange(largeSystemCpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeSystemRange(largeSystemCpuSet)).To(gomega.BeTrue(),
 								"Large system container CPU set %s should cover entire system range", largeSystemCpuSet)
 
 							ginkgo.GinkgoWriter.Printf("✅ Clean Large System Container (50/59): CPU set = %s (System)\n", largeSystemCpuSet)
@@ -1205,7 +1111,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 
 					// Verify each container is allocated to NUMA level
 					cpuSet := allocation.Resources.CpusetCpus
-					gomega.Expect(isValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+					gomega.Expect(isValidLargeNUMARange(cpuSet)).To(gomega.BeTrue(),
 						"Small container %d CPU set %s should be in NUMA range", i, cpuSet)
 
 					allocations = append(allocations, allocation)
@@ -1256,7 +1162,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 
 				// Verify the new container gets NUMA-level allocation
 				newCpuSet := newAllocation.Resources.CpusetCpus
-				gomega.Expect(isValidNUMARange(newCpuSet)).To(gomega.BeTrue(),
+				gomega.Expect(isValidLargeNUMARange(newCpuSet)).To(gomega.BeTrue(),
 					"New small container CPU set %s should be in NUMA range", newCpuSet)
 
 				ginkgo.GinkgoWriter.Printf("  New container: CPU set = %s (NUMA)\n", newCpuSet)
@@ -1319,13 +1225,13 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						// Verify allocation type matches expectation
 						switch test.expectedType {
 						case "NUMA":
-							gomega.Expect(isValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeNUMARange(cpuSet)).To(gomega.BeTrue(),
 								"Container %s CPU set %s should be in NUMA range", test.name, cpuSet)
 						case "Socket":
-							gomega.Expect(isValidSocketRange(cpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeSocketRange(cpuSet)).To(gomega.BeTrue(),
 								"Container %s CPU set %s should be in Socket range", test.name, cpuSet)
 						case "System":
-							gomega.Expect(isValidSystemRange(cpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeSystemRange(cpuSet)).To(gomega.BeTrue(),
 								"Container %s CPU set %s should be in System range", test.name, cpuSet)
 						default:
 							gomega.Expect(true).To(gomega.BeFalse(), "Unknown expected allocation type: %s", test.expectedType)
@@ -1392,7 +1298,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 					gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
 					cpuSet := allocation.Resources.CpusetCpus
-					gomega.Expect(isValidSocketRange(cpuSet)).To(gomega.BeTrue(),
+					gomega.Expect(isValidLargeSocketRange(cpuSet)).To(gomega.BeTrue(),
 						"Medium container %d CPU set %s should be in Socket range", i, cpuSet)
 
 					mediumContainers = append(mediumContainers, containerCtx)
@@ -1422,7 +1328,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 					// If it succeeds, verify it's system-wide
 					gomega.Expect(largeAllocation).NotTo(gomega.BeNil())
 					cpuSet := largeAllocation.Resources.CpusetCpus
-					gomega.Expect(isValidSystemRange(cpuSet)).To(gomega.BeTrue(),
+					gomega.Expect(isValidLargeSystemRange(cpuSet)).To(gomega.BeTrue(),
 						"Large container CPU set %s should be in System range", cpuSet)
 					ginkgo.GinkgoWriter.Printf("  Large container: CPU set = %s (System)\n", cpuSet)
 				}
@@ -1458,7 +1364,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 					gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
 					cpuSet := allocation.Resources.CpusetCpus
-					gomega.Expect(isValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+					gomega.Expect(isValidLargeNUMARange(cpuSet)).To(gomega.BeTrue(),
 						"Small recovery container %d CPU set %s should be in NUMA range", i, cpuSet)
 
 					ginkgo.GinkgoWriter.Printf("  Small recovery container %d: CPU set = %s (NUMA)\n", i, cpuSet)
@@ -1525,7 +1431,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
 						cpuSet := allocation.Resources.CpusetCpus
-						allocationType := getAllocationType(cpuSet)
+						allocationType := getLargeAllocationType(cpuSet)
 
 						activeContainers[op.name] = containerCtx
 						activeAllocations[op.name] = allocation
@@ -1612,13 +1518,13 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 						cpuSet := allocation.Resources.CpusetCpus
 						switch test.expectType {
 						case "NUMA":
-							gomega.Expect(isValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeNUMARange(cpuSet)).To(gomega.BeTrue(),
 								"Boundary test %s CPU set %s should be in NUMA range", test.name, cpuSet)
 						case "Socket":
-							gomega.Expect(isValidSocketRange(cpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeSocketRange(cpuSet)).To(gomega.BeTrue(),
 								"Boundary test %s CPU set %s should be in Socket range", test.name, cpuSet)
 						case "System":
-							gomega.Expect(isValidSystemRange(cpuSet)).To(gomega.BeTrue(),
+							gomega.Expect(isValidLargeSystemRange(cpuSet)).To(gomega.BeTrue(),
 								"Boundary test %s CPU set %s should be in System range", test.name, cpuSet)
 						default:
 							gomega.Expect(true).To(gomega.BeFalse(), "Unknown expected allocation type: %s", test.expectType)
@@ -1714,7 +1620,7 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 				gomega.Expect(retryAllocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
 				retryCpuSet := retryAllocation.Resources.CpusetCpus
-				gomega.Expect(isValidNUMARange(retryCpuSet)).To(gomega.BeTrue(),
+				gomega.Expect(isValidLargeNUMARange(retryCpuSet)).To(gomega.BeTrue(),
 					"Retry small container CPU set %s should be in NUMA range", retryCpuSet)
 				ginkgo.GinkgoWriter.Printf("  ✅ Small container retry succeeded: CPU set = %s (NUMA)\n", retryCpuSet)
 
@@ -1823,6 +1729,521 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 				)
 				_, err = topologyPolicy.PostStopContainerHook(releaseCtx)
 				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
+	})
+
+	// Cluster Affinity Tests
+	// These tests verify cluster-level allocation behavior on 950 model machines
+	// Note: In test environment without real 950 hardware, cluster affinity will be disabled
+	// and allocation will fall back to NUMA level, which is the expected behavior
+	ginkgo.Describe("Cluster Affinity Feature Tests", func() {
+		var (
+			topologyPolicy *topologyaware.TopologyAwarePolicy
+			validator      *TopologyValidator // Dynamic validator based on topology config
+		)
+
+		ginkgo.Context("with cluster affinity enabled on 950 topology (SMT disabled, 16 CPUs per cluster)", func() {
+			ginkgo.BeforeEach(func() {
+				// Setup 950 topology without SMT using unified SetupTopology method
+				// This returns a TopologyValidator for dynamic range validation
+				validator = mockSystem.SetupTopology(Config950NoSMT)
+				mockCache.ClearContainers()
+
+				// Enable cluster affinity in options
+				opts.EnableClusterAffinity = true
+				opts.EnableMemoryTopology = false
+
+				policy := topologyaware.NewTopologyAwarePolicyWithSystem(mockCache, opts, mockSystem)
+				gomega.Expect(policy).NotTo(gomega.BeNil())
+
+				var ok bool
+				topologyPolicy, ok = policy.(*topologyaware.TopologyAwarePolicy)
+				gomega.Expect(ok).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("should handle small container requests (4 CPUs) - cluster size boundary", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Cluster Affinity Test: Small Container (4 CPUs) ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"small-cluster-container",
+					"small-cluster-pod-uid",
+					"small-cluster-pod",
+					"default",
+					4,   // requests.CPU = 4 (half of cluster size 16)
+					4,   // limits.CPU = 4
+					200, // memory = 200MB
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+				gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
+
+				cpuSet := allocation.Resources.CpusetCpus
+				// Should allocate within cluster range (SMT disabled, 16 CPUs per cluster)
+				gomega.Expect(validator.IsValidClusterRange(cpuSet)).To(gomega.BeTrue(),
+					"Small container (4 CPUs) should be allocated within cluster range: %s", cpuSet)
+
+				ginkgo.GinkgoWriter.Printf("✅ Small container (4 CPUs) allocated to cluster: %s\n", cpuSet)
+			})
+
+			ginkgo.It("should handle cluster boundary requests (8 CPUs) - exact cluster size", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Cluster Affinity Test: Cluster Boundary (8 CPUs) ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"cluster-boundary-container",
+					"cluster-boundary-pod-uid",
+					"cluster-boundary-pod",
+					"default",
+					8,   // requests.CPU = 8 (half of cluster size 16)
+					8,   // limits.CPU = 8
+					200, // memory = 200MB
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+				gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
+
+				cpuSet := allocation.Resources.CpusetCpus
+				// Should allocate within cluster range
+				gomega.Expect(validator.IsValidClusterRange(cpuSet)).To(gomega.BeTrue(),
+					"Cluster boundary container (8 CPUs) should be allocated within cluster range: %s", cpuSet)
+
+				ginkgo.GinkgoWriter.Printf("✅ Cluster boundary container (8 CPUs) allocated to cluster: %s\n", cpuSet)
+			})
+
+			ginkgo.It("should fall back to NUMA for requests above cluster size (20 CPUs)", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Cluster Affinity Test: Above Cluster Size (20 CPUs) ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"above-cluster-container",
+					"above-cluster-pod-uid",
+					"above-cluster-pod",
+					"default",
+					20,  // requests.CPU = 20 (> 16 cluster size)
+					20,  // limits.CPU = 20
+					200, // memory = 200MB
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+				gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
+
+				cpuSet := allocation.Resources.CpusetCpus
+				// Should allocate within NUMA range (fallback from cluster)
+				gomega.Expect(validator.IsValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+					"Above cluster size container (20 CPUs) should fall back to NUMA allocation: %s", cpuSet)
+
+				ginkgo.GinkgoWriter.Printf("✅ Above cluster size container (20 CPUs) allocated to NUMA: %s\n", cpuSet)
+			})
+
+			ginkgo.It("should handle mixed workload with different sizes", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Cluster Affinity Test: Mixed Workload ===\n")
+
+				// Allocate small container (8 CPUs) - should use cluster affinity
+				smallCtx := createContainerContextWithMemory(
+					"mixed-small",
+					"mixed-small-pod-uid",
+					"mixed-small-pod",
+					"default",
+					8, 8, 200,
+				)
+
+				smallAlloc, err := topologyPolicy.PreCreateContainerHook(smallCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(smallAlloc).NotTo(gomega.BeNil())
+
+				// Allocate medium container (24 CPUs) - should fall back to NUMA (> 16 cluster size)
+				mediumCtx := createContainerContextWithMemory(
+					"mixed-medium",
+					"mixed-medium-pod-uid",
+					"mixed-medium-pod",
+					"default",
+					24, 24, 200,
+				)
+
+				mediumAlloc, err := topologyPolicy.PreCreateContainerHook(mediumCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(mediumAlloc).NotTo(gomega.BeNil())
+
+				// Small should be in cluster range, medium should be in NUMA range
+				gomega.Expect(validator.IsValidClusterRange(smallAlloc.Resources.CpusetCpus)).To(gomega.BeTrue(),
+					"Small container should be in cluster range")
+				gomega.Expect(validator.IsValidNUMARange(mediumAlloc.Resources.CpusetCpus)).To(gomega.BeTrue(),
+					"Medium container should be in NUMA range")
+
+				ginkgo.GinkgoWriter.Printf("✅ Mixed workload - Small (8 CPUs): %s (Cluster), Medium (24 CPUs): %s (NUMA)\n",
+					smallAlloc.Resources.CpusetCpus, mediumAlloc.Resources.CpusetCpus)
+			})
+		})
+
+		ginkgo.Context("with cluster affinity enabled on 950 topology with SMT", func() {
+			ginkgo.BeforeEach(func() {
+				// Setup 950 topology with SMT using unified SetupTopology method
+				validator = mockSystem.SetupTopology(Config950SMT)
+				mockCache.ClearContainers()
+
+				opts.EnableClusterAffinity = true
+				opts.EnableMemoryTopology = false
+
+				policy := topologyaware.NewTopologyAwarePolicyWithSystem(mockCache, opts, mockSystem)
+				gomega.Expect(policy).NotTo(gomega.BeNil())
+
+				var ok bool
+				topologyPolicy, ok = policy.(*topologyaware.TopologyAwarePolicy)
+				gomega.Expect(ok).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("should handle small container requests (16 CPUs) - half cluster size", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== 950 SMT Test: Small Container (16 CPUs) ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"smt-small-container",
+					"smt-small-pod-uid",
+					"smt-small-pod",
+					"default",
+					16, 16, 200,
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+
+				cpuSet := allocation.Resources.CpusetCpus
+				// Should allocate within cluster range (SMT enabled, 32 CPUs per cluster)
+				gomega.Expect(validator.IsValidClusterRange(cpuSet)).To(gomega.BeTrue(),
+					"SMT small container (16 CPUs) should be allocated within cluster range: %s", cpuSet)
+
+				ginkgo.GinkgoWriter.Printf("✅ SMT small container (16 CPUs) allocated to cluster: %s\n", cpuSet)
+			})
+
+			ginkgo.It("should handle cluster boundary requests (32 CPUs) - exact cluster size", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== 950 SMT Test: Cluster Boundary (32 CPUs) ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"smt-boundary-container",
+					"smt-boundary-pod-uid",
+					"smt-boundary-pod",
+					"default",
+					32, 32, 200,
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+
+				cpuSet := allocation.Resources.CpusetCpus
+				// Should allocate within cluster range (exact cluster size)
+				gomega.Expect(validator.IsValidClusterRange(cpuSet)).To(gomega.BeTrue(),
+					"SMT cluster boundary (32 CPUs) should be allocated within cluster range: %s", cpuSet)
+
+				ginkgo.GinkgoWriter.Printf("✅ SMT cluster boundary (32 CPUs) allocated to cluster: %s\n", cpuSet)
+			})
+
+			ginkgo.It("should fall back to NUMA for requests above cluster size (40 CPUs)", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== 950 SMT Test: Above Cluster Size (40 CPUs) ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"smt-above-cluster",
+					"smt-above-pod-uid",
+					"smt-above-pod",
+					"default",
+					40, 40, 200,
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+
+				cpuSet := allocation.Resources.CpusetCpus
+				// Should allocate within NUMA range (fallback from cluster)
+				gomega.Expect(validator.IsValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+					"SMT above cluster size (40 CPUs) should fall back to NUMA allocation: %s", cpuSet)
+
+				ginkgo.GinkgoWriter.Printf("✅ SMT above cluster size (40 CPUs) allocated to NUMA: %s\n", cpuSet)
+			})
+
+			ginkgo.It("should handle full NUMA request (96 CPUs)", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== 950 SMT Test: Full NUMA (96 CPUs) ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"smt-full-numa",
+					"smt-full-numa-pod-uid",
+					"smt-full-numa-pod",
+					"default",
+					96, 96, 200,
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+
+				cpuSet := allocation.Resources.CpusetCpus
+				// Should allocate full NUMA node (96 CPUs)
+				cpuList := parseCpuList(cpuSet)
+				gomega.Expect(len(cpuList)).To(gomega.Equal(96),
+					"Full NUMA request should allocate 96 CPUs")
+				gomega.Expect(validator.IsValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+					"Full NUMA request should be in NUMA range: %s", cpuSet)
+
+				ginkgo.GinkgoWriter.Printf("✅ SMT full NUMA (96 CPUs) allocated to NUMA: %s\n", cpuSet)
+			})
+		})
+
+		ginkgo.Context("Cluster Affinity Boundary Tests (SMT disabled, 16 CPUs per cluster)", func() {
+			ginkgo.BeforeEach(func() {
+				// Setup 950 topology without SMT for boundary tests using unified method
+				validator = mockSystem.SetupTopology(Config950NoSMT)
+				mockCache.ClearContainers()
+
+				opts.EnableClusterAffinity = true
+				opts.EnableMemoryTopology = false
+
+				policy := topologyaware.NewTopologyAwarePolicyWithSystem(mockCache, opts, mockSystem)
+				gomega.Expect(policy).NotTo(gomega.BeNil())
+
+				var ok bool
+				topologyPolicy, ok = policy.(*topologyaware.TopologyAwarePolicy)
+				gomega.Expect(ok).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("should handle single CPU request", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Boundary Test: Single CPU ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"single-cpu-container",
+					"single-cpu-pod-uid",
+					"single-cpu-pod",
+					"default",
+					1, 1, 100,
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+
+				cpuList := parseCpuList(allocation.Resources.CpusetCpus)
+				gomega.Expect(len(cpuList)).To(gomega.BeNumerically(">=", 1))
+
+				ginkgo.GinkgoWriter.Printf("✅ Single CPU request allocated: %s\n",
+					allocation.Resources.CpusetCpus)
+			})
+
+			ginkgo.It("should handle request just above cluster boundary (17 CPUs)", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Boundary Test: Just Above Cluster (17 CPUs) ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"above-boundary-container",
+					"above-boundary-pod-uid",
+					"above-boundary-pod",
+					"default",
+					17, 17, 200,
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+
+				cpuSet := allocation.Resources.CpusetCpus
+				// Should fall back to NUMA allocation
+				gomega.Expect(validator.IsValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+					"Just above cluster boundary (17 CPUs) should fall back to NUMA allocation: %s", cpuSet)
+
+				ginkgo.GinkgoWriter.Printf("✅ Just above cluster boundary (17 CPUs) allocated to NUMA: %s\n", cpuSet)
+			})
+
+			ginkgo.It("should handle request at NUMA boundary (48 CPUs)", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Boundary Test: Full NUMA (48 CPUs) ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"full-numa-container",
+					"full-numa-pod-uid",
+					"full-numa-pod",
+					"default",
+					48, 48, 200,
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+
+				cpuSet := allocation.Resources.CpusetCpus
+				cpuList := parseCpuList(cpuSet)
+				gomega.Expect(len(cpuList)).To(gomega.Equal(48))
+				gomega.Expect(validator.IsValidNUMARange(cpuSet)).To(gomega.BeTrue(),
+					"Full NUMA (48 CPUs) should be in NUMA range: %s", cpuSet)
+
+				ginkgo.GinkgoWriter.Printf("✅ Full NUMA (48 CPUs) allocated to NUMA: %s\n", cpuSet)
+			})
+
+			ginkgo.It("should handle request at Socket boundary (96 CPUs)", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Boundary Test: Full Socket (96 CPUs) ===\n")
+
+				containerCtx := createContainerContextWithMemory(
+					"full-socket-container",
+					"full-socket-pod-uid",
+					"full-socket-pod",
+					"default",
+					96, 96, 200,
+				)
+
+				allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(allocation).NotTo(gomega.BeNil())
+
+				cpuList := parseCpuList(allocation.Resources.CpusetCpus)
+				gomega.Expect(len(cpuList)).To(gomega.Equal(96))
+				gomega.Expect(validator.IsValidSocketRange(allocation.Resources.CpusetCpus)).To(gomega.BeTrue())
+
+				ginkgo.GinkgoWriter.Printf("✅ Full Socket (96 CPUs) allocated: %s\n",
+					allocation.Resources.CpusetCpus)
+			})
+		})
+
+		ginkgo.Context("Cluster Affinity Mixed Deployment Tests (SMT disabled, 16 CPUs per cluster)", func() {
+			ginkgo.BeforeEach(func() {
+				// Setup 950 topology without SMT for mixed deployment tests using unified method
+				validator = mockSystem.SetupTopology(Config950NoSMT)
+				mockCache.ClearContainers()
+
+				opts.EnableClusterAffinity = true
+				opts.EnableMemoryTopology = false
+
+				policy := topologyaware.NewTopologyAwarePolicyWithSystem(mockCache, opts, mockSystem)
+				gomega.Expect(policy).NotTo(gomega.BeNil())
+
+				var ok bool
+				topologyPolicy, ok = policy.(*topologyaware.TopologyAwarePolicy)
+				gomega.Expect(ok).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("should allocate multiple small containers to different clusters within same NUMA", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Mixed Deployment: Multiple Small Containers ===\n")
+
+				// Allocate 3 small containers (8 CPUs each)
+				// Each should ideally go to a different cluster within the same NUMA
+				var allocations []*policy.Allocation
+
+				for i := 1; i <= 3; i++ {
+					containerCtx := createContainerContextWithMemory(
+						fmt.Sprintf("small-cluster-%d", i),
+						fmt.Sprintf("small-cluster-pod-uid-%d", i),
+						fmt.Sprintf("small-cluster-pod-%d", i),
+						"default",
+						8, 8, 100,
+					)
+
+					allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(allocation).NotTo(gomega.BeNil())
+
+					allocations = append(allocations, allocation)
+					ginkgo.GinkgoWriter.Printf("Container %d allocated: %s\n", i, allocation.Resources.CpusetCpus)
+				}
+
+				// All should be in valid cluster ranges (SMT disabled, 16 CPUs per cluster)
+				for i, alloc := range allocations {
+					gomega.Expect(validator.IsValidClusterRange(alloc.Resources.CpusetCpus)).To(gomega.BeTrue(),
+						"Container %d should be in cluster range", i+1)
+				}
+
+				ginkgo.GinkgoWriter.Printf("✅ All 3 small containers allocated successfully\n")
+			})
+
+			ginkgo.It("should handle cluster exhaustion and move to next NUMA", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Mixed Deployment: Cluster Exhaustion ===\n")
+
+				// Allocate containers until we exhaust clusters in first NUMA
+				// Each NUMA has 48 CPUs, divided into 3 clusters of 16 CPUs
+				// Allocate 4 containers of 12 CPUs each (total 48 CPUs)
+				var allocations []*policy.Allocation
+
+				for i := 1; i <= 4; i++ {
+					containerCtx := createContainerContextWithMemory(
+						fmt.Sprintf("exhaust-container-%d", i),
+						fmt.Sprintf("exhaust-pod-uid-%d", i),
+						fmt.Sprintf("exhaust-pod-%d", i),
+						"default",
+						12, 12, 100,
+					)
+
+					allocation, err := topologyPolicy.PreCreateContainerHook(containerCtx)
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(allocation).NotTo(gomega.BeNil())
+
+					allocations = append(allocations, allocation)
+					ginkgo.GinkgoWriter.Printf("Container %d allocated: %s\n", i, allocation.Resources.CpusetCpus)
+				}
+
+				// Verify all allocations are in valid cluster ranges
+				clusterNodes := make(map[string]int)
+				for i, alloc := range allocations {
+					gomega.Expect(validator.IsValidClusterRange(alloc.Resources.CpusetCpus)).To(gomega.BeTrue(),
+						"Container %d should be in cluster range", i+1)
+					clusterNodes[alloc.Resources.CpusetCpus]++
+				}
+
+				ginkgo.GinkgoWriter.Printf("✅ Cluster exhaustion handled, containers distributed across %d clusters\n",
+					len(clusterNodes))
+			})
+
+			ginkgo.It("should handle mixed cluster and NUMA level allocations", func() {
+				ginkgo.GinkgoWriter.Printf("\n=== Mixed Deployment: Cluster + NUMA Levels ===\n")
+
+				// Allocate small container (cluster level)
+				smallCtx := createContainerContextWithMemory(
+					"mixed-small-1",
+					"mixed-small-pod-uid-1",
+					"mixed-small-pod-1",
+					"default",
+					8, 8, 100,
+				)
+
+				smallAlloc, err := topologyPolicy.PreCreateContainerHook(smallCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(smallAlloc).NotTo(gomega.BeNil())
+
+				// Allocate medium container (NUMA level - above cluster size)
+				mediumCtx := createContainerContextWithMemory(
+					"mixed-medium-1",
+					"mixed-medium-pod-uid-1",
+					"mixed-medium-pod-1",
+					"default",
+					20, 20, 200,
+				)
+
+				mediumAlloc, err := topologyPolicy.PreCreateContainerHook(mediumCtx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(mediumAlloc).NotTo(gomega.BeNil())
+
+				// Allocate another small container (cluster level)
+				small2Ctx := createContainerContextWithMemory(
+					"mixed-small-2",
+					"mixed-small-pod-uid-2",
+					"mixed-small-pod-2",
+					"default",
+					10, 10, 100,
+				)
+
+				small2Alloc, err := topologyPolicy.PreCreateContainerHook(small2Ctx)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(small2Alloc).NotTo(gomega.BeNil())
+
+				// Small containers should be in cluster range, medium container in NUMA range
+				gomega.Expect(validator.IsValidClusterRange(smallAlloc.Resources.CpusetCpus)).To(gomega.BeTrue(),
+					"Small-1 container should be in cluster range")
+				gomega.Expect(validator.IsValidNUMARange(mediumAlloc.Resources.CpusetCpus)).To(gomega.BeTrue(),
+					"Medium container should be in NUMA range")
+				gomega.Expect(validator.IsValidClusterRange(small2Alloc.Resources.CpusetCpus)).To(gomega.BeTrue(),
+					"Small-2 container should be in cluster range")
+
+				ginkgo.GinkgoWriter.Printf("✅ Mixed deployment:\n")
+				ginkgo.GinkgoWriter.Printf("   Small-1 (8 CPUs): %s (Cluster)\n", smallAlloc.Resources.CpusetCpus)
+				ginkgo.GinkgoWriter.Printf("   Medium (20 CPUs): %s (NUMA)\n", mediumAlloc.Resources.CpusetCpus)
+				ginkgo.GinkgoWriter.Printf("   Small-2 (10 CPUs): %s (Cluster)\n", small2Alloc.Resources.CpusetCpus)
 			})
 		})
 	})

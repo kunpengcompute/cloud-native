@@ -33,6 +33,8 @@ const (
 	UnknownNode NodeKind = "unknown"
 	// NumaNode represents a NUMA node in the system.
 	NumaNode NodeKind = "numa node"
+	// ClusterNode represents a CPU cluster within a NUMA node (for 950 model machines).
+	ClusterNode NodeKind = "cluster"
 	// DieNode represents a die within a physical CPU package/socket in the system.
 	DieNode NodeKind = "die"
 	// SocketNode represents a physical CPU package/socket in the system.
@@ -97,6 +99,7 @@ type Node interface {
 var _ Node = &socketNode{}
 var _ Node = &dieNode{}
 var _ Node = &numaNode{}
+var _ Node = &clusterNode{}
 var _ Node = &virtualNode{}
 
 // baseNode 包含所有节点类型共享的基本实现
@@ -445,6 +448,67 @@ func (n *numaNode) DiscoverResource() Supply {
 	n.nodeResource = newSupply(n, isolated, sharable)
 	n.freeResource = n.nodeResource.Clone()
 	return n.nodeResource.Clone()
+}
+
+// clusterNode represents a CPU cluster within a NUMA node.
+// This is used for 950 model machines where each NUMA node contains multiple clusters.
+type clusterNode struct {
+	baseNode
+	clusterID  system.ID      // Cluster ID
+	numaNodeID system.ID      // Parent NUMA node ID
+	cpus       cpuset.CPUSet  // CPUs in this cluster
+	sysCluster system.Cluster // System cluster info
+}
+
+// NewClusterNode creates a new cluster node.
+func NewClusterNode(p *TopologyAwarePolicy, clusterID system.ID, numaNodeID system.ID, cpus cpuset.CPUSet, sysCluster system.Cluster, parent Node) Node {
+	n := &clusterNode{
+		clusterID:  clusterID,
+		numaNodeID: numaNodeID,
+		cpus:       cpus,
+		sysCluster: sysCluster,
+	}
+	n.init(p, fmt.Sprintf("cluster #%v (NUMA %v)", clusterID, numaNodeID), ClusterNode, parent, n)
+	return n
+}
+
+func (n *clusterNode) DiscoverResource() Supply {
+	klog.V(5).InfoS("Discovering Resource available at cluster Node", "node", n.Name(), "cpus", n.cpus)
+	isolated := n.cpus.Intersection(n.policy.isolated)
+	sharable := n.cpus.Difference(isolated)
+
+	n.nodeResource = newSupply(n, isolated, sharable)
+	n.freeResource = n.nodeResource.Clone()
+	return n.nodeResource.Clone()
+}
+
+// GetClusterID returns the cluster ID.
+func (n *clusterNode) GetClusterID() system.ID {
+	return n.clusterID
+}
+
+// GetNUMANodeID returns the parent NUMA node ID.
+func (n *clusterNode) GetNUMANodeID() system.ID {
+	return n.numaNodeID
+}
+
+// GetCPUs returns the CPUs in this cluster.
+func (n *clusterNode) GetCPUs() cpuset.CPUSet {
+	return n.cpus
+}
+
+// MemoryInfo returns memory information for this cluster node.
+// Clusters don't have their own memory, so we return the parent NUMA node's memory info.
+func (n *clusterNode) MemoryInfo() (*system.MemInfo, error) {
+	if n.parent != nil && !n.parent.IsNil() {
+		return n.parent.MemoryInfo()
+	}
+	return nil, fmt.Errorf("cluster node has no parent")
+}
+
+// GetNUMAIDs returns the NUMA node ID for this cluster.
+func (n *clusterNode) GetNUMAIDs() []system.ID {
+	return []system.ID{n.numaNodeID}
 }
 
 // virtualNode 表示虚拟节点

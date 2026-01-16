@@ -55,19 +55,21 @@ func (p *TopologyAwarePolicy) newAllocations() allocations {
 
 type TopologyAwarePolicy struct {
 	policy.BasePolicy
-	cache                cache.Cache
-	sys                  system.System
-	allowed              cpuset.CPUSet
-	isolated             cpuset.CPUSet
-	nodes                map[string]Node
-	pools                []Node
-	root                 Node
-	nodeCnt              int
-	depth                int
-	allocations          allocations             // container pool assignmentss
-	enableMemoryTopology bool                    // 是否启用内存拓扑感知
-	resourcePriority     string                  // 资源分配优先级策略
-	metricsManager       *TopologyMetricsManager // 资源树监控管理器
+
+	cache                 cache.Cache
+	sys                   system.System
+	allowed               cpuset.CPUSet
+	isolated              cpuset.CPUSet
+	nodes                 map[string]Node
+	pools                 []Node
+	root                  Node
+	nodeCnt               int
+	depth                 int
+	allocations           allocations             // container pool assignmentss
+	enableMemoryTopology  bool                    // 是否启用内存拓扑感知
+	resourcePriority      string                  // 资源分配优先级策略
+	enableClusterAffinity bool                    // 是否启用 cluster 亲和
+	metricsManager        *TopologyMetricsManager // 资源树监控管理器
 }
 
 // Name returns the name of this policy.
@@ -104,13 +106,33 @@ func NewTopologyAwarePolicyWithSystem(c cache.Cache, opts *policy.PolicyOptions,
 		}
 	}
 	p := &TopologyAwarePolicy{
-		BasePolicy:           *policy.NewBasePolicy(PolicyName, PolicyDescription),
-		sys:                  sys,
-		cache:                c,
-		enableMemoryTopology: opts.EnableMemoryTopology,
-		resourcePriority:     opts.ResourcePriority,
+		BasePolicy:            *policy.NewBasePolicy(PolicyName, PolicyDescription),
+		sys:                   sys,
+		cache:                 c,
+		enableMemoryTopology:  opts.EnableMemoryTopology,
+		resourcePriority:      opts.ResourcePriority,
+		enableClusterAffinity: opts.EnableClusterAffinity,
 	}
 	p.allocations = p.newAllocations()
+
+	// 如果启用了 cluster 亲和，检查机器是否支持 Cluster 特性并验证 cluster 拓扑
+	if p.enableClusterAffinity {
+		if sys.SupportsClusterFeature() {
+			// Cluster 拓扑已经在 System.Discover() 中被发现
+			// 这里只需要验证是否有可用的 clusters
+			clusterIDs := sys.ClusterIDs()
+			if len(clusterIDs) > 0 {
+				klog.InfoS("Cluster affinity enabled",
+					"numClusters", len(clusterIDs))
+			} else {
+				klog.InfoS("Cluster affinity enabled but no clusters found, feature disabled")
+				p.enableClusterAffinity = false
+			}
+		} else {
+			klog.InfoS("Cluster affinity enabled but machine doesn't support cluster feature, feature disabled")
+			p.enableClusterAffinity = false
+		}
+	}
 
 	if err := p.initialize(); err != nil {
 		klog.ErrorS(err, "Failed to initialize topology-aware policy")
@@ -245,9 +267,10 @@ func (p *TopologyAwarePolicy) allocatePool(containerCtx policy.ContainerContext)
 		affinity := p.calculatePoolAffinities(request)
 
 		// 根据请求的资源，选择最优的资源池
+		// Cluster 亲和性已在 sortPoolsByScore 中通过 compareClusterAffinity 处理
 		score, pools := p.sortPoolsByScore(request, affinity)
 		if len(pools) == 0 {
-			return nil, fmt.Errorf("no suitable pool found for container %s",
+			return nil, fmt.Errorf("failed to allocate cpu: no suitable pool found for container %s",
 				containerCtx.Request.PodMeta.Name)
 		}
 
@@ -255,10 +278,10 @@ func (p *TopologyAwarePolicy) allocatePool(containerCtx policy.ContainerContext)
 			klog.V(5).InfoS("node fitting for container", "node", n.Name(), "score", score[n.NodeID()].String())
 		}
 
-		// 选择出最优的资源池
+		// 选择最优的资源池（已包含 Cluster 亲和性排序）
 		pool = p.findBestAvailablePool(request, pools)
 		if pool == nil {
-			return nil, fmt.Errorf("no suitable pool found for container %s",
+			return nil, fmt.Errorf("failed to allocate cpu: no suitable pool found for container %s",
 				containerCtx.Request.PodMeta.Name)
 		}
 	}
@@ -473,13 +496,36 @@ func (p *TopologyAwarePolicy) isPoolInGPUNUMANodes(poolNUMAIDs []system.ID, gpuN
 
 // findRegularPool finds the best pool using regular allocation logic
 func (p *TopologyAwarePolicy) findRegularPool(request Request, pools []Node) Node {
-	bestPool := pools[0]
+	if len(pools) == 0 {
+		klog.ErrorS(nil, "No pools available for allocation")
+		return nil
+	}
+
+	// 在有足够容量的 pools 中，选择深度最大的（优先选择更细粒度的节点）
+	var bestPool Node
+	maxDepth := -1
+
 	for _, pool := range pools {
-		if p.hasCapacity(request, pool) && pool.RootDistance() > bestPool.RootDistance() {
-			bestPool = pool
+		if p.hasCapacity(request, pool) {
+			depth := pool.RootDistance()
+			if depth > maxDepth {
+				bestPool = pool
+				maxDepth = depth
+			}
 		}
 	}
-	klog.V(5).InfoS("Best pool", "bestPool", bestPool.Name())
+
+	if bestPool == nil {
+		klog.ErrorS(nil, "No pool with sufficient capacity found",
+			"request", request.String(),
+			"poolsEvaluated", len(pools))
+		return nil
+	}
+
+	klog.V(4).InfoS("Selected pool",
+		"pool", bestPool.Name(),
+		"capacity", bestPool.FreeResource().GetScore(request).SharedCapacity(),
+		"depth", bestPool.RootDistance())
 	return bestPool
 }
 
@@ -487,7 +533,8 @@ func (p *TopologyAwarePolicy) hasCapacity(request Request, pool Node) bool {
 	return checkCapacityByRequest(request, p.root, pool) && checkMemoryCapacity(request, p.root, pool)
 }
 
-// checkCapacity checks if the pool has enough capacity for the request.
+// checkCapacityByRequest 检查 pool 是否有足够的容量满足请求
+// 使用 request 值进行容量检查，与实际分配逻辑保持一致
 func checkCapacityByRequest(request Request, root, pool Node) bool {
 	// 不断向上遍历，确认是否满足容量条件
 	for pool != nil && pool != root {
@@ -503,9 +550,15 @@ func checkCapacityByRequest(request Request, root, pool Node) bool {
 			return false
 		}
 
+		// 使用 SharedCapacityByRequest 检查容量（基于 request 值）
 		if score.SharedCapacityByRequest() < 0 {
+			klog.V(5).InfoS("Pool does not have enough capacity for request",
+				"pool", pool.Name(),
+				"sharedCapacityByRequest", score.SharedCapacityByRequest(),
+				"request", request.String())
 			return false
 		}
+
 		pool = pool.Parent()
 	}
 	return true
@@ -633,21 +686,24 @@ func (p *TopologyAwarePolicy) sortPoolsByScore(req Request, affinity map[int]int
 	return scores, p.pools
 }
 
-// Helper method to check resource capacity comparison
+// compareResourceCapacity 比较两个节点的资源容量
+// 使用 SharedCapacity()（基于 limit）进行排序，确保选出的节点能容纳 limit
 func (p *TopologyAwarePolicy) compareResourceCapacity(request Request, node1, node2 Node) (bool, bool) {
 	capacity1 := node1.FreeResource().GetScore(request).SharedCapacity()
 	capacity2 := node2.FreeResource().GetScore(request).SharedCapacity()
 
+	// 有足够容量的节点优先
 	if capacity1 >= 0 && capacity2 < 0 {
-		klog.V(5).InfoS("Lower shared capacity wins", "winner", node1.Name(), "failed", node2.Name())
+		klog.V(5).InfoS("Sufficient capacity wins", "winner", node1.Name(), "capacity", capacity1, "failed", node2.Name(), "capacity", capacity2)
 		return true, true // node1 wins, comparison complete
 	}
 
 	if capacity1 < 0 && capacity2 >= 0 {
-		klog.V(5).InfoS("Lower shared capacity wins", "winner", node2.Name(), "failed", node1.Name())
+		klog.V(5).InfoS("Sufficient capacity wins", "winner", node2.Name(), "capacity", capacity2, "failed", node1.Name(), "capacity", capacity1)
 		return false, true // node2 wins, comparison complete
 	}
 
+	// 两者都有容量或都无容量时，让后续的比较逻辑决定
 	return false, false // tie, continue comparison
 }
 
@@ -746,10 +802,12 @@ func (p *TopologyAwarePolicy) compareGPUAffinity(request Request, affinity map[i
 func (p *TopologyAwarePolicy) compare(request Request, scores map[int]Score, affinity map[int]int32, i int, j int) bool {
 	//
 	// 比较计分的算法如下：
-	// 1. 如果节点在树中较低，则获胜
-	// 2. 如果是共享分配，则较少共置容器获胜
-	// 3. 根据资源优先级策略，调整CPU和GPU亲和性的比较顺序
-	// 4. id 更小的获胜
+	// 1. 资源容量检查（是否满足请求）
+	// 2. 深度比较（树中更深的节点优先，Cluster 深度 > NUMA 深度）
+	// 3. 共享容量比较（共享容量大的优先）
+	// 4. 共置容器数比较（共置容器少的优先）
+	// 5. GPU 亲和性比较（GPU 亲和性高的优先）
+	// 6. ID 比较（ID 小的优先）
 
 	node1, node2 := p.pools[i], p.pools[j]
 	id1, id2 := node1.NodeID(), node2.NodeID()
@@ -765,7 +823,7 @@ func (p *TopologyAwarePolicy) compare(request Request, scores map[int]Score, aff
 		return result
 	}
 
-	// 2. Check depth
+	// 2. Check depth (Cluster nodes have greater depth than NUMA nodes)
 	if result, done := p.compareDepth(node1, node2); done {
 		return result
 	}
@@ -1244,7 +1302,9 @@ func (p *TopologyAwarePolicy) createDieNodes(sockets map[system.ID]Node) map[sys
 }
 
 // createNumaNodes creates NUMA nodes and returns a map of NUMA ID to Node
-func (p *TopologyAwarePolicy) createNumaNodes(sockets map[system.ID]Node, dies map[system.ID]Node) {
+func (p *TopologyAwarePolicy) createNumaNodes(sockets map[system.ID]Node, dies map[system.ID]Node) map[system.ID]Node {
+	numaNodes := make(map[system.ID]Node)
+
 	for _, numaNodeID := range p.sys.NodeIDs() {
 		var parent Node
 
@@ -1261,11 +1321,61 @@ func (p *TopologyAwarePolicy) createNumaNodes(sockets map[system.ID]Node, dies m
 
 		numaNode := NewNumaNode(p, numaNodeID, parent)
 		p.nodes[numaNode.Name()] = numaNode
+		numaNodes[numaNodeID] = numaNode
 
 		klog.V(5).InfoS("Created NUMA node",
 			"numaNodeID", numaNodeID,
 			"parent", parent.Name())
 	}
+
+	return numaNodes
+}
+
+// createClusterNodes creates cluster nodes under NUMA nodes when cluster affinity is enabled.
+// This is only applicable for machines that support the cluster topology feature.
+// Clusters are discovered during System.Discover() if the machine supports cluster feature.
+func (p *TopologyAwarePolicy) createClusterNodes(numaNodes map[system.ID]Node) {
+	if !p.enableClusterAffinity {
+		return
+	}
+
+	// Clusters should have been discovered during System.Discover()
+	// Use System interface to check if clusters are available
+	clusterIDs := p.sys.ClusterIDs()
+	if len(clusterIDs) == 0 {
+		klog.V(4).InfoS("Cluster affinity enabled but no clusters available")
+		return
+	}
+
+	// Create cluster nodes under each NUMA node
+	for numaNodeID, numaNode := range numaNodes {
+		// Use System interface to get clusters for this NUMA node
+		nodeClusterIDs := p.sys.NodeClusters(numaNodeID)
+		if len(nodeClusterIDs) == 0 {
+			continue
+		}
+
+		for _, clusterID := range nodeClusterIDs {
+			// Use System interface to get cluster by ID
+			sysCluster := p.sys.Cluster(clusterID)
+			if sysCluster == nil {
+				klog.Warningf("Cluster %d not found in system", clusterID)
+				continue
+			}
+
+			clusterNode := NewClusterNode(p, clusterID, numaNodeID, sysCluster.CPUSet(), sysCluster, numaNode)
+			p.nodes[clusterNode.Name()] = clusterNode
+
+			klog.V(5).InfoS("Created cluster node",
+				"clusterID", clusterID,
+				"numaNodeID", numaNodeID,
+				"cpus", sysCluster.CPUSet().String(),
+				"parent", numaNode.Name())
+		}
+	}
+
+	klog.InfoS("Cluster nodes created",
+		"totalClusters", len(clusterIDs))
 }
 
 // validateSocketStructure checks if socket structure is valid
@@ -1325,7 +1435,10 @@ func (p *TopologyAwarePolicy) buildResourcePoolsByTopology() error {
 	}
 
 	// 创建 NUMA 节点
-	p.createNumaNodes(sockets, dies)
+	numaNodes := p.createNumaNodes(sockets, dies)
+
+	// 创建 Cluster 节点（仅在启用 cluster 亲和且机器支持 Cluster 特性时）
+	p.createClusterNodes(numaNodes)
 
 	// 深度遍历资源树，计算深度和资源量，赋值 NUMA 节点
 	p.pools = make([]Node, 0)
@@ -1345,10 +1458,14 @@ func (p *TopologyAwarePolicy) buildResourcePoolsByTopology() error {
 		return fmt.Errorf("failed to build resource pools: %v", err)
 	}
 
+	clusterCount := len(p.sys.ClusterIDs())
+
 	klog.InfoS("Topology pool setup completed",
 		"socketCount", len(sockets),
 		"dieCount", len(dies),
-		"numaCount", len(p.sys.NodeIDs()))
+		"numaCount", len(p.sys.NodeIDs()),
+		"clusterCount", clusterCount,
+		"clusterAffinityEnabled", p.enableClusterAffinity)
 
 	p.root.Dump("Topology pool setup completed")
 
