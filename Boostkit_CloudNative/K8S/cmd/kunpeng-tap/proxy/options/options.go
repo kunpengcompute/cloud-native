@@ -56,4 +56,5 @@ var (
 	MetricsAddr              string
 	Version                  bool
 	EnableMemoryTopology     bool
+	EnableClusterAffinity    bool
 )

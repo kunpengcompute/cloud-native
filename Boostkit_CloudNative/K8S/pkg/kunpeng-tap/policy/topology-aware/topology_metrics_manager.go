@@ -242,6 +242,8 @@ func (m *TopologyMetricsManager) getHierarchyLevel(node Node) string {
 		return "die"
 	case NumaNode:
 		return "numa"
+	case ClusterNode:
+		return "cluster"
 	default:
 		return "unknown"
 	}

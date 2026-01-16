@@ -25,18 +25,22 @@ import (
 
 // MockSystem implements system.System interface for testing
 type MockSystem struct {
-	packages   map[system.ID]*MockCPUPackage
-	nodes      map[system.ID]*MockNode
-	cpus       map[system.ID]*MockCPU
-	gpus       map[system.ID]*MockGPU
-	allowedSet cpuset.CPUSet
-	packageIDs []system.ID
-	nodeIDs    []system.ID
-	cpuIDs     []system.ID
-	gpuIDs     []system.ID
-	distances  map[system.ID]map[system.ID]int
-	shouldFail bool
-	memInfo    *system.MemInfo
+	packages               map[system.ID]*MockCPUPackage
+	nodes                  map[system.ID]*MockNode
+	cpus                   map[system.ID]*MockCPU
+	gpus                   map[system.ID]*MockGPU
+	clusters               map[system.ID]system.Cluster // Mock clusters
+	allowedSet             cpuset.CPUSet
+	packageIDs             []system.ID
+	nodeIDs                []system.ID
+	clusterIDs             []system.ID // Mock cluster IDs
+	cpuIDs                 []system.ID
+	gpuIDs                 []system.ID
+	distances              map[system.ID]map[system.ID]int
+	shouldFail             bool
+	memInfo                *system.MemInfo
+	supportsClusterFeature bool                // Mock value for SupportsClusterFeature()
+	clusterInfo            *system.ClusterInfo // Mock cluster topology information
 }
 
 // NewMockSystem creates a new mock system
@@ -46,6 +50,7 @@ func NewMockSystem() *MockSystem {
 		nodes:      make(map[system.ID]*MockNode),
 		cpus:       make(map[system.ID]*MockCPU),
 		gpus:       make(map[system.ID]*MockGPU),
+		clusters:   make(map[system.ID]system.Cluster),
 		distances:  make(map[system.ID]map[system.ID]int),
 		allowedSet: cpuset.CPUSet{},
 		memInfo: &system.MemInfo{
@@ -237,6 +242,197 @@ func (m *MockSystem) SetupLargeTopology() {
 	m.allowedSet, _ = cpuset.Parse("0-95")
 }
 
+// SetupTopology sets up a topology based on the provided TopologyConfig
+// This is the unified entry point for setting up any topology configuration
+// Returns a TopologyValidator that can be used to validate CPU allocations
+func (m *MockSystem) SetupTopology(config TopologyConfig) *TopologyValidator {
+	if err := config.Validate(); err != nil {
+		panic(fmt.Sprintf("Invalid topology config: %v", err))
+	}
+
+	// Setup packages (sockets)
+	m.setupGenericPackages(config)
+
+	// Setup NUMA nodes
+	m.setupGenericNodes(config)
+
+	// Setup CPUs
+	m.setupGenericCPUs(config)
+
+	// Setup NUMA distances
+	m.setupGenericDistances(config)
+
+	// Set allowed CPU set
+	m.allowedSet, _ = cpuset.Parse(config.GetSystemRange())
+
+	// Set supports cluster feature flag
+	m.supportsClusterFeature = config.SupportsClusterFeature
+
+	// Setup cluster info if applicable
+	if config.ClusterCount > 0 {
+		m.clusterInfo = m.createGenericClusterInfo(config)
+	}
+
+	return NewTopologyValidator(config)
+}
+
+// setupGenericPackages creates packages based on TopologyConfig
+func (m *MockSystem) setupGenericPackages(config TopologyConfig) {
+	for socketID := 0; socketID < config.SocketCount; socketID++ {
+		cpuStart := socketID * config.CPUsPerSocket
+		cpuEnd := cpuStart + config.CPUsPerSocket - 1
+		pkgSet, _ := cpuset.Parse(fmt.Sprintf("%d-%d", cpuStart, cpuEnd))
+
+		// Calculate NUMA nodes for this socket
+		nodeIDs := make([]system.ID, config.NUMAPerSocket)
+		for i := 0; i < config.NUMAPerSocket; i++ {
+			nodeIDs[i] = system.ID(socketID*config.NUMAPerSocket + i)
+		}
+
+		pkg := &MockCPUPackage{
+			id:      system.ID(socketID),
+			cpuSet:  pkgSet,
+			nodeIDs: nodeIDs,
+			dieIDs:  []system.ID{},
+		}
+		m.packages[system.ID(socketID)] = pkg
+		m.packageIDs = append(m.packageIDs, system.ID(socketID))
+	}
+}
+
+// setupGenericNodes creates NUMA nodes based on TopologyConfig
+func (m *MockSystem) setupGenericNodes(config TopologyConfig) {
+	for numaID := 0; numaID < config.NUMACount; numaID++ {
+		socketID := numaID / config.NUMAPerSocket
+		cpuStart := numaID * config.CPUsPerNUMA
+		cpuEnd := cpuStart + config.CPUsPerNUMA - 1
+
+		nodeSet, _ := cpuset.Parse(fmt.Sprintf("%d-%d", cpuStart, cpuEnd))
+
+		// Generate distance array (simple model: 10 for local, 12 for same socket, 20-22 for remote)
+		distances := m.generateDistances(numaID, config)
+
+		node := &MockNode{
+			id:         system.ID(numaID),
+			packageID:  system.ID(socketID),
+			dieID:      -1,
+			cpuSet:     nodeSet,
+			distance:   distances,
+			hasMemory:  true,
+			memoryType: system.MemoryTypeDRAM,
+			memInfo: &system.MemInfo{
+				MemTotal: 64 * 1024 * 1024, // 64GB per NUMA
+				MemFree:  32 * 1024 * 1024,
+				MemUsed:  32 * 1024 * 1024,
+				MemSet:   cpuset.New(numaID),
+			},
+		}
+		m.nodes[system.ID(numaID)] = node
+		m.nodeIDs = append(m.nodeIDs, system.ID(numaID))
+	}
+}
+
+// generateDistances generates NUMA distance array for a node
+func (m *MockSystem) generateDistances(numaID int, config TopologyConfig) []int {
+	distances := make([]int, config.NUMACount)
+	mySocket := numaID / config.NUMAPerSocket
+
+	for otherNUMA := 0; otherNUMA < config.NUMACount; otherNUMA++ {
+		otherSocket := otherNUMA / config.NUMAPerSocket
+		if otherNUMA == numaID {
+			distances[otherNUMA] = 10 // Local
+		} else if mySocket == otherSocket {
+			distances[otherNUMA] = 12 // Same socket
+		} else {
+			// Different socket: 20 + offset based on position
+			offset := (numaID % config.NUMAPerSocket) + (otherNUMA % config.NUMAPerSocket)
+			distances[otherNUMA] = 20 + (offset % 3)
+		}
+	}
+	return distances
+}
+
+// setupGenericCPUs creates CPUs based on TopologyConfig
+func (m *MockSystem) setupGenericCPUs(config TopologyConfig) {
+	for cpuID := 0; cpuID < config.TotalCPUs; cpuID++ {
+		numaID := cpuID / config.CPUsPerNUMA
+		socketID := numaID / config.NUMAPerSocket
+
+		var coreID system.ID
+		if config.SMTEnabled {
+			coreID = system.ID(cpuID / 2) // SMT: 2 threads per core
+		} else {
+			coreID = system.ID(cpuID) // No SMT: 1 thread per core
+		}
+
+		cpu := &MockCPU{
+			id:        system.ID(cpuID),
+			packageID: system.ID(socketID),
+			dieID:     -1,
+			nodeID:    system.ID(numaID),
+			coreID:    coreID,
+			isolated:  false,
+			online:    true,
+		}
+		m.cpus[system.ID(cpuID)] = cpu
+		m.cpuIDs = append(m.cpuIDs, system.ID(cpuID))
+	}
+}
+
+// setupGenericDistances sets up NUMA distance matrix based on TopologyConfig
+func (m *MockSystem) setupGenericDistances(config TopologyConfig) {
+	for numaID := 0; numaID < config.NUMACount; numaID++ {
+		distances := m.generateDistances(numaID, config)
+		m.distances[system.ID(numaID)] = make(map[system.ID]int)
+		for otherNUMA := 0; otherNUMA < config.NUMACount; otherNUMA++ {
+			m.distances[system.ID(numaID)][system.ID(otherNUMA)] = distances[otherNUMA]
+		}
+	}
+}
+
+// createGenericClusterInfo creates ClusterInfo based on TopologyConfig
+func (m *MockSystem) createGenericClusterInfo(config TopologyConfig) *system.ClusterInfo {
+	clusterInfo := system.NewClusterInfo()
+	m.clusters = make(map[system.ID]system.Cluster)
+	m.clusterIDs = make([]system.ID, 0, config.ClusterCount)
+
+	for clusterID := 0; clusterID < config.ClusterCount; clusterID++ {
+		// Calculate which NUMA this cluster belongs to
+		numaID := clusterID / config.ClustersPerNUMA
+
+		// Calculate CPU range for this cluster
+		cpuStart := clusterID * config.CPUsPerCluster
+		cpuEnd := cpuStart + config.CPUsPerCluster - 1
+
+		cpuRange := fmt.Sprintf("%d-%d", cpuStart, cpuEnd)
+		cpuSet, _ := cpuset.Parse(cpuRange)
+
+		cluster := &mockCluster{
+			id:     system.ID(clusterID),
+			nodeID: system.ID(numaID),
+			cpus:   cpuSet,
+		}
+
+		// Add to clusterInfo
+		clusterInfo.Clusters[system.ID(clusterID)] = cluster
+
+		// Add to clusters map
+		m.clusters[system.ID(clusterID)] = cluster
+		m.clusterIDs = append(m.clusterIDs, system.ID(clusterID))
+
+		clusterInfo.NodeClusters[system.ID(numaID)] = append(
+			clusterInfo.NodeClusters[system.ID(numaID)],
+			system.ID(clusterID),
+		)
+
+		for _, cpuID := range cpuSet.List() {
+			clusterInfo.CPUCluster[system.ID(cpuID)] = system.ID(clusterID)
+		}
+	}
+
+	return clusterInfo
+}
+
 // setupLargeTopologyPackages creates packages for large topology
 func (m *MockSystem) setupLargeTopologyPackages() {
 	// Package 0 (Socket 0)
@@ -377,6 +573,10 @@ func (m *MockSystem) NodeIDs() []system.ID {
 	return m.nodeIDs
 }
 
+func (m *MockSystem) ClusterIDs() []system.ID {
+	return m.clusterIDs
+}
+
 func (m *MockSystem) Package(id system.ID) system.CPUPackage {
 	if pkg, exists := m.packages[id]; exists {
 		return pkg
@@ -387,6 +587,13 @@ func (m *MockSystem) Package(id system.ID) system.CPUPackage {
 func (m *MockSystem) Node(id system.ID) system.Node {
 	if node, exists := m.nodes[id]; exists {
 		return node
+	}
+	return nil
+}
+
+func (m *MockSystem) Cluster(id system.ID) system.Cluster {
+	if cluster, exists := m.clusters[id]; exists {
+		return cluster
 	}
 	return nil
 }
@@ -421,11 +628,51 @@ func (m *MockSystem) NodeGPUs(nodeID system.ID) []system.ID {
 	return gpus
 }
 
+func (m *MockSystem) NodeClusters(nodeID system.ID) []system.ID {
+	// Use clusterInfo if available for backward compatibility
+	if m.clusterInfo != nil {
+		return m.clusterInfo.GetClustersForNode(nodeID)
+	}
+
+	// Fallback: build from clusters map
+	var clusterIDs []system.ID
+	for _, cluster := range m.clusters {
+		if cluster.NodeID() == nodeID {
+			clusterIDs = append(clusterIDs, cluster.ID())
+		}
+	}
+	return clusterIDs
+}
+
 func (m *MockSystem) MemoryInfo() (*system.MemInfo, error) {
 	if m.shouldFail {
 		return nil, fmt.Errorf("mock memory info failure")
 	}
 	return m.memInfo, nil
+}
+
+// SupportsClusterFeature returns the mock value for cluster feature support.
+// This allows tests to simulate both machines that support and don't support cluster topology.
+func (m *MockSystem) SupportsClusterFeature() bool {
+	return m.supportsClusterFeature
+}
+
+// SetSupportsClusterFeature sets the mock value for cluster feature support.
+// Use this in tests to simulate machines with or without cluster topology support.
+func (m *MockSystem) SetSupportsClusterFeature(supports bool) {
+	m.supportsClusterFeature = supports
+}
+
+// ClusterInfo returns the mock cluster topology information.
+// Returns nil if no cluster info has been set.
+func (m *MockSystem) ClusterInfo() *system.ClusterInfo {
+	return m.clusterInfo
+}
+
+// SetClusterInfo sets the mock cluster topology information.
+// Use this in tests to simulate cluster topology for 950 machines.
+func (m *MockSystem) SetClusterInfo(clusterInfo *system.ClusterInfo) {
+	m.clusterInfo = clusterInfo
 }
 
 // MockCPUPackage implements system.CPUPackage interface for testing
@@ -660,4 +907,31 @@ func (g *MockGPU) DeviceID() string {
 
 func (g *MockGPU) DeviceClass() string {
 	return g.deviceClass
+}
+
+// mockCluster implements system.Cluster interface for testing
+type mockCluster struct {
+	id     system.ID
+	nodeID system.ID
+	cpus   cpuset.CPUSet
+}
+
+func (c *mockCluster) ID() system.ID {
+	return c.id
+}
+
+func (c *mockCluster) NodeID() system.ID {
+	return c.nodeID
+}
+
+func (c *mockCluster) CPUSet() cpuset.CPUSet {
+	return c.cpus
+}
+
+func (c *mockCluster) Size() int {
+	return c.cpus.Size()
+}
+
+func (c *mockCluster) SetNodeID(nodeID system.ID) {
+	c.nodeID = nodeID
 }

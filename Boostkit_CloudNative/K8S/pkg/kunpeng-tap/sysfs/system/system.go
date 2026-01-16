@@ -45,13 +45,18 @@ type System interface {
 	ValidateTopology() error
 	PackageIDs() []ID
 	NodeIDs() []ID
+	ClusterIDs() []ID // Returns all Cluster IDs
 	Package(id ID) CPUPackage
 	Node(id ID) Node
+	Cluster(id ID) Cluster // Returns Cluster by ID
 	NodeDistance(from, to ID) int
+	NodeClusters(nodeID ID) []ID   // Returns Cluster IDs for a NUMA node
 	GPUIDs() []ID                  // Returns all GPU IDs
 	GPU(id ID) GPU                 // Returns GPU by ID
 	NodeGPUs(nodeID ID) []ID       // Returns GPUs attached to a NUMA node
 	MemoryInfo() (*MemInfo, error) // 返回系统的总内存信息
+	SupportsClusterFeature() bool  // Returns true if the system supports cluster topology feature
+	ClusterInfo() *ClusterInfo     // Returns cluster topology information (may be nil if not available)
 }
 
 // CPUPackage is a physical package (a collection of CPUs).
@@ -161,11 +166,13 @@ type system struct {
 	sysRoot        string            // sysfs mount point
 	packages       map[ID]CPUPackage // physical packages
 	nodes          map[ID]Node       // NUMA nodes
+	clusters       map[ID]Cluster    // CPU clusters
 	cpus           map[ID]CPU        // CPUs
 	offline        cpuset.CPUSet     // offlined CPUs
 	isolated       cpuset.CPUSet     // isolated CPUs
 	threadsPerCore int               // hyperthreads per core
 	gpus           map[ID]GPU        // GPUs
+	clusterInfo    *ClusterInfo      // cluster topology information (for backward compatibility)
 }
 
 // NewSystem creates a new System instance, discovering the system resources.
@@ -249,6 +256,17 @@ func (s *system) Discover() error {
 	if err := s.populateNodePackageInfo(); err != nil {
 		return err
 	}
+
+	// 发现 Cluster 拓扑（仅在支持时）
+	// 与 GPU 类似，我们在 Discover() 中进行检测，但失败不会中断整个流程
+	// SupportsClusterFeature() 是轻量级检查（基于机器型号），避免不必要的 sysfs 访问
+	if s.SupportsClusterFeature() {
+		if err := s.discoverClusters(); err != nil {
+			klog.ErrorS(err, "Failed to discover clusters")
+			// 不要因为 cluster 发现失败而中断整个发现过程
+		}
+	}
+
 	return nil
 }
 
@@ -844,6 +862,64 @@ func (s *system) discoverGPUs() error {
 	return nil
 }
 
+// discoverClusters discovers cluster topology and populates the clusters map.
+// This follows the same pattern as discoverGPUs - it doesn't fail the entire discovery
+// process if cluster topology is not available.
+func (s *system) discoverClusters() error {
+	if s.clusters != nil {
+		return nil
+	}
+
+	s.clusters = make(map[ID]Cluster)
+
+	// Check if the system supports cluster feature
+	if !s.SupportsClusterFeature() {
+		klog.V(4).InfoS("Cluster feature not supported on this system")
+		return nil
+	}
+
+	// Discover cluster topology using the existing DiscoverClusters function
+	clusterInfo, err := DiscoverClusters(s.sysRoot)
+	if err != nil {
+		klog.ErrorS(err, "Failed to discover cluster topology")
+		return err
+	}
+
+	if clusterInfo == nil || len(clusterInfo.Clusters) == 0 {
+		klog.V(4).InfoS("No cluster topology available")
+		return nil
+	}
+
+	// Build CPU to NUMA node mapping for cluster association
+	cpuNodeMap := make(map[ID]ID)
+	for _, nodeID := range s.NodeIDs() {
+		sysNode := s.Node(nodeID)
+		if sysNode == nil {
+			continue
+		}
+		for _, cpuID := range sysNode.CPUSet().List() {
+			cpuNodeMap[ID(cpuID)] = nodeID
+		}
+	}
+
+	// Associate clusters with NUMA nodes
+	clusterInfo.AssociateWithNodes(cpuNodeMap)
+
+	// Populate the clusters map from clusterInfo
+	for clusterID, cluster := range clusterInfo.Clusters {
+		s.clusters[clusterID] = cluster
+	}
+
+	// Cache clusterInfo for backward compatibility
+	s.clusterInfo = clusterInfo
+
+	klog.V(3).InfoS("Discovered cluster topology",
+		"clusterCount", len(s.clusters),
+		"nodeClusters", clusterInfo.NodeClusters)
+
+	return nil
+}
+
 // MemoryInfo returns the aggregated memory information for the entire system.
 func (s *system) MemoryInfo() (*MemInfo, error) {
 	// 创建一个新的 MemInfo 结构体来存储聚合结果
@@ -876,4 +952,77 @@ func (s *system) MemoryInfo() (*MemInfo, error) {
 	}
 
 	return result, nil
+}
+
+// SupportsClusterFeature returns true if the system supports cluster topology feature.
+// Currently, this checks if the system is a 950 model machine.
+// In the future, this can be extended to support other machine models that have cluster topology.
+// This method delegates to the global SupportsClusterFeature function.
+func (s *system) SupportsClusterFeature() bool {
+	return SupportsClusterFeature()
+}
+
+// ClusterInfo returns cluster topology information for the system.
+// It discovers cluster topology from sysfs on first call and caches the result.
+// Returns nil if cluster topology is not available.
+func (s *system) ClusterInfo() *ClusterInfo {
+	if s.clusterInfo == nil {
+		// Trigger cluster discovery
+		if err := s.discoverClusters(); err != nil {
+			klog.ErrorS(err, "Failed to discover cluster topology")
+			return nil
+		}
+	}
+	return s.clusterInfo
+}
+
+// ClusterIDs returns a sorted slice of cluster IDs.
+// This method performs lazy discovery of cluster topology on first call.
+// Returns empty slice if cluster feature is not supported or no clusters found.
+func (s *system) ClusterIDs() []ID {
+	// Lazy initialization: only discover if not already done
+	if s.clusters == nil {
+		// Don't auto-discover on every call - only if explicitly requested
+		// Caller should check SupportsClusterFeature() first
+		return []ID{}
+	}
+
+	ids := make([]ID, 0, len(s.clusters))
+	for id := range s.clusters {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	return ids
+}
+
+// Cluster returns the cluster with the specified ID.
+// Returns nil if cluster feature is not supported or cluster not found.
+func (s *system) Cluster(id ID) Cluster {
+	if s.clusters == nil {
+		return nil
+	}
+	return s.clusters[id]
+}
+
+// NodeClusters returns the cluster IDs for a specific NUMA node.
+// Returns empty slice if cluster feature is not supported or no clusters for this node.
+func (s *system) NodeClusters(nodeID ID) []ID {
+	// Use ClusterInfo if available for backward compatibility
+	if s.clusterInfo != nil {
+		return s.clusterInfo.GetClustersForNode(nodeID)
+	}
+
+	// Fallback: build from clusters map
+	if s.clusters == nil {
+		return []ID{}
+	}
+
+	var clusterIDs []ID
+	for _, cluster := range s.clusters {
+		if cluster.NodeID() == nodeID {
+			clusterIDs = append(clusterIDs, cluster.ID())
+		}
+	}
+	sort.Ints(clusterIDs)
+	return clusterIDs
 }
