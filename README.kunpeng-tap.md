@@ -229,7 +229,7 @@ sudo make -f Makefile.kunpeng-tap uninstall-service
 | `--resource-policy` | 资源分配策略 | `topology-aware` | `numa-aware`/`topology-aware` |
 | `--resource-priority` | 资源优先级策略 | `cpu-first` | `cpu-first`/`gpu-first` |
 | `--enable-memory-topology` | 启用内存拓扑感知 | `false` | `true`/`false` |
-| `--metrics-bind-address` | Prometheus 指标端点 | `:9091` | 自定义地址 |
+| `--metrics-bind-address` | Prometheus 指标端点 | `无端口设置` | 自定义地址 |
 
 ### 配置示例
 
