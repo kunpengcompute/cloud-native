@@ -58,7 +58,7 @@ func (manager *PodManager) HandleEvent(eventType typedef.EventType, event typede
 func (manager *PodManager) handleWatchEvent(eventType typedef.EventType, event typedef.Event) {
 	pod, err := eventToRawPod(event)
 	if err != nil {
-		klog.Warningf(err.Error())
+		klog.Warningf("%v", err.Error())
 		return
 	}
 
@@ -78,7 +78,7 @@ func (manager *PodManager) handleWatchEvent(eventType typedef.EventType, event t
 func (manager *PodManager) handleListEvent(eventType typedef.EventType, event typedef.Event) {
 	pods, err := eventToRawPods(event)
 	if err != nil {
-		klog.Errorf(err.Error())
+		klog.Errorf("%v", err.Error())
 		return
 	}
 	switch eventType {
