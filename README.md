@@ -471,7 +471,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 2.  在**master节点**上执行如下命令部署插件。
 
     ```
-    cd cloud-native/Boostkit_CloudNative/K8S/k8s-mpam-controller-config/samples
+    cd k8s-mpam-controller-config/samples
     kubectl apply -f k8s-mpam-controller.yaml
     ```
 

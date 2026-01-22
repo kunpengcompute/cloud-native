@@ -152,7 +152,13 @@ var _ = Describe("Handler", Ordered, func() {
 		dockerServer = docker.NewDockerServer(dockerHandler)
 		go dockerServer.Run()
 
-		options.MetricsAddr = ":9091"
+		l, err = net.Listen("tcp", ":0")
+		Expect(err).To(BeNil())
+		var port string
+		_, port, err = net.SplitHostPort(l.Addr().String())
+		Expect(err).To(BeNil())
+		l.Close()
+		options.MetricsAddr = ":" + port
 		// Expose the Prometheus http endpoint
 		go monitoring.ExportMetrics()
 

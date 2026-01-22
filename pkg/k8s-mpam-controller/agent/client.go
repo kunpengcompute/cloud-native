@@ -72,7 +72,7 @@ func establishConnection(server string, tlsCfg *tls.Config) (*tls.Conn, error) {
 	klog.Info("Connecting to server: " + server)
 	conn, err := tls.Dial("tcp", server, tlsCfg)
 	if err != nil {
-		return nil, fmt.Errorf(err.Error())
+		return nil, fmt.Errorf("%v", err.Error())
 	}
 	klog.Info("Connected to ", conn.RemoteAddr())
 

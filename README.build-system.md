@@ -6,18 +6,15 @@
 
 ```
 kunpeng-cloud-computing/
-├── Makefile                           # 第一层：顶层统一管理
-└── Boostkit_CloudNative/K8S/
-    ├── Makefile                       # 第二层：K8S项目协调
-    ├── Makefile.mpam                  # 第三层：MPAM专用
-    └── Makefile.kunpeng-tap           # 第三层：Kunpeng TAP专用
+├── Makefile                           # 顶层统一管理
+├── Makefile.mpam                      # MPAM专用
+└── Makefile.kunpeng-tap               # Kunpeng TAP专用
 ```
 
 ## 构建系统特点
 
-### 1. 层次化管理
-- **顶层Makefile**: 提供项目级别的统一入口
-- **协调Makefile**: 管理相关子项目的组合操作
+### 1. 扁平化管理
+- **顶层Makefile**: 提供项目级别的统一入口和协调管理
 - **专用Makefile**: 每个子项目的独立构建逻辑
 
 ### 2. 命令一致性
@@ -48,7 +45,6 @@ make test                     # 测试所有项目
 
 ### 从K8S层构建相关项目
 ```bash
-cd Boostkit_CloudNative/K8S
 make build                    # 构建K8S相关项目
 make mpam-build              # 仅构建MPAM
 make kunpeng-tap-build       # 仅构建Kunpeng TAP
@@ -58,7 +54,6 @@ make kunpeng-tap-build-proxy    # 仅构建TAP代理
 
 ### 直接构建特定项目
 ```bash
-cd Boostkit_CloudNative/K8S
 
 # 构建MPAM Controller
 make -f Makefile.mpam build
