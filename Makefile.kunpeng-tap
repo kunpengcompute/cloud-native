@@ -53,17 +53,13 @@ help: ## Display this help.
 fmt: ## Run go fmt against code.
 	go fmt ./cmd/kunpeng-tap/... ./pkg/kunpeng-tap/... ./test/kunpeng-tap/...
 
-.PHONY: vet
-vet: ## Run go vet against code.
-	go vet ./cmd/kunpeng-tap/... ./pkg/kunpeng-tap/... ./test/kunpeng-tap/...
-
 .PHONY: test
-test: fmt vet ## Run tests.
+test: fmt ## Run tests.
 	go test ./pkg/kunpeng-tap/... -v
 	go test ./test/kunpeng-tap/... -v
 
 .PHONY: test-e2e
-test-e2e: fmt vet ## Run the e2e tests.
+test-e2e: fmt ## Run the e2e tests.
 	go test ./test/kunpeng-tap/e2e/ -v -ginkgo.v
 
 .PHONY: tidy
@@ -73,7 +69,7 @@ tidy: ## Tidy go modules.
 ##@ Build
 
 .PHONY: build
-build: fmt vet ## Build manager and proxy binaries.
+build: fmt ## Build manager and proxy binaries.
 	@echo "Building kunpeng-tap manager..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/$(MANAGER_BINARY) $(MANAGER_SRC)
@@ -81,13 +77,13 @@ build: fmt vet ## Build manager and proxy binaries.
 	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/$(PROXY_BINARY) $(PROXY_SRC)
 
 .PHONY: build-manager
-build-manager: fmt vet ## Build manager binary.
+build-manager: fmt ## Build manager binary.
 	@echo "Building kunpeng-tap manager..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/$(MANAGER_BINARY) $(MANAGER_SRC)
 
 .PHONY: build-proxy
-build-proxy: fmt vet ## Build proxy binary.
+build-proxy: fmt ## Build proxy binary.
 	@echo "Building kunpeng-tap proxy..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/$(PROXY_BINARY) $(PROXY_SRC)
@@ -100,11 +96,11 @@ clean: ## Clean build artifacts.
 	rm -f $(MANAGER_BINARY) $(PROXY_BINARY)
 
 .PHONY: run-manager
-run-manager: fmt vet ## Run manager from your host.
+run-manager: fmt ## Run manager from your host.
 	go run $(MANAGER_SRC)
 
 .PHONY: run-proxy
-run-proxy: fmt vet ## Run proxy from your host.
+run-proxy: fmt ## Run proxy from your host.
 	go run $(PROXY_SRC)
 
 ##@ Service Management

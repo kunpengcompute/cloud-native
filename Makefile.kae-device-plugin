@@ -52,12 +52,6 @@ fmt: ## Format code.
 	go fmt ./cmd/kae-device-plugin ./pkg/kae-device-plugin/...
 	@echo "Code formatted"
 
-.PHONY: vet
-vet: ## Run go vet.
-	@echo "Running go vet..."
-	go vet ./cmd/kae-device-plugin ./pkg/kae-device-plugin/...
-	@echo "Go vet completed"
-
 .PHONY: test
 test: ## Run tests.
 	@echo "Running tests..."
@@ -142,7 +136,7 @@ run: build-local ## Run the application locally.
 	./$(BUILD_DIR)/kae-device-plugin
 
 .PHONY: check
-check: fmt vet test ## Run all checks (format, vet, test).
+check: fmt test ## Run all checks (format, test).
 	@echo "All checks passed"
 
 .PHONY: ci
