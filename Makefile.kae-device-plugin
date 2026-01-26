@@ -46,12 +46,6 @@ deps: ## Download dependencies.
 	go get -d -v ./cmd/kae-device-plugin ./pkg/kae-device-plugin/...
 	@echo "Dependencies downloaded"
 
-.PHONY: fmt
-fmt: ## Format code.
-	@echo "Formatting code..."
-	go fmt ./cmd/kae-device-plugin ./pkg/kae-device-plugin/...
-	@echo "Code formatted"
-
 .PHONY: test
 test: ## Run tests.
 	@echo "Running tests..."
@@ -136,7 +130,7 @@ run: build-local ## Run the application locally.
 	./$(BUILD_DIR)/kae-device-plugin
 
 .PHONY: check
-check: fmt test ## Run all checks (format, test).
+check: test ## Run all checks (format, test).
 	@echo "All checks passed"
 
 .PHONY: ci

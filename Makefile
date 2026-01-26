@@ -63,9 +63,6 @@ mpam-uninstall: ## Uninstall k8s-mpam-controller from system.
 mpam-run: ## Run k8s-mpam-controller locally.
 	$(MAKE) -f Makefile.mpam run
 
-.PHONY: mpam-fmt
-mpam-fmt: ## Format k8s-mpam-controller code.
-	$(MAKE) -f Makefile.mpam fmt
 
 .PHONY: mpam-test
 mpam-test: ## Test k8s-mpam-controller.
@@ -97,9 +94,6 @@ kunpeng-tap-test: ## Test kunpeng-tap project.
 kunpeng-tap-clean: ## Clean kunpeng-tap build artifacts.
 	$(MAKE) -f Makefile.kunpeng-tap clean
 
-.PHONY: kunpeng-tap-fmt
-kunpeng-tap-fmt: ## Format kunpeng-tap code.
-	$(MAKE) -f Makefile.kunpeng-tap fmt
 
 .PHONY: kunpeng-tap-tidy
 kunpeng-tap-tidy: ## Tidy kunpeng-tap go modules.
@@ -195,10 +189,6 @@ kae-device-plugin-uninstall: ## Uninstall kae-device-plugin from system.
 kae-device-plugin-run: ## Run kae-device-plugin locally.
 	$(MAKE) -f Makefile.kae-device-plugin run
 
-.PHONY: kae-device-plugin-fmt
-kae-device-plugin-fmt: ## Format kae-device-plugin code.
-	$(MAKE) -f Makefile.kae-device-plugin fmt
-
 .PHONY: kae-device-plugin-test
 kae-device-plugin-test: ## Test kae-device-plugin.
 	$(MAKE) -f Makefile.kae-device-plugin test
@@ -217,9 +207,6 @@ clean: mpam-clean kunpeng-tap-clean kae-device-plugin-clean kunpeng-perf-monitor
 
 .PHONY: docker
 docker: mpam-docker kunpeng-tap-docker-build kae-device-plugin-docker kunpeng-perf-monitor-docker ## Build all docker images.
-
-.PHONY: fmt
-fmt: mpam-fmt kunpeng-tap-fmt kae-device-plugin-fmt ## Format code for all projects.
 
 .PHONY: test
 test: mpam-test kunpeng-tap-test kae-device-plugin-test kunpeng-perf-monitor-test ## Run tests for all projects.
@@ -311,6 +298,9 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	"$(CONTROLLER_GEN)" object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+.PHONY: fmt
+fmt: ## Run go fmt against code.
+	go fmt ./...
 
 .PHONY: vet
 vet: ## Run go vet against code.
