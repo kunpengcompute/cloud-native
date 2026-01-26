@@ -43,7 +43,7 @@ version: ## Show version information.
 .PHONY: deps
 deps: ## Download dependencies.
 	@echo "Downloading dependencies..."
-	bash libkperf.sh get_libkperf_ready $(CURDIR)
+	bash hack/kunpeng-perf-monitor/libkperf.sh get_libkperf_ready $(CURDIR)
 	go get -d -v ./cmd/kunpeng-perf-monitor ./pkg/kunpeng-perf-monitor/...
 	@echo "Dependencies downloaded"
 
@@ -100,7 +100,7 @@ build-static: deps ## Build binary statically to local bin directory.
 clean: ## Clean build artifacts.
 	@echo "Cleaning $(PROJECT_NAME)..."
 	# rm -f $(GOPATH_BIN)/kunpeng-perf-monitor
-	bash libkperf.sh rm_libkperf_files $(CURDIR)
+	bash hack/kunpeng-perf-monitor/libkperf.sh rm_libkperf_files $(CURDIR)
 	rm -rf $(BUILD_DIR)
 	@echo "Clean completed"
 

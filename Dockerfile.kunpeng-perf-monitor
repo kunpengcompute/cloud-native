@@ -27,7 +27,7 @@ RUN go env -w GO111MODULE=on && \
     go env -w GONOSUMDB=*
 
 # download dependencies manually, instead of using libkperf.sh
-RUN sed -i 's|get_dependencies=true|get_dependencies=false|g' libkperf.sh
+RUN sed -i 's|get_dependencies=true|get_dependencies=false|g' hack/kunpeng-perf-monitor/libkperf.sh
 RUN apt remove -y g++ && apt autoremove -y
 RUN apt-get update -y \
     && DEBIAN_FRONTEND=noninteractive \
