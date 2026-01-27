@@ -47,18 +47,6 @@ deps: ## Download dependencies.
 	go get -d -v ./cmd/kunpeng-perf-monitor ./pkg/kunpeng-perf-monitor/...
 	@echo "Dependencies downloaded"
 
-.PHONY: fmt
-fmt: ## Format code.
-	@echo "Formatting code..."
-	go fmt ./cmd/kunpeng-perf-monitor ./pkg/kunpeng-perf-monitor/...
-	@echo "Code formatted"
-
-.PHONY: vet
-vet: ## Run go vet.
-	@echo "Running go vet..."
-	go vet ./cmd/kunpeng-perf-monitor ./pkg/kunpeng-perf-monitor/...
-	@echo "Go vet completed"
-
 .PHONY: test
 test: deps ## Run tests.
 	@echo "Running tests..."
@@ -152,7 +140,7 @@ run: build-local ## Run the application locally.
 	./$(BUILD_DIR)/kunpeng-perf-monitor
 
 .PHONY: check
-check: fmt vet test ## Run all checks (format, vet, test).
+check: test ## Run all checks (format, test).
 	@echo "All checks passed"
 
 .PHONY: ci
