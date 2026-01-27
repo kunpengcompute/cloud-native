@@ -208,7 +208,7 @@ Kunpeng TAP的运行依赖于K8s集群，当前支持使用Dockershim通信方�
         WantedBy=multi-user.target
         ```
 
-        >![](figures/icon-note.gif) **说明：**
+        >**说明：**
         >指定运行时为Containerd，运行如下安装命令，参数配置可在源代码目录下的“hack/kunpeng-tap.service.containerd“文件中修改。
         >```
         >make install-service-containerd
@@ -244,7 +244,7 @@ Kunpeng TAP的运行依赖于K8s集群，当前支持使用Dockershim通信方�
             --resource-policy="numa-aware"
         ```
 
-    >![](figures/icon-note.gif) **说明：**
+    >**说明：**
     >用户可根据需求修改相关参数后启动。参数说明见[表1](#table105725712163)。
 
     **表 1**  参数说明
@@ -374,7 +374,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 2.  以指定Pod在**compute01**节点上运行为例，需要在YAML文件中的**spec**部分加入以下内容。
 
-    >![](figures/icon-note.gif) **说明：**
+    >**说明：**
     >在多个工作节点的K8s集群中，Pod可能会被调度到不同节点的NUMA内。如果希望Pod在指定的节点上运行，只需在YAML文件的**spec**部分加入**nodeSelector**字段，并指定**kubernetes.io/hostname**为目标节点的名称。
 
     ```
@@ -411,7 +411,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
                     "CpusetMems": "0",
         ```
 
-        >![](figures/icon-note.gif) **说明：**
+        >**说明：**
         >在不同的机器上查看时，绑定的NUMA节点不固定，_CpusetCpus_数字可能不一致。
 
         Containerd运行时可以运行如下命令查看容器的可调度CPU范围。
@@ -471,7 +471,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 2.  在**master节点**上执行如下命令部署插件。
 
     ```
-    cd k8s-mpam-controller-config/samples
+    cd config/k8s-mpam-controller-config/samples
     kubectl apply -f k8s-mpam-controller.yaml
     ```
 
@@ -560,7 +560,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
                 mb: <schemata>
         ```
 
-        >![](figures/icon-note.gif) **说明：**
+        >**说明：**
         >-   最多可以设置32个资源组（根分组默认占一个资源组，根分组下最多实际只能创建出31个资源组），每条<schemata\>必须要满足语法规则。
         >-   如果某个资源组中没有对某一项进行配置或者已配置的配置项不满足语法规则，该资源组将使用该配置项的默认配置。L3 cache的默认配置为**"L3:0=fffffff;1=fffffff;2=fffffff;3=fffffff"**；带宽的默认配置为**"MB:0=100;1=100;2=100;3=100"**
 
@@ -579,7 +579,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
     ls
     ```
 
-    >![](figures/icon-note.gif) **说明：**
+    >**说明：**
     >例如，可以通过以下命令查看资源组group1的配置。
     >```
     >cat group1/schemata
@@ -609,7 +609,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
             MPAM: enabled
         ```
 
-        >![](figures/icon-note.gif) **说明：**
+        >**说明：**
         >-   在**labels**字段中通过rcgroup字段指定对应的资源组，例如将Pod加到**group2**中。
         >-   在**nodeSelector**字段中增加**MPAM：enabled**，用于调度器将该Pod调度到支持MPAM特性的节点上去。
 
@@ -866,7 +866,7 @@ spec:
 
 使用动态MPAM隔离功能后插件会在“/sys/fs/resctrl“目录下创建mpam-controller\_dynamic目录，如下图所示。
 
-![](figures/zh-cn_image_0000002475117233.png)
+![](docs/images/mpam-controller_dynamic_dir.png)
 
 **部署离线业务<a name="section28948105567"></a>**
 
