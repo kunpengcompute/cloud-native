@@ -25,6 +25,15 @@ type HookManager interface {
 	v1alpha1.RuntimeHookServiceClient
 }
 
+// StateSynchronizer provides resource state synchronization capability
+// This interface is used to rebuild allocation state from cached containers
+// after the NRI plugin restarts
+type StateSynchronizer interface {
+	// RebuildAllocationsFromCache rebuilds resource allocation state from
+	// container information stored in the cache
+	RebuildAllocationsFromCache() error
+}
+
 // HookType identifies the container lifecycle hook point
 type HookType string
 

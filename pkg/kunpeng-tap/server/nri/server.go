@@ -130,6 +130,16 @@ func (p *Plugin) Synchronize(ctx context.Context, pods []*api.PodSandbox,
 	p.synchronizePods(pods)
 	p.synchronizeContainers(containers)
 
+	// Trigger resource state rebuild from cached containers
+	// This ensures topology-aware policy is aware of existing container NUMA placements
+	if rebuilder, ok := p.hookManager.(policy.StateSynchronizer); ok {
+		if err := rebuilder.RebuildAllocationsFromCache(); err != nil {
+			klog.ErrorS(err, "Failed to rebuild allocations from cache")
+		} else {
+			klog.InfoS("Successfully rebuilt allocations from cache")
+		}
+	}
+
 	return nil, nil
 }
 
@@ -158,7 +168,7 @@ func (p *Plugin) synchronizeContainers(containers []*api.Container) {
 		if container == nil {
 			continue
 		}
-		klog.InfoS("Synchronizing container", "id", container.Id, "name", container.Name)
+		klog.InfoS("Synchronizing container", "id", container.Id, "name", container.Name, "container's cpuset", container.Linux.Resources.Cpu.Cpus)
 		// Insert container into cache if not exists
 		if _, found := p.cache.LookupContainer(container.Id); !found {
 			_, err := p.cache.InsertContainer(container.Id, container)
