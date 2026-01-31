@@ -139,11 +139,6 @@ func NewTopologyAwarePolicyWithSystem(c cache.Cache, opts *policy.PolicyOptions,
 		return nil
 	}
 
-	// 从 cache 中恢复资源分配状态
-	if err := p.restoreAllocations(); err != nil {
-		klog.ErrorS(err, "Failed to restore allocations from cache")
-	}
-
 	// 初始化资源树监控管理器
 	p.metricsManager = NewTopologyMetricsManager(p)
 
@@ -1243,22 +1238,6 @@ func (p *TopologyAwarePolicy) rebuildContainerAllocation(container cache.Contain
 		"node", targetNode.Name(),
 		"allocatedCPUs", grant.AllocatedCPUs(),
 		"allocatedMemory", grant.AllocatedMemory())
-
-	return nil
-}
-
-// restoreAllocations 从 cache 中恢复资源分配状态
-func (p *TopologyAwarePolicy) restoreAllocations() error {
-	if p.cache == nil {
-		return nil
-	}
-
-	// 遍历所有容器
-	for _, container := range p.cache.GetContainers() {
-		if err := p.rebuildContainerAllocation(container); err != nil {
-			klog.ErrorS(err, "Failed to rebuild allocation for container", "containerID", container.GetID())
-		}
-	}
 
 	return nil
 }

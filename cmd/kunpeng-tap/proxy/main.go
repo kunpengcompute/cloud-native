@@ -163,16 +163,34 @@ func createPolicyOptions() *policy.PolicyOptions {
 func createProxyServer(d dispatcher.Dispatcher, policyManager policy.HookManager, cache cache.Cache) server.ProxyServer {
 	switch options.ContainerRuntimeMode {
 	case options.ContainerRuntimeModeContainerd:
-		return NewContainerdProxyServer(d, cache)
+		proxyServer := NewContainerdProxyServer(d, cache)
+		// Trigger resource state rebuild after cache population
+		triggerRebuildAllocations(policyManager)
+		return proxyServer
 	case options.ContainerRuntimeModeDocker:
-		return NewDockerProxyServer(d, cache)
+		proxyServer := NewDockerProxyServer(d, cache)
+		// Trigger resource state rebuild after cache population
+		triggerRebuildAllocations(policyManager)
+		return proxyServer
 	case options.ContainerRuntimeModeNRI:
 		// NRI mode works as a plugin, no proxy socket needed
+		// For NRI, rebuild is triggered in Synchronize callback
 		klog.InfoS("NRI mode: skipping proxy socket setup", "nriSocketPath", options.NRISocketPath)
 		return NewNriProxyServer(policyManager, cache, options.NRISocketPath)
 	default:
 		klog.Fatalf("unknown runtime engine backend %v", options.ContainerRuntimeMode)
 		return nil
+	}
+}
+
+// triggerRebuildAllocations triggers resource allocation state rebuild from cache
+func triggerRebuildAllocations(policyManager policy.HookManager) {
+	if rebuilder, ok := policyManager.(policy.StateSynchronizer); ok {
+		if err := rebuilder.RebuildAllocationsFromCache(); err != nil {
+			klog.ErrorS(err, "Failed to rebuild allocations from cache")
+		} else {
+			klog.InfoS("Successfully rebuilt allocations from cache")
+		}
 	}
 }
 
