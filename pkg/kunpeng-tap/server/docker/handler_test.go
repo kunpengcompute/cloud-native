@@ -149,7 +149,7 @@ var _ = Describe("Handler", Ordered, func() {
 			Expect(err).To(BeNil())
 			os.Remove(options.RuntimeProxyEndpoint)
 		}
-		dockerServer = docker.NewDockerServer(dockerHandler)
+		dockerServer = docker.NewDockerServer(dockerHandler, nil)
 		go dockerServer.Run()
 
 		l, err = net.Listen("tcp", ":0")

@@ -163,34 +163,17 @@ func createPolicyOptions() *policy.PolicyOptions {
 func createProxyServer(d dispatcher.Dispatcher, policyManager policy.HookManager, cache cache.Cache) server.ProxyServer {
 	switch options.ContainerRuntimeMode {
 	case options.ContainerRuntimeModeContainerd:
-		proxyServer := NewContainerdProxyServer(d, cache)
-		// Trigger resource state rebuild after cache population
-		triggerRebuildAllocations(policyManager)
-		return proxyServer
+		return NewContainerdProxyServer(d, policyManager, cache)
 	case options.ContainerRuntimeModeDocker:
-		proxyServer := NewDockerProxyServer(d, cache)
-		// Trigger resource state rebuild after cache population
-		triggerRebuildAllocations(policyManager)
-		return proxyServer
+		return NewDockerProxyServer(d, policyManager, cache)
 	case options.ContainerRuntimeModeNRI:
 		// NRI mode works as a plugin, no proxy socket needed
 		// For NRI, rebuild is triggered in Synchronize callback
 		klog.InfoS("NRI mode: skipping proxy socket setup", "nriSocketPath", options.NRISocketPath)
-		return NewNriProxyServer(policyManager, cache, options.NRISocketPath)
+		return NewNriAgent(policyManager, cache, options.NRISocketPath)
 	default:
 		klog.Fatalf("unknown runtime engine backend %v", options.ContainerRuntimeMode)
 		return nil
-	}
-}
-
-// triggerRebuildAllocations triggers resource allocation state rebuild from cache
-func triggerRebuildAllocations(policyManager policy.HookManager) {
-	if rebuilder, ok := policyManager.(policy.StateSynchronizer); ok {
-		if err := rebuilder.RebuildAllocationsFromCache(); err != nil {
-			klog.ErrorS(err, "Failed to rebuild allocations from cache")
-		} else {
-			klog.InfoS("Successfully rebuilt allocations from cache")
-		}
 	}
 }
 
@@ -202,7 +185,7 @@ func startMonitor(proxyServer server.ProxyServer) {
 	}
 }
 
-func NewContainerdProxyServer(dispatcher dispatcher.Dispatcher, cache cache.Cache) server.ProxyServer {
+func NewContainerdProxyServer(dispatcher dispatcher.Dispatcher, policyManager policy.HookManager, cache cache.Cache) server.ProxyServer {
 	containerRuntimeConn, err := grpc.NewClient(
 		options.GRPCPassthroughScheme+options.ContainerRuntimeEndpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -225,14 +208,14 @@ func NewContainerdProxyServer(dispatcher dispatcher.Dispatcher, cache cache.Cach
 		klog.Fatalf("failed to load container and pod into cache: %v", err)
 	}
 
-	// 默认使用NUMA-aware策略
 	return containerd.NewContainerdServer(
 		containerd.NewCriServer(runtimeServiceClient, dispatcher),
 		containerRuntimeConn,
+		policyManager,
 	)
 }
 
-func NewDockerProxyServer(dispatcher dispatcher.Dispatcher, cache cache.Cache) server.ProxyServer {
+func NewDockerProxyServer(dispatcher dispatcher.Dispatcher, policyManager policy.HookManager, cache cache.Cache) server.ProxyServer {
 	dockerClient, err := client.NewClientWithOpts(client.WithHost(options.UnixSocketPrefix+options.ContainerRuntimeEndpoint), client.WithAPIVersionNegotiation())
 	if err != nil {
 		klog.Fatalf("failed to get docker client from %v: %v", options.UnixSocketPrefix+options.ContainerRuntimeEndpoint, err)
@@ -249,19 +232,21 @@ func NewDockerProxyServer(dispatcher dispatcher.Dispatcher, cache cache.Cache) s
 	}
 
 	dispatcher.SetDockerCgroupDriver(info.CgroupDriver)
-	// 默认使用NUMA-aware策略
-	return docker.NewDockerServer(docker.NewDockerHandler(
-		docker.ReverseProxy(options.ContainerRuntimeEndpoint),
-		cache,
-		dockerClient,
-		dispatcher,
-	))
+	return docker.NewDockerServer(
+		docker.NewDockerHandler(
+			docker.ReverseProxy(options.ContainerRuntimeEndpoint),
+			cache,
+			dockerClient,
+			dispatcher,
+		),
+		policyManager,
+	)
 }
 
 // NewNriProxyServer creates a NRI proxy server.
-func NewNriProxyServer(hookManager policy.HookManager, cache cache.Cache, nriSocketPath string) server.ProxyServer {
+func NewNriAgent(hookManager policy.HookManager, cache cache.Cache, nriSocketPath string) server.ProxyServer {
 	klog.InfoS("Creating NRI proxy server", "socketPath", nriSocketPath)
-	proxyServer, err := nri.NewNriServer(cache, hookManager, nriSocketPath)
+	proxyServer, err := nri.NewNriAgent(cache, hookManager, nriSocketPath)
 	if err != nil {
 		klog.Fatalf("Failed to create NRI proxy server: %v", err)
 	}
