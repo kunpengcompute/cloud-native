@@ -408,6 +408,7 @@ func (cch *cache) processContainer(containerdClient criv1.RuntimeServiceClient, 
 			Name:      podCheckPoint.GetName(),
 			Uid:       podCheckPoint.GetUID(),
 			Namespace: podCheckPoint.GetNamespace(),
+			Id:        container.GetPodSandboxId(),
 		}
 		cInfo.PodResources = podCheckPoint.GetLinuxResources()
 	}
