@@ -20,14 +20,14 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 
 	"github.com/gorilla/mux"
 	"k8s.io/klog/v2"
 
-	"net/http/httputil"
-
 	"kunpeng.huawei.com/kunpeng-cloud-computing/cmd/kunpeng-tap/proxy/options"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/policy"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server"
 )
 
@@ -52,11 +52,13 @@ func ReverseProxy(containerRuntimeEndpoint string) *httputil.ReverseProxy {
 }
 
 type DockerServer struct {
-	httpServer http.Server
+	httpServer  http.Server
+	hookManager policy.HookManager
 }
 
 func NewDockerServer(
 	dockerHandler DockerHandler,
+	hookManager policy.HookManager,
 ) server.ProxyServer {
 	klog.InfoS("Creating and Registering docker server")
 	router := mux.NewRouter()
@@ -77,11 +79,15 @@ func NewDockerServer(
 		httpServer: http.Server{
 			Handler: router,
 		},
+		hookManager: hookManager,
 	}
 }
 
 func (d *DockerServer) Run() error {
 	klog.InfoS("Starting docker server", "endpoint", options.RuntimeProxyEndpoint)
+
+	// Trigger resource state rebuild from cache before starting the server
+	d.rebuildAllocations()
 
 	lis, err := net.Listen("unix", options.RuntimeProxyEndpoint)
 	if err != nil {
@@ -95,6 +101,20 @@ func (d *DockerServer) Run() error {
 	}
 
 	return nil
+}
+
+// rebuildAllocations triggers resource allocation state rebuild from cache
+func (d *DockerServer) rebuildAllocations() {
+	if d.hookManager == nil {
+		return
+	}
+	if rebuilder, ok := d.hookManager.(policy.StateSynchronizer); ok {
+		if err := rebuilder.RebuildAllocationsFromCache(); err != nil {
+			klog.ErrorS(err, "Failed to rebuild allocations from cache")
+		} else {
+			klog.InfoS("Successfully rebuilt allocations from cache")
+		}
+	}
 }
 
 func (d *DockerServer) Shutdown(ctx context.Context) {

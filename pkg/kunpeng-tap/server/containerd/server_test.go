@@ -53,7 +53,7 @@ var _ = Describe("Server", func() {
 
 		server = containerd.NewContainerdServer(containerd.NewCriServer(
 			fakeRuntimeServiceClient, fakeDispatcher,
-		), containerRuntimeConn)
+		), containerRuntimeConn, nil)
 
 		go func() {
 			err := server.Run()

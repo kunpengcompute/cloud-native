@@ -79,7 +79,7 @@ var _ = Describe("Server", Ordered, func() {
 			os.Remove(options.RuntimeProxyEndpoint)
 		}
 
-		server = docker.NewDockerServer(FakeDockerHandler)
+		server = docker.NewDockerServer(FakeDockerHandler, nil)
 		Expect(server).NotTo(BeNil())
 
 		go func() {

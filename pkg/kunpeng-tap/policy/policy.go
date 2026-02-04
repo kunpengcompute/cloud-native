@@ -141,6 +141,24 @@ func (pm *policyManager) GetCache() cache.Cache {
 	return pm.cache
 }
 
+// RebuildAllocationsFromCache rebuilds resource allocation state from cached containers
+// This method is called after NRI Synchronize to restore allocation state for existing containers
+func (pm *policyManager) RebuildAllocationsFromCache() error {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	for _, p := range pm.policies {
+		if rebuilder, ok := p.(StateSynchronizer); ok {
+			if err := rebuilder.RebuildAllocationsFromCache(); err != nil {
+				klog.ErrorS(err, "Failed to rebuild allocations from cache", "policy", p.Name())
+			} else {
+				klog.InfoS("Successfully rebuilt allocations from cache", "policy", p.Name())
+			}
+		}
+	}
+	return nil
+}
+
 // PreRunPodSandboxHook calls RuntimeHookServer before pod creating, and would merge RunPodSandboxHookResponse
 // and Original RunPodSandboxRequest generating a new RunPodSandboxRequest to transfer to backend runtime engine.
 // RuntimeHookServer should ensure the correct operations basing on RunPodSandboxHookRequest.

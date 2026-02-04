@@ -27,11 +27,13 @@ import (
 	"k8s.io/klog/v2"
 
 	"kunpeng.huawei.com/kunpeng-cloud-computing/cmd/kunpeng-tap/proxy/options"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/policy"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/server"
 )
 
 type ContainerdServer struct {
-	grpcServer *grpc.Server
+	grpcServer  *grpc.Server
+	hookManager policy.HookManager
 }
 
 func Dialer(ctx context.Context, addr string) (net.Conn, error) {
@@ -41,6 +43,7 @@ func Dialer(ctx context.Context, addr string) (net.Conn, error) {
 func NewContainerdServer(
 	criServer *criServer,
 	remoteContainerRuntimeConn *grpc.ClientConn,
+	hookManager policy.HookManager,
 ) server.ProxyServer {
 	klog.InfoS("Creating and Registering containerd server")
 
@@ -55,12 +58,16 @@ func NewContainerdServer(
 	runtimeapi.RegisterRuntimeServiceServer(grpcServer, criServer)
 
 	return &ContainerdServer{
-		grpcServer: grpcServer,
+		grpcServer:  grpcServer,
+		hookManager: hookManager,
 	}
 }
 
 func (c *ContainerdServer) Run() error {
 	klog.InfoS("Starting containerd server", "endpoint", options.RuntimeProxyEndpoint)
+
+	// Trigger resource state rebuild from cache before starting the server
+	c.rebuildAllocations()
 
 	lis, err := net.Listen("unix", options.RuntimeProxyEndpoint)
 	if err != nil {
@@ -74,6 +81,20 @@ func (c *ContainerdServer) Run() error {
 	}
 
 	return nil
+}
+
+// rebuildAllocations triggers resource allocation state rebuild from cache
+func (c *ContainerdServer) rebuildAllocations() {
+	if c.hookManager == nil {
+		return
+	}
+	if rebuilder, ok := c.hookManager.(policy.StateSynchronizer); ok {
+		if err := rebuilder.RebuildAllocationsFromCache(); err != nil {
+			klog.ErrorS(err, "Failed to rebuild allocations from cache")
+		} else {
+			klog.InfoS("Successfully rebuilt allocations from cache")
+		}
+	}
 }
 
 func (c *ContainerdServer) Shutdown(ctx context.Context) {

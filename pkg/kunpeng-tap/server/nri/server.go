@@ -39,8 +39,8 @@ const (
 	PluginIdx = "00"
 )
 
-// Plugin implements both the NRI plugin interface and server.ProxyServer interface
-type Plugin struct {
+// Agent implements both the NRI plugin interface and server.ProxyServer interface
+type Agent struct {
 	cache       cache.Cache
 	hookManager policy.HookManager
 	stub        stub.Stub
@@ -48,11 +48,11 @@ type Plugin struct {
 	socketPath  string
 }
 
-// NewNriServer creates a new NRI server instance
-func NewNriServer(cache cache.Cache, hookManager policy.HookManager, socketPath string) (server.ProxyServer, error) {
+// NewNriAgent creates a new NRI server instance
+func NewNriAgent(cache cache.Cache, hookManager policy.HookManager, socketPath string) (server.ProxyServer, error) {
 	klog.InfoS("Creating NRI server", "socketPath", socketPath)
 
-	plugin := &Plugin{
+	plugin := &Agent{
 		cache:       cache,
 		hookManager: hookManager,
 		mask: api.MustParseEventMask("RunPodSandbox,StopPodSandbox,RemovePodSandbox,CreateContainer," +
@@ -82,7 +82,7 @@ func NewNriServer(cache cache.Cache, hookManager policy.HookManager, socketPath 
 }
 
 // Run starts the NRI server
-func (p *Plugin) Run() error {
+func (p *Agent) Run() error {
 	klog.InfoS("Starting NRI server")
 	if err := p.start(); err != nil {
 		klog.InfoS("", "Failed to start NRI plugin", err)
@@ -92,7 +92,7 @@ func (p *Plugin) Run() error {
 }
 
 // Shutdown gracefully shuts down the NRI server
-func (p *Plugin) Shutdown(ctx context.Context) {
+func (p *Agent) Shutdown(ctx context.Context) {
 	klog.InfoS("Shutting down NRI server")
 	if p.stub != nil {
 		p.stub.Stop()
@@ -100,7 +100,7 @@ func (p *Plugin) Shutdown(ctx context.Context) {
 }
 
 // start starts the NRI plugin
-func (p *Plugin) start() error {
+func (p *Agent) start() error {
 	if p.stub == nil {
 		return fmt.Errorf("NRI plugin stub is not initialized")
 	}
@@ -114,7 +114,7 @@ func (p *Plugin) start() error {
 }
 
 // Configure is called when the plugin is being configured
-func (p *Plugin) Configure(ctx context.Context, config, runtime, version string) (stub.EventMask, error) {
+func (p *Agent) Configure(ctx context.Context, config, runtime, version string) (stub.EventMask, error) {
 	klog.InfoS("Configuring NRI plugin", "config", config, "runtime", runtime, "version", version)
 
 	// Return the events we want to subscribe to
@@ -122,7 +122,7 @@ func (p *Plugin) Configure(ctx context.Context, config, runtime, version string)
 }
 
 // Synchronize is called to synchronize the plugin state with the runtime
-func (p *Plugin) Synchronize(ctx context.Context, pods []*api.PodSandbox,
+func (p *Agent) Synchronize(ctx context.Context, pods []*api.PodSandbox,
 	containers []*api.Container) ([]*api.ContainerUpdate, error) {
 	klog.InfoS("Synchronizing NRI plugin", "pods", len(pods), "containers", len(containers))
 
@@ -130,11 +130,21 @@ func (p *Plugin) Synchronize(ctx context.Context, pods []*api.PodSandbox,
 	p.synchronizePods(pods)
 	p.synchronizeContainers(containers)
 
+	// Trigger resource state rebuild from cached containers
+	// This ensures topology-aware policy is aware of existing container NUMA placements
+	if rebuilder, ok := p.hookManager.(policy.StateSynchronizer); ok {
+		if err := rebuilder.RebuildAllocationsFromCache(); err != nil {
+			klog.ErrorS(err, "Failed to rebuild allocations from cache")
+		} else {
+			klog.InfoS("Successfully rebuilt allocations from cache")
+		}
+	}
+
 	return nil, nil
 }
 
 // synchronizePods synchronizes pods with the cache
-func (p *Plugin) synchronizePods(pods []*api.PodSandbox) {
+func (p *Agent) synchronizePods(pods []*api.PodSandbox) {
 	for _, pod := range pods {
 		if pod == nil {
 			continue
@@ -153,12 +163,12 @@ func (p *Plugin) synchronizePods(pods []*api.PodSandbox) {
 }
 
 // synchronizeContainers synchronizes containers with the cache
-func (p *Plugin) synchronizeContainers(containers []*api.Container) {
+func (p *Agent) synchronizeContainers(containers []*api.Container) {
 	for _, container := range containers {
 		if container == nil {
 			continue
 		}
-		klog.InfoS("Synchronizing container", "id", container.Id, "name", container.Name)
+		klog.InfoS("Synchronizing container", "id", container.Id, "name", container.Name, "container's cpuset", container.Linux.Resources.Cpu.Cpus)
 		// Insert container into cache if not exists
 		if _, found := p.cache.LookupContainer(container.Id); !found {
 			_, err := p.cache.InsertContainer(container.Id, container)
@@ -170,7 +180,7 @@ func (p *Plugin) synchronizeContainers(containers []*api.Container) {
 }
 
 // RunPodSandbox is called when a pod sandbox is being started
-func (p *Plugin) RunPodSandbox(ctx context.Context, pod *api.PodSandbox) error {
+func (p *Agent) RunPodSandbox(ctx context.Context, pod *api.PodSandbox) error {
 	klog.InfoS("Running pod sandbox", "podID", pod.Id, "podName", pod.Name, "namespace", pod.Namespace)
 
 	// Insert pod into cache
@@ -187,7 +197,7 @@ func (p *Plugin) RunPodSandbox(ctx context.Context, pod *api.PodSandbox) error {
 }
 
 // StopPodSandbox is called when a pod sandbox is being stopped
-func (p *Plugin) StopPodSandbox(ctx context.Context, pod *api.PodSandbox) error {
+func (p *Agent) StopPodSandbox(ctx context.Context, pod *api.PodSandbox) error {
 	klog.InfoS("Stopping pod sandbox", "podID", pod.Id, "podName", pod.Name, "namespace", pod.Namespace)
 
 	// Pod stop logic can be added here if needed
@@ -197,7 +207,7 @@ func (p *Plugin) StopPodSandbox(ctx context.Context, pod *api.PodSandbox) error 
 }
 
 // RemovePodSandbox is called when a pod sandbox is being removed
-func (p *Plugin) RemovePodSandbox(ctx context.Context, pod *api.PodSandbox) error {
+func (p *Agent) RemovePodSandbox(ctx context.Context, pod *api.PodSandbox) error {
 	klog.InfoS("Removing pod sandbox", "podID", pod.Id, "podName", pod.Name, "namespace", pod.Namespace)
 
 	// Remove pod from cache
@@ -212,7 +222,7 @@ func (p *Plugin) RemovePodSandbox(ctx context.Context, pod *api.PodSandbox) erro
 }
 
 // CreateContainer is called when a container is being created
-func (p *Plugin) CreateContainer(ctx context.Context, pod *api.PodSandbox,
+func (p *Agent) CreateContainer(ctx context.Context, pod *api.PodSandbox,
 	container *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error) {
 	klog.InfoS("Creating container",
 		"containerID", container.Id,
@@ -267,7 +277,7 @@ func (p *Plugin) CreateContainer(ctx context.Context, pod *api.PodSandbox,
 }
 
 // PostCreateContainer is called after a container has been created
-func (p *Plugin) PostCreateContainer(ctx context.Context, pod *api.PodSandbox, container *api.Container) error {
+func (p *Agent) PostCreateContainer(ctx context.Context, pod *api.PodSandbox, container *api.Container) error {
 	klog.InfoS("Post-create container", "containerID", container.Id, "containerName", container.Name, "podID", pod.Id)
 
 	// Container should already be in cache from CreateContainer
@@ -277,7 +287,7 @@ func (p *Plugin) PostCreateContainer(ctx context.Context, pod *api.PodSandbox, c
 }
 
 // StartContainer is called when a container is being started
-func (p *Plugin) StartContainer(ctx context.Context, pod *api.PodSandbox, container *api.Container) error {
+func (p *Agent) StartContainer(ctx context.Context, pod *api.PodSandbox, container *api.Container) error {
 	klog.InfoS("Starting container", "containerID", container.Id, "containerName", container.Name, "podID", pod.Id)
 
 	// Container start logic can be added here if needed
@@ -287,7 +297,7 @@ func (p *Plugin) StartContainer(ctx context.Context, pod *api.PodSandbox, contai
 }
 
 // StopContainer is called when a container is being stopped
-func (p *Plugin) StopContainer(ctx context.Context, pod *api.PodSandbox,
+func (p *Agent) StopContainer(ctx context.Context, pod *api.PodSandbox,
 	container *api.Container) ([]*api.ContainerUpdate, error) {
 	klog.InfoS("Stopping container", "containerID", container.Id, "containerName", container.Name, "podID", pod.Id)
 
@@ -312,7 +322,7 @@ func (p *Plugin) StopContainer(ctx context.Context, pod *api.PodSandbox,
 }
 
 // UpdateContainer is called when a container is being updated
-func (p *Plugin) UpdateContainer(ctx context.Context, pod *api.PodSandbox,
+func (p *Agent) UpdateContainer(ctx context.Context, pod *api.PodSandbox,
 	container *api.Container, resources *api.LinuxResources) ([]*api.ContainerUpdate, error) {
 	klog.InfoS("Updating container", "containerID", container.Id, "containerName", container.Name, "podID", pod.Id)
 
@@ -323,7 +333,7 @@ func (p *Plugin) UpdateContainer(ctx context.Context, pod *api.PodSandbox,
 }
 
 // RemoveContainer is called when a container is being removed
-func (p *Plugin) RemoveContainer(ctx context.Context, pod *api.PodSandbox, container *api.Container) error {
+func (p *Agent) RemoveContainer(ctx context.Context, pod *api.PodSandbox, container *api.Container) error {
 	klog.InfoS("Removing container", "containerID", container.Id, "containerName", container.Name, "podID", pod.Id)
 
 	// Convert NRI request to hook request format for removal
@@ -352,7 +362,7 @@ func (p *Plugin) RemoveContainer(ctx context.Context, pod *api.PodSandbox, conta
 }
 
 // convertToHookRequest converts NRI pod and container to hook request format
-func (p *Plugin) convertToHookRequest(pod *api.PodSandbox,
+func (p *Agent) convertToHookRequest(pod *api.PodSandbox,
 	container *api.Container) (*v1alpha1.ContainerResourceHookRequest, error) {
 	// Create hook request with basic metadata
 	hookReq := &v1alpha1.ContainerResourceHookRequest{
@@ -371,7 +381,7 @@ func (p *Plugin) convertToHookRequest(pod *api.PodSandbox,
 }
 
 // convertToCtrAdjustment converts hook response to NRI container adjustment
-func (p *Plugin) convertToCtrAdjustment(hookResp *v1alpha1.ContainerResourceHookResponse) *api.ContainerAdjustment {
+func (p *Agent) convertToCtrAdjustment(hookResp *v1alpha1.ContainerResourceHookResponse) *api.ContainerAdjustment {
 	if hookResp == nil {
 		return nil
 	}
@@ -399,7 +409,7 @@ func (p *Plugin) convertToCtrAdjustment(hookResp *v1alpha1.ContainerResourceHook
 }
 
 // setLinuxResources sets Linux resources using NRI adjustment helper methods
-func (p *Plugin) setLinuxResources(adjustment *api.ContainerAdjustment,
+func (p *Agent) setLinuxResources(adjustment *api.ContainerAdjustment,
 	resources *v1alpha1.LinuxContainerResources) {
 	// Set CPU resources
 	if resources.CpuPeriod != 0 {
@@ -431,7 +441,7 @@ func (p *Plugin) setLinuxResources(adjustment *api.ContainerAdjustment,
 }
 
 // convertPodMetadata converts NRI PodSandbox to PodSandboxMetadata
-func (p *Plugin) convertPodMetadata(pod *api.PodSandbox) *v1alpha1.PodSandboxMetadata {
+func (p *Agent) convertPodMetadata(pod *api.PodSandbox) *v1alpha1.PodSandboxMetadata {
 	return &v1alpha1.PodSandboxMetadata{
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
@@ -441,7 +451,7 @@ func (p *Plugin) convertPodMetadata(pod *api.PodSandbox) *v1alpha1.PodSandboxMet
 }
 
 // convertContainerMetadata converts NRI Container to ContainerMetadata
-func (p *Plugin) convertContainerMetadata(container *api.Container) *v1alpha1.ContainerMetadata {
+func (p *Agent) convertContainerMetadata(container *api.Container) *v1alpha1.ContainerMetadata {
 	return &v1alpha1.ContainerMetadata{
 		Name: container.Name,
 		Id:   container.Id,
@@ -449,7 +459,7 @@ func (p *Plugin) convertContainerMetadata(container *api.Container) *v1alpha1.Co
 }
 
 // convertContainerResources converts NRI container resources to LinuxContainerResources
-func (p *Plugin) convertContainerResources(container *api.Container) *v1alpha1.LinuxContainerResources {
+func (p *Agent) convertContainerResources(container *api.Container) *v1alpha1.LinuxContainerResources {
 	if container.Linux == nil || container.Linux.Resources == nil {
 		return nil
 	}
@@ -474,7 +484,7 @@ func (p *Plugin) convertContainerResources(container *api.Container) *v1alpha1.L
 }
 
 // extractCPUResources extracts CPU resources from NRI LinuxCPU
-func (p *Plugin) extractCPUResources(cpu *api.LinuxCPU,
+func (p *Agent) extractCPUResources(cpu *api.LinuxCPU,
 	containerResources *v1alpha1.LinuxContainerResources) {
 	if period := cpu.GetPeriod(); period != nil {
 		containerResources.CpuPeriod = int64(period.Value)
@@ -490,7 +500,7 @@ func (p *Plugin) extractCPUResources(cpu *api.LinuxCPU,
 }
 
 // extractMemoryResources extracts memory resources from NRI LinuxMemory
-func (p *Plugin) extractMemoryResources(memory *api.LinuxMemory,
+func (p *Agent) extractMemoryResources(memory *api.LinuxMemory,
 	containerResources *v1alpha1.LinuxContainerResources) {
 	if limit := memory.GetLimit(); limit != nil {
 		containerResources.MemoryLimitInBytes = limit.Value
@@ -498,7 +508,7 @@ func (p *Plugin) extractMemoryResources(memory *api.LinuxMemory,
 }
 
 // convertEnvironmentVariables converts NRI environment variables to map[string]string
-func (p *Plugin) convertEnvironmentVariables(envVars []string) map[string]string {
+func (p *Agent) convertEnvironmentVariables(envVars []string) map[string]string {
 	envMap := make(map[string]string)
 	for _, env := range envVars {
 		// NRI env variables are in "KEY=VALUE" format
@@ -518,7 +528,7 @@ func (p *Plugin) convertEnvironmentVariables(envVars []string) map[string]string
 }
 
 // extractCgroupParent extracts cgroup parent from NRI PodSandbox
-func (p *Plugin) extractCgroupParent(pod *api.PodSandbox) string {
+func (p *Agent) extractCgroupParent(pod *api.PodSandbox) string {
 	if pod.Linux != nil {
 		return pod.Linux.CgroupParent
 	}
@@ -526,7 +536,7 @@ func (p *Plugin) extractCgroupParent(pod *api.PodSandbox) string {
 }
 
 // convertPodResources converts NRI pod resources to LinuxContainerResources
-func (p *Plugin) convertPodResources(pod *api.PodSandbox) *v1alpha1.LinuxContainerResources {
+func (p *Agent) convertPodResources(pod *api.PodSandbox) *v1alpha1.LinuxContainerResources {
 	if pod.Linux == nil || pod.Linux.Resources == nil {
 		return nil
 	}

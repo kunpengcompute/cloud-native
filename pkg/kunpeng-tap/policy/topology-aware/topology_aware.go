@@ -139,11 +139,6 @@ func NewTopologyAwarePolicyWithSystem(c cache.Cache, opts *policy.PolicyOptions,
 		return nil
 	}
 
-	// 从 cache 中恢复资源分配状态
-	if err := p.restoreAllocations(); err != nil {
-		klog.ErrorS(err, "Failed to restore allocations from cache")
-	}
-
 	// 初始化资源树监控管理器
 	p.metricsManager = NewTopologyMetricsManager(p)
 
@@ -1093,14 +1088,36 @@ func (p *TopologyAwarePolicy) saveAllocations() {
 	}
 }
 
-// Helper method to find target node for container restoration
-func (p *TopologyAwarePolicy) findTargetNodeForRestore(cpus string) Node {
+// findNodeByCPUSet finds the best matching node for a given cpuset string
+// Strategy: find the deepest node whose CPU set contains the container's cpuset
+func (p *TopologyAwarePolicy) findNodeByCPUSet(cpuSetStr string) Node {
+	containerCPUs, err := cpuset.Parse(cpuSetStr)
+	if err != nil {
+		klog.ErrorS(err, "Failed to parse cpuset", "cpuset", cpuSetStr)
+		return nil
+	}
+
+	// Find the deepest (most precise) node whose CPU set contains the container's cpuset
+	var bestMatch Node
 	for _, node := range p.pools {
-		if node.FreeResource().SharableCPUs().String() == cpus {
-			return node
+		nodeCPUs := node.FreeResource().SharableCPUs()
+		// Check if container's cpuset is a subset of node's cpuset
+		if containerCPUs.IsSubsetOf(nodeCPUs) {
+			// Select the node with greatest depth (more precise match)
+			if bestMatch == nil || node.RootDistance() > bestMatch.RootDistance() {
+				bestMatch = node
+			}
 		}
 	}
-	return nil
+
+	if bestMatch != nil {
+		klog.V(5).InfoS("Found matching node for cpuset",
+			"cpuset", cpuSetStr,
+			"node", bestMatch.Name(),
+			"depth", bestMatch.RootDistance())
+	}
+
+	return bestMatch
 }
 
 // Helper method to create grant from container info
@@ -1123,51 +1140,214 @@ func (p *TopologyAwarePolicy) createGrantFromContainer(container cache.Container
 	}
 	grant := newGrant(targetNode, containerCtx, false, 0)
 
-	// Set allocated CPU from container limits
-	if resources := container.GetResourceRequirements(); resources.Limits != nil {
-		if cpuLimit := resources.Limits.Cpu(); cpuLimit != nil {
-			grant.SetAllocatedCPU(int(cpuLimit.MilliValue()))
+	// Set allocated CPU and memory from container resource requirements
+	resources := container.GetResourceRequirements()
+
+	// For containerd/docker mode, GetResourceRequirements() may return empty values
+	// because container.Resources is copied from pod.Resources which is not properly set.
+	// In this case, we need to estimate resources from LinuxContainerResources.
+	cpuRequestMilli := int64(0)
+	cpuLimitMilli := int64(0)
+	memoryBytes := int64(0)
+
+	// First try to get from ResourceRequirements
+	if resources.Requests != nil {
+		if cpuRequest := resources.Requests.Cpu(); cpuRequest != nil && cpuRequest.MilliValue() > 0 {
+			cpuRequestMilli = cpuRequest.MilliValue()
+		}
+		if memRequest := resources.Requests.Memory(); memRequest != nil && memRequest.Value() > 0 {
+			memoryBytes = memRequest.Value()
 		}
 	}
+	if resources.Limits != nil {
+		if cpuLimit := resources.Limits.Cpu(); cpuLimit != nil && cpuLimit.MilliValue() > 0 {
+			cpuLimitMilli = cpuLimit.MilliValue()
+		}
+	}
+
+	// If ResourceRequirements is empty, estimate from LinuxContainerResources
+	if cpuRequestMilli == 0 || cpuLimitMilli == 0 {
+		linuxRes := container.GetLinuxResources()
+		if linuxRes != nil {
+			// Calculate CPU request from CpuShares (shares to milliCPU conversion)
+			// CpuShares of 1024 = 1000 milliCPU (1 CPU)
+			if cpuRequestMilli == 0 && linuxRes.CpuShares > 0 {
+				cpuRequestMilli = int64(float64(linuxRes.CpuShares*1000)/float64(1024) + 0.5)
+			}
+			// Calculate CPU limit from CpuQuota and CpuPeriod
+			if cpuLimitMilli == 0 && linuxRes.CpuQuota > 0 && linuxRes.CpuPeriod > 0 {
+				cpuLimitMilli = int64(float64(linuxRes.CpuQuota*1000)/float64(linuxRes.CpuPeriod) + 0.5)
+			}
+			// Get memory limit
+			if memoryBytes == 0 && linuxRes.MemoryLimitInBytes > 0 {
+				memoryBytes = linuxRes.MemoryLimitInBytes
+			}
+		}
+	}
+
+	// Set CPU request
+	if cpuRequestMilli > 0 {
+		grant.SetAllocatedCPU(int(cpuRequestMilli))
+		grant.SetAllocatedCPUByRequest(int(cpuRequestMilli))
+	}
+
+	// Set CPU limit
+	if cpuLimitMilli > 0 {
+		grant.SetAllocatedCPUByLimit(int(cpuLimitMilli))
+	}
+
+	// Set memory (convert bytes to KB)
+	if memoryBytes > 0 {
+		grant.SetAllocatedMemory(uint64(memoryBytes / 1024))
+	}
+
+	klog.V(5).InfoS("Created grant from container",
+		"containerID", container.GetID(),
+		"cpuRequestMilli", cpuRequestMilli,
+		"cpuLimitMilli", cpuLimitMilli,
+		"memoryBytes", memoryBytes)
 
 	gid := pod.GetUID() + ":" + container.GetName()
 	return grant, gid, nil
 }
 
-// Helper method to process a single container for restoration
-func (p *TopologyAwarePolicy) processContainerForRestore(container cache.Container) error {
+// updateNodeResourceUsage updates the resource usage for a node and propagates to parent nodes
+func (p *TopologyAwarePolicy) updateNodeResourceUsage(node Node, grant Grant) {
+	if node == nil || node.IsNil() {
+		return
+	}
+
+	// Update the target node's resource usage
+	if s, ok := node.FreeResource().(*supply); ok {
+		s.grantedShared += grant.AllocatedCPUs()
+		s.grantedCPUByRequest += grant.AllocatedCPUByRequest()
+		s.grantedCPUByLimit += grant.AllocatedCPUByLimit()
+		s.grantedMemory += grant.AllocatedMemory()
+
+		klog.V(5).InfoS("Updated node resource usage",
+			"node", node.Name(),
+			"grantedShared", s.grantedShared,
+			"grantedCPUByRequest", s.grantedCPUByRequest,
+			"grantedCPUByLimit", s.grantedCPUByLimit,
+			"grantedMemory", s.grantedMemory)
+	}
+
+	// Propagate to parent nodes
+	p.propagateResourceUsageToParent(grant)
+}
+
+// rebuildContainerAllocation rebuilds allocation for a single container
+func (p *TopologyAwarePolicy) rebuildContainerAllocation(container cache.Container) error {
 	cpus := container.GetCpusetCpus()
 	if cpus == "" {
 		return nil // Skip containers without CPU allocation
 	}
 
-	targetNode := p.findTargetNodeForRestore(cpus)
-	if targetNode == nil {
-		klog.Warningf("Node not found when restoring grant for container %s", container.GetID())
+	// Check if grant already exists
+	pod, ok := container.GetPod()
+	if !ok {
+		return fmt.Errorf("pod not found for container %s", container.GetID())
+	}
+	gid := pod.GetUID() + ":" + container.GetName()
+	if _, exists := p.allocations.grants.Load(gid); exists {
+		klog.V(5).InfoS("Grant already exists, skipping rebuild",
+			"containerID", container.GetID(),
+			"gid", gid)
 		return nil
 	}
 
-	grant, gid, err := p.createGrantFromContainer(container, targetNode)
-	if err != nil {
-		klog.Warningf("Failed to create grant for container %s: %v", container.GetID(), err)
+	// Find matching node
+	targetNode := p.findNodeByCPUSet(cpus)
+	if targetNode == nil {
+		klog.Warningf("Node not found when rebuilding allocation for container %s with cpuset %s",
+			container.GetID(), cpus)
 		return nil
 	}
+
+	// Create grant
+	grant, gid, err := p.createGrantFromContainer(container, targetNode)
+	if err != nil {
+		return fmt.Errorf("failed to create grant: %w", err)
+	}
+
+	// Update node resource usage
+	p.updateNodeResourceUsage(targetNode, grant)
+
+	// Store grant
 	p.allocations.grants.Store(gid, grant)
+
+	klog.InfoS("Rebuilt allocation for container",
+		"containerID", container.GetID(),
+		"containerName", container.GetName(),
+		"cpuset", cpus,
+		"node", targetNode.Name(),
+		"allocatedCPUs", grant.AllocatedCPUs(),
+		"allocatedMemory", grant.AllocatedMemory())
+
 	return nil
 }
 
-// restoreAllocations 从 cache 中恢复资源分配状态
-func (p *TopologyAwarePolicy) restoreAllocations() error {
+// RebuildAllocationsFromCache implements StateSynchronizer interface
+// This method is called after NRI Synchronize to rebuild allocation state from cached containers
+func (p *TopologyAwarePolicy) RebuildAllocationsFromCache() error {
 	if p.cache == nil {
+		klog.InfoS("Cache is nil, skipping allocation rebuild")
 		return nil
 	}
 
-	// 遍历所有容器
-	for _, container := range p.cache.GetContainers() {
-		if err := p.processContainerForRestore(container); err != nil {
-			klog.ErrorS(err, "Failed to process container for restore", "containerID", container.GetID())
+	containers := p.cache.GetContainers()
+	klog.InfoS("Rebuilding allocations from cache", "containerCount", len(containers))
+
+	// Log available pools for debugging
+	for _, node := range p.pools {
+		supply := node.FreeResource()
+		if supply != nil {
+			klog.V(4).InfoS("Pool available for rebuild",
+				"node", node.Name(),
+				"sharableCPUs", supply.SharableCPUs().String(),
+				"depth", node.RootDistance())
 		}
 	}
+
+	rebuiltCount := 0
+	skippedNoCpuset := 0
+	for _, container := range containers {
+		cpuset := container.GetCpusetCpus()
+		if cpuset == "" {
+			skippedNoCpuset++
+			continue
+		}
+		if err := p.rebuildContainerAllocation(container); err != nil {
+			klog.ErrorS(err, "Failed to rebuild allocation for container",
+				"containerID", container.GetID(),
+				"containerName", container.GetName(),
+				"cpuset", cpuset)
+		} else {
+			rebuiltCount++
+		}
+	}
+
+	klog.InfoS("Completed rebuilding allocations from cache",
+		"totalContainers", len(containers),
+		"rebuiltAllocations", rebuiltCount,
+		"skippedNoCpuset", skippedNoCpuset)
+
+	// Log node resource usage after rebuild for verification
+	for _, node := range p.pools {
+		supply := node.FreeResource()
+		if supply != nil && supply.GrantedShared() > 0 {
+			klog.InfoS("Node resource usage after rebuild",
+				"node", node.Name(),
+				"grantedCPU", supply.GrantedShared(),
+				"grantedCPUByRequest", supply.GrantedCPUByRequest(),
+				"grantedCPUByLimit", supply.GrantedCPUByLimit(),
+				"grantedMemory", supply.GrantedMemory(),
+				"allocatableSharedCPU", supply.AllocatableSharedCPU())
+		}
+	}
+
+	// Update metrics after rebuild
+	p.updateAllMetrics()
 
 	return nil
 }

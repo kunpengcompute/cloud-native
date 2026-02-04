@@ -28,17 +28,17 @@ import (
 
 var _ = ginkgo.Describe("Plugin", func() {
 	var (
-		plugin *Plugin
+		plugin *Agent
 	)
 
 	ginkgo.BeforeEach(func() {
-		plugin = &Plugin{}
+		plugin = &Agent{}
 	})
 
 	ginkgo.Describe("Configure", func() {
 		ginkgo.Context("when configuring the plugin", func() {
 			ginkgo.BeforeEach(func() {
-				plugin = &Plugin{
+				plugin = &Agent{
 					mask: api.MustParseEventMask("RunPodSandbox,CreateContainer,PostCreateContainer,RemoveContainer"),
 				}
 			})
