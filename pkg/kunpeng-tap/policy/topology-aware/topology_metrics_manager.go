@@ -69,14 +69,14 @@ func (m *TopologyMetricsManager) updateNodeCapacityMetrics() {
 		return
 	}
 
-	m.policy.root.DepthFirst(func(node Node) error {
+	for _, node := range m.policy.pools {
 		if node == nil || node.IsNil() {
-			return nil
+			continue
 		}
 
 		supply := node.FreeResource()
 		if supply == nil {
-			return nil
+			continue
 		}
 
 		// 获取节点信息
@@ -107,9 +107,7 @@ func (m *TopologyMetricsManager) updateNodeCapacityMetrics() {
 				"total_kb",
 			).Set(float64(memInfo.MemTotal))
 		}
-
-		return nil
-	})
+	}
 }
 
 // updateNodeUsageMetrics 更新节点使用指标
@@ -118,14 +116,14 @@ func (m *TopologyMetricsManager) updateNodeUsageMetrics() {
 		return
 	}
 
-	m.policy.root.DepthFirst(func(node Node) error {
+	for _, node := range m.policy.pools {
 		if node == nil || node.IsNil() {
-			return nil
+			continue
 		}
 
 		supply := node.FreeResource()
 		if supply == nil {
-			return nil
+			continue
 		}
 
 		// 获取节点信息
@@ -171,9 +169,7 @@ func (m *TopologyMetricsManager) updateNodeUsageMetrics() {
 			"memory",
 			"allocated_kb",
 		).Set(float64(supply.GrantedMemory()))
-
-		return nil
-	})
+	}
 }
 
 // updateContainerDistributionMetrics 更新容器分布指标
@@ -204,16 +200,9 @@ func (m *TopologyMetricsManager) updateContainerDistributionMetrics() {
 
 	// 更新容器分布指标
 	for nodeName, count := range nodeContainerCount {
-		// 查找对应的节点
-		var targetNode Node
-		m.policy.root.DepthFirst(func(node Node) error {
-			if node.Name() == nodeName {
-				targetNode = node
-			}
-			return nil
-		})
-
-		if targetNode == nil {
+		// 通过 p.nodes 直接查找节点
+		targetNode, exists := m.policy.nodes[nodeName]
+		if !exists || targetNode == nil {
 			continue
 		}
 
@@ -238,8 +227,6 @@ func (m *TopologyMetricsManager) getHierarchyLevel(node Node) string {
 		return "virtual"
 	case SocketNode:
 		return "socket"
-	case DieNode:
-		return "die"
 	case NumaNode:
 		return "numa"
 	case ClusterNode:
