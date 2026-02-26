@@ -28,6 +28,17 @@ import (
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/sysfs/system"
 )
 
+// ScoreContext provides external information needed for score calculation.
+// This interface breaks the circular dependency between Node and TopologyAwarePolicy
+// by allowing the Policy to provide colocation and GPU information without being
+// directly referenced by Node.
+type ScoreContext interface {
+	// CountColocation returns the number of containers already allocated to the specified node.
+	CountColocation(nodeID int) int
+	// CountNodeGPUs returns the number of GPUs attached to the specified NUMA node.
+	CountNodeGPUs(numaID system.ID) int
+}
+
 type Supply interface {
 	// GetNode returns the node supplying this capacity.
 	GetNode() Node
@@ -36,7 +47,9 @@ type Supply interface {
 	// Clone clones the given supply.
 	Clone() Supply
 	// GetScore calculates how well this supply fits/fulfills the given request.
-	GetScore(Request) Score
+	// The ctx parameter provides external information (colocation count, GPU count)
+	// that would otherwise require a circular dependency on the policy.
+	GetScore(req Request, ctx ScoreContext) Score
 	// Granted returns the locally granted capacity in this supply.
 	GrantedShared() int
 	// GrantedCPUByRequest returns the amount of milli-CPU granted by request.
@@ -50,6 +63,10 @@ type Supply interface {
 
 	// SharableCPUs returns the sharable cpuset in this supply.
 	SharableCPUs() cpuset.CPUSet
+	// IsolatedCPUs returns the isolated cpuset in this supply.
+	IsolatedCPUs() cpuset.CPUSet
+	// TotalCPUs returns the total cpuset (isolated + sharable) in this supply.
+	TotalCPUs() cpuset.CPUSet
 
 	Release(Grant)
 
@@ -108,6 +125,16 @@ func (cs *supply) SharableCPUs() cpuset.CPUSet {
 	return cs.sharable.Clone()
 }
 
+// IsolatedCPUs returns the isolated CPUSet of this supply.
+func (cs *supply) IsolatedCPUs() cpuset.CPUSet {
+	return cs.isolated.Clone()
+}
+
+// TotalCPUs returns the total CPUSet (isolated + sharable) of this supply.
+func (cs *supply) TotalCPUs() cpuset.CPUSet {
+	return cs.isolated.Union(cs.sharable)
+}
+
 // Collect collects the given supply into this one.
 func (s *supply) Collect(more Supply) {
 	moreSupply, ok := more.(*supply)
@@ -125,7 +152,9 @@ func (s *supply) Collect(more Supply) {
 }
 
 // Score collects data for scoring this supply wrt. the given request.
-func (s *supply) GetScore(req Request) Score {
+// The ctx parameter provides external information (colocation count, GPU count)
+// that breaks the circular dependency on the policy.
+func (s *supply) GetScore(req Request, ctx ScoreContext) Score {
 	score := &score{
 		supply:    s,
 		request:   req,
@@ -137,20 +166,14 @@ func (s *supply) GetScore(req Request) Score {
 	score.sharedByLimit = s.AllocatableCPUByLimit() - req.CPULimit()
 	score.memoryCapacity = s.AllocatableMemory()
 
-	// 计算 colocation score
-	s.node.Policy().allocations.grants.Range(func(_, grantVal interface{}) bool {
-		grant := grantVal.(Grant)
-		if grant.GetNode().NodeID() == s.node.NodeID() {
-			score.colocated++
-		}
-		return true
-	})
+	// 计算 colocation score - 使用 context 获取，避免循环依赖
+	score.colocated = ctx.CountColocation(s.node.NodeID())
 
-	// 计算节点上的GPU数量
+	// 计算节点上的GPU数量 - 使用 context 获取，避免循环依赖
 	numaIDs := s.node.GetNUMAIDs()
 	score.gpuCount = 0
 	for _, numaID := range numaIDs {
-		score.gpuCount += len(s.node.Policy().sys.NodeGPUs(numaID))
+		score.gpuCount += ctx.CountNodeGPUs(numaID)
 	}
 
 	return score
