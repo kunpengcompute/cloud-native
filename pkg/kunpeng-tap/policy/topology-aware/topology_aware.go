@@ -85,6 +85,33 @@ func (p *TopologyAwarePolicy) Root() Node {
 	return p.root
 }
 
+// CountColocation returns the number of containers already allocated to the specified node.
+// Implements the ScoreContext interface.
+func (p *TopologyAwarePolicy) CountColocation(nodeID int) int {
+	count := 0
+	p.allocations.grants.Range(func(_, grantVal interface{}) bool {
+		grant, ok := grantVal.(Grant)
+		if !ok {
+			klog.ErrorS(nil, "Invalid grant type in allocations", "grantVal", grantVal)
+			return true
+		}
+		if grant.GetNode().NodeID() == nodeID {
+			count++
+		}
+		return true
+	})
+	return count
+}
+
+// CountNodeGPUs returns the number of GPUs attached to the specified NUMA node.
+// Implements the ScoreContext interface.
+func (p *TopologyAwarePolicy) CountNodeGPUs(numaID system.ID) int {
+	return len(p.sys.NodeGPUs(numaID))
+}
+
+// Ensure TopologyAwarePolicy implements ScoreContext.
+var _ ScoreContext = &TopologyAwarePolicy{}
+
 func (p *TopologyAwarePolicy) MemoryTopology() bool {
 	return p.enableMemoryTopology
 }
@@ -522,27 +549,27 @@ func (p *TopologyAwarePolicy) findRegularPool(request Request, pools []Node) Nod
 
 	klog.V(4).InfoS("Selected pool",
 		"pool", bestPool.Name(),
-		"capacity", bestPool.FreeResource().GetScore(request).SharedCapacity(),
+		"capacity", bestPool.FreeResource().GetScore(request, p).SharedCapacity(),
 		"depth", bestPool.RootDistance())
 	return bestPool
 }
 
 func (p *TopologyAwarePolicy) hasCapacity(request Request, pool Node) bool {
-	return checkCapacityByRequest(request, p.root, pool) && checkMemoryCapacity(request, p.root, pool)
+	return p.checkCapacityByRequest(request, pool) && p.checkMemoryCapacity(request, pool)
 }
 
 // checkCapacityByRequest 检查 pool 是否有足够的容量满足请求
 // 使用 request 值进行容量检查，与实际分配逻辑保持一致
-func checkCapacityByRequest(request Request, root, pool Node) bool {
+func (p *TopologyAwarePolicy) checkCapacityByRequest(request Request, pool Node) bool {
 	// 不断向上遍历，确认是否满足容量条件
-	for pool != nil && pool != root {
+	for pool != nil && pool != p.root {
 		freeResource := pool.FreeResource()
 		if freeResource == nil {
 			klog.ErrorS(nil, "Pool has nil FreeResource", "pool", pool.Name())
 			return false
 		}
 
-		score := freeResource.GetScore(request)
+		score := freeResource.GetScore(request, p)
 		if score == nil {
 			klog.ErrorS(nil, "FreeResource returned nil score", "pool", pool.Name(), "request", request.String())
 			return false
@@ -563,10 +590,10 @@ func checkCapacityByRequest(request Request, root, pool Node) bool {
 }
 
 // checkMemoryCapacity checks if the pool has enough capacity for the request.
-func checkMemoryCapacity(request Request, root, pool Node) bool {
+func (p *TopologyAwarePolicy) checkMemoryCapacity(request Request, pool Node) bool {
 	// 不断向上遍历，确认是否满足容量条件
-	for pool != nil && pool != root {
-		if pool.FreeResource().GetScore(request).MemoryCapacity() < uint64(request.MemoryLimit()/1024) {
+	for pool != nil && pool != p.root {
+		if pool.FreeResource().GetScore(request, p).MemoryCapacity() < uint64(request.MemoryLimit()/1024) {
 			return false
 		}
 		pool = pool.Parent()
@@ -669,10 +696,9 @@ func (p *TopologyAwarePolicy) applyGrant(grant Grant) {
 func (p *TopologyAwarePolicy) sortPoolsByScore(req Request, affinity map[int]int32) (map[int]Score, []Node) {
 	scores := make(map[int]Score, p.nodeCnt)
 
-	p.root.DepthFirst(func(n Node) error {
-		scores[n.NodeID()] = n.GetScore(req)
-		return nil
-	})
+	for _, n := range p.pools {
+		scores[n.NodeID()] = n.GetScore(req, p)
+	}
 
 	sort.Slice(p.pools, func(i, j int) bool {
 		return p.compare(req, scores, affinity, i, j)
@@ -687,8 +713,8 @@ func (p *TopologyAwarePolicy) sortPoolsByScore(req Request, affinity map[int]int
 // compareResourceCapacity 比较两个节点的资源容量
 // 使用 SharedCapacity()（基于 limit）进行排序，确保选出的节点能容纳 limit
 func (p *TopologyAwarePolicy) compareResourceCapacity(request Request, node1, node2 Node) (bool, bool) {
-	capacity1 := node1.FreeResource().GetScore(request).SharedCapacity()
-	capacity2 := node2.FreeResource().GetScore(request).SharedCapacity()
+	capacity1 := node1.FreeResource().GetScore(request, p).SharedCapacity()
+	capacity2 := node2.FreeResource().GetScore(request, p).SharedCapacity()
 
 	// 有足够容量的节点优先
 	if capacity1 >= 0 && capacity2 < 0 {
@@ -1394,11 +1420,11 @@ func (p *TopologyAwarePolicy) createSocketNodes() map[system.ID]Node {
 		var socket Node
 
 		if p.root != nil {
-			socket = NewSocketNode(p, socketID, p.root)
+			socket = NewSocketNode(p, socketID, p.root, p.sys.Package(socketID))
 			klog.V(5).InfoS("Created pool for ", "name", p.root.Name()+"/"+socket.Name())
 		} else {
 			// 单 Socket 时，直接设置为根节点
-			socket = NewSocketNode(p, socketID, nilNode)
+			socket = NewSocketNode(p, socketID, nilNode, p.sys.Package(socketID))
 			p.root = socket
 			klog.V(5).InfoS("Created single socket pool for ", "name", socket.Name())
 		}
@@ -1410,101 +1436,12 @@ func (p *TopologyAwarePolicy) createSocketNodes() map[system.ID]Node {
 	return sockets
 }
 
-// validateDieStructure checks if die structure is valid
-func (p *TopologyAwarePolicy) validateDieStructure() bool {
-	hasDieTopology := false
-	for _, socketID := range p.sys.PackageIDs() {
-		pkg := p.sys.Package(socketID)
-		dieIDs := pkg.DieIDs()
-
-		if len(dieIDs) > 0 {
-			hasDieTopology = true
-			// 检查每个 die 的合法性
-			for _, dieID := range dieIDs {
-				// 检查 die ID 是否合法
-				if dieID < 0 {
-					klog.V(4).InfoS("Invalid die ID found",
-						"socketID", socketID,
-						"dieID", dieID)
-					return false
-				}
-
-				// 检查该 die 是否有关联的 NUMA 节点
-				if len(pkg.DieNodeIDs(dieID)) == 0 {
-					klog.V(4).InfoS("Die has no associated NUMA nodes",
-						"socketID", socketID,
-						"dieID", dieID)
-					return false
-				}
-			}
-		}
-	}
-
-	if !hasDieTopology {
-		klog.V(4).Info("No valid die topology detected")
-		return false
-	}
-
-	klog.V(3).Info("Valid die topology detected")
-	return true
-}
-
-// createDieNodes creates die nodes and returns a map of NUMA ID to its parent die Node
-func (p *TopologyAwarePolicy) createDieNodes(sockets map[system.ID]Node) map[system.ID]Node {
-	dies := make(map[system.ID]Node)
-
-	// 检查是否存在合法的 die 层级
-	if !p.validateDieStructure() {
-		klog.V(4).Info("No valid die topology detected, skipping die node creation")
-		return dies
-	}
-
-	// 遍历 Socket 节点，创建 die 节点
-	for _, socketID := range p.sys.PackageIDs() {
-		socket, ok := sockets[socketID]
-		if !ok {
-			klog.Warningf("Socket not found: socketID=%d", socketID)
-			continue
-		}
-
-		pkg := p.sys.Package(socketID)
-
-		for _, dieID := range pkg.DieIDs() {
-			if len(pkg.DieNodeIDs(dieID)) > 0 {
-				die := NewDieNode(p, dieID, socket)
-				p.nodes[die.Name()] = die
-				// 记录 die 节点下属的 NUMA 节点映射关系
-				for _, numaID := range pkg.DieNodeIDs(dieID) {
-					dies[numaID] = die
-				}
-				klog.V(5).InfoS("Created die node",
-					"socketID", socketID,
-					"dieID", dieID,
-					"numaNodes", pkg.DieNodeIDs(dieID))
-			}
-		}
-	}
-
-	return dies
-}
-
 // createNumaNodes creates NUMA nodes and returns a map of NUMA ID to Node
-func (p *TopologyAwarePolicy) createNumaNodes(sockets map[system.ID]Node, dies map[system.ID]Node) map[system.ID]Node {
+func (p *TopologyAwarePolicy) createNumaNodes(sockets map[system.ID]Node) map[system.ID]Node {
 	numaNodes := make(map[system.ID]Node)
 
 	for _, numaNodeID := range p.sys.NodeIDs() {
-		var parent Node
-
-		// 根据是否有 die 层级决定 NUMA 节点的父节点
-		if len(dies) > 0 {
-			if dieNode, exists := dies[numaNodeID]; exists {
-				parent = dieNode
-			} else {
-				parent = sockets[p.sys.Node(numaNodeID).PackageID()]
-			}
-		} else {
-			parent = sockets[p.sys.Node(numaNodeID).PackageID()]
-		}
+		parent := sockets[p.sys.Node(numaNodeID).PackageID()]
 
 		numaNode := NewNumaNode(p, numaNodeID, parent)
 		p.nodes[numaNode.Name()] = numaNode
@@ -1550,7 +1487,7 @@ func (p *TopologyAwarePolicy) createClusterNodes(numaNodes map[system.ID]Node) {
 				continue
 			}
 
-			clusterNode := NewClusterNode(p, clusterID, numaNodeID, sysCluster.CPUSet(), sysCluster, numaNode)
+			clusterNode := NewClusterNode(p, sysCluster, numaNode)
 			p.nodes[clusterNode.Name()] = clusterNode
 
 			klog.V(5).InfoS("Created cluster node",
@@ -1613,23 +1550,22 @@ func (p *TopologyAwarePolicy) buildResourcePoolsByTopology() error {
 	// 创建 Socket 节点
 	sockets := p.createSocketNodes()
 
-	// 创建 Die 节点
-	dies := p.createDieNodes(sockets)
-	if len(dies) > 0 {
-		klog.Info("Die topology is valid, die nodes created")
-	} else {
-		klog.Info("No valid die topology detected, skipping die nodes")
-	}
-
 	// 创建 NUMA 节点
-	numaNodes := p.createNumaNodes(sockets, dies)
+	numaNodes := p.createNumaNodes(sockets)
 
 	// 创建 Cluster 节点（仅在启用 cluster 亲和且机器支持 Cluster 特性时）
 	p.createClusterNodes(numaNodes)
 
-	// 深度遍历资源树，计算深度和资源量，赋值 NUMA 节点
-	p.pools = make([]Node, 0)
-	err := p.root.DepthFirst(func(n Node) error {
+	// Assign node IDs and collect pools (resources already created during node construction)
+	p.pools = make([]Node, 0, len(p.nodes))
+
+	// Helper function to traverse the tree in DFS order
+	var collectNodes func(n Node)
+	collectNodes = func(n Node) {
+		if n.IsNil() {
+			return
+		}
+
 		p.pools = append(p.pools, n)
 		n.SetNodeID(p.nodeCnt)
 		p.nodeCnt++
@@ -1637,19 +1573,20 @@ func (p *TopologyAwarePolicy) buildResourcePoolsByTopology() error {
 		if p.depth < n.Depth() {
 			p.depth = n.Depth()
 		}
-		n.DiscoverResource()
-		return nil
-	})
 
-	if err != nil {
-		return fmt.Errorf("failed to build resource pools: %v", err)
+		// Traverse children
+		for _, child := range n.Children() {
+			collectNodes(child)
+		}
 	}
+
+	// Start traversal from root
+	collectNodes(p.root)
 
 	clusterCount := len(p.sys.ClusterIDs())
 
 	klog.InfoS("Topology pool setup completed",
 		"socketCount", len(sockets),
-		"dieCount", len(dies),
 		"numaCount", len(p.sys.NodeIDs()),
 		"clusterCount", clusterCount,
 		"clusterAffinityEnabled", p.enableClusterAffinity)
