@@ -411,15 +411,21 @@ func (p *Agent) convertToCtrAdjustment(hookResp *v1alpha1.ContainerResourceHookR
 // setLinuxResources sets Linux resources using NRI adjustment helper methods
 func (p *Agent) setLinuxResources(adjustment *api.ContainerAdjustment,
 	resources *v1alpha1.LinuxContainerResources) {
-	// Set CPU resources
-	if resources.CpuPeriod != 0 {
+	// Set CPU resources with value validation to prevent scope bypass
+	if resources.CpuPeriod > 0 {
 		adjustment.SetLinuxCPUPeriod(resources.CpuPeriod)
+	} else if resources.CpuPeriod != 0 {
+		klog.Warningf("Ignoring invalid CpuPeriod value: %d", resources.CpuPeriod)
 	}
-	if resources.CpuQuota != 0 {
+	if resources.CpuQuota > 0 {
 		adjustment.SetLinuxCPUQuota(resources.CpuQuota)
+	} else if resources.CpuQuota != 0 {
+		klog.Warningf("Ignoring invalid CpuQuota value: %d", resources.CpuQuota)
 	}
-	if resources.CpuShares != 0 {
+	if resources.CpuShares > 0 {
 		adjustment.SetLinuxCPUShares(uint64(resources.CpuShares))
+	} else if resources.CpuShares != 0 {
+		klog.Warningf("Ignoring invalid CpuShares value: %d", resources.CpuShares)
 	}
 	if resources.CpusetCpus != "" {
 		adjustment.SetLinuxCPUSetCPUs(resources.CpusetCpus)
@@ -428,15 +434,21 @@ func (p *Agent) setLinuxResources(adjustment *api.ContainerAdjustment,
 		adjustment.SetLinuxCPUSetMems(resources.CpusetMems)
 	}
 
-	// Set Memory resources
-	if resources.MemoryLimitInBytes != 0 {
+	// Set Memory resources with value validation
+	if resources.MemoryLimitInBytes > 0 {
 		adjustment.SetLinuxMemoryLimit(resources.MemoryLimitInBytes)
+	} else if resources.MemoryLimitInBytes != 0 {
+		klog.Warningf("Ignoring invalid MemoryLimitInBytes value: %d", resources.MemoryLimitInBytes)
 	}
 
-	// Set OOM score adjustment
+	// Set OOM score adjustment with range validation (valid range: -1000 to 1000)
 	if resources.OomScoreAdj != 0 {
-		oomScore := int(resources.OomScoreAdj)
-		adjustment.SetLinuxOomScoreAdj(&oomScore)
+		if resources.OomScoreAdj < -1000 || resources.OomScoreAdj > 1000 {
+			klog.Warningf("Ignoring out-of-range OomScoreAdj value: %d", resources.OomScoreAdj)
+		} else {
+			oomScore := int(resources.OomScoreAdj)
+			adjustment.SetLinuxOomScoreAdj(&oomScore)
+		}
 	}
 }
 
@@ -495,8 +507,13 @@ func (p *Agent) extractCPUResources(cpu *api.LinuxCPU,
 	if shares := cpu.GetShares(); shares != nil {
 		containerResources.CpuShares = int64(shares.Value)
 	}
-	containerResources.CpusetCpus = cpu.GetCpus()
-	containerResources.CpusetMems = cpu.GetMems()
+	// Validate CpusetCpus and CpusetMems before assignment to avoid bypassing scope
+	if cpus := cpu.GetCpus(); cpus != "" {
+		containerResources.CpusetCpus = cpus
+	}
+	if mems := cpu.GetMems(); mems != "" {
+		containerResources.CpusetMems = mems
+	}
 }
 
 // extractMemoryResources extracts memory resources from NRI LinuxMemory

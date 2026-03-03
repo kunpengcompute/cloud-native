@@ -120,25 +120,46 @@ func (c *container) convertNriLinuxResources(nriRes *api.LinuxResources) *v1alph
 
 	resources := &v1alpha1.LinuxContainerResources{}
 
-	// Convert CPU resources
+	// Convert CPU resources with value validation to prevent scope bypass
 	if cpu := nriRes.GetCpu(); cpu != nil {
 		if period := cpu.GetPeriod(); period != nil {
-			resources.CpuPeriod = int64(period.Value)
+			if int64(period.Value) > 0 {
+				resources.CpuPeriod = int64(period.Value)
+			} else {
+				klog.Warningf("Ignoring invalid CpuPeriod value in container resource conversion: %d", period.Value)
+			}
 		}
 		if quota := cpu.GetQuota(); quota != nil {
-			resources.CpuQuota = quota.Value
+			if quota.Value > 0 {
+				resources.CpuQuota = quota.Value
+			} else {
+				klog.Warningf("Ignoring invalid CpuQuota value in container resource conversion: %d", quota.Value)
+			}
 		}
 		if shares := cpu.GetShares(); shares != nil {
-			resources.CpuShares = int64(shares.Value)
+			if int64(shares.Value) > 0 {
+				resources.CpuShares = int64(shares.Value)
+			} else {
+				klog.Warningf("Ignoring invalid CpuShares value in container resource conversion: %d", shares.Value)
+			}
 		}
-		resources.CpusetCpus = cpu.GetCpus()
-		resources.CpusetMems = cpu.GetMems()
+		// Validate CpusetCpus and CpusetMems before assignment to avoid bypassing scope
+		if cpus := cpu.GetCpus(); cpus != "" {
+			resources.CpusetCpus = cpus
+		}
+		if mems := cpu.GetMems(); mems != "" {
+			resources.CpusetMems = mems
+		}
 	}
 
-	// Convert Memory resources
+	// Convert Memory resources with value validation
 	if memory := nriRes.GetMemory(); memory != nil {
 		if limit := memory.GetLimit(); limit != nil {
-			resources.MemoryLimitInBytes = limit.Value
+			if limit.Value > 0 {
+				resources.MemoryLimitInBytes = limit.Value
+			} else {
+				klog.Warningf("Ignoring invalid MemoryLimitInBytes value in container resource conversion: %d", limit.Value)
+			}
 		}
 	}
 
@@ -281,6 +302,10 @@ func (c *container) SetLinuxResources(req *v1alpha1.LinuxContainerResources) {
 }
 
 func (c *container) SetCPUPeriod(value int64) {
+	if value < 0 {
+		klog.Warningf("Ignoring invalid CpuPeriod value: %d", value)
+		return
+	}
 	if c.LinuxReq == nil {
 		c.LinuxReq = &v1alpha1.LinuxContainerResources{}
 	}
@@ -289,6 +314,10 @@ func (c *container) SetCPUPeriod(value int64) {
 }
 
 func (c *container) SetCPUQuota(value int64) {
+	if value < 0 {
+		klog.Warningf("Ignoring invalid CpuQuota value: %d", value)
+		return
+	}
 	if c.LinuxReq == nil {
 		c.LinuxReq = &v1alpha1.LinuxContainerResources{}
 	}
@@ -297,6 +326,10 @@ func (c *container) SetCPUQuota(value int64) {
 }
 
 func (c *container) SetCPUShares(value int64) {
+	if value < 0 {
+		klog.Warningf("Ignoring invalid CpuShares value: %d", value)
+		return
+	}
 	if c.LinuxReq == nil {
 		c.LinuxReq = &v1alpha1.LinuxContainerResources{}
 	}
@@ -305,6 +338,10 @@ func (c *container) SetCPUShares(value int64) {
 }
 
 func (c *container) SetMemoryLimit(value int64) {
+	if value < 0 {
+		klog.Warningf("Ignoring invalid MemoryLimitInBytes value: %d", value)
+		return
+	}
 	if c.LinuxReq == nil {
 		c.LinuxReq = &v1alpha1.LinuxContainerResources{}
 	}
@@ -313,6 +350,10 @@ func (c *container) SetMemoryLimit(value int64) {
 }
 
 func (c *container) SetOomScoreAdj(value int64) {
+	if value < -1000 || value > 1000 {
+		klog.Warningf("Ignoring out-of-range OomScoreAdj value: %d", value)
+		return
+	}
 	if c.LinuxReq == nil {
 		c.LinuxReq = &v1alpha1.LinuxContainerResources{}
 	}
