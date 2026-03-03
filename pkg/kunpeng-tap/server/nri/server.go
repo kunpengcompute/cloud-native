@@ -168,7 +168,11 @@ func (p *Agent) synchronizeContainers(containers []*api.Container) {
 		if container == nil {
 			continue
 		}
-		klog.InfoS("Synchronizing container", "id", container.Id, "name", container.Name, "container's cpuset", container.Linux.Resources.Cpu.Cpus)
+		cpuset := ""
+		if container.Linux != nil && container.Linux.Resources != nil && container.Linux.Resources.Cpu != nil {
+			cpuset = container.Linux.Resources.Cpu.Cpus
+		}
+		klog.InfoS("Synchronizing container", "id", container.Id, "name", container.Name, "container's cpuset", cpuset)
 		// Insert container into cache if not exists
 		if _, found := p.cache.LookupContainer(container.Id); !found {
 			_, err := p.cache.InsertContainer(container.Id, container)
