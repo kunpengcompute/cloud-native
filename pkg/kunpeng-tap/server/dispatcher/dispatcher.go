@@ -225,10 +225,16 @@ func BackfillPodRequest(proxyPodReq interface{}, hookPodReq interface{}, hookPod
 			hookPodReq.(*v1alpha1.PodSandboxHookRequest).Labels = hookPodResponse.Labels
 		}
 		if hookPodResponse.CgroupParent != "" {
+			if proxyRequest.Config.Linux == nil {
+				proxyRequest.Config.Linux = &runtimeapi.LinuxPodSandboxConfig{}
+			}
 			proxyRequest.Config.Linux.CgroupParent = hookPodResponse.CgroupParent
 			hookPodReq.(*v1alpha1.PodSandboxHookRequest).CgroupParent = hookPodResponse.CgroupParent
 		}
 		if hookPodResponse.Resources != nil {
+			if proxyRequest.Config.Linux == nil {
+				proxyRequest.Config.Linux = &runtimeapi.LinuxPodSandboxConfig{}
+			}
 			proxyRequest.Config.Linux.Resources = TransferToCRIResources(hookPodResponse.Resources)
 			hookPodReq.(*v1alpha1.PodSandboxHookRequest).Resources = hookPodResponse.Resources
 		}
@@ -237,7 +243,7 @@ func BackfillPodRequest(proxyPodReq interface{}, hookPodReq interface{}, hookPod
 			proxyRequest.HostConfig = utils.UpdateHostConfigByResource(proxyRequest.HostConfig, hookPodResponse.Resources)
 			hookPodReq.(*v1alpha1.PodSandboxHookRequest).Resources = hookPodResponse.Resources
 		}
-		if hookPodResponse.CgroupParent != "" {
+		if hookPodResponse.CgroupParent != "" && proxyRequest.HostConfig != nil {
 			proxyRequest.HostConfig.CgroupParent = utils.GenerateExpectedCgroupParent(dockerCgroupDriver, hookPodResponse.CgroupParent)
 			hookPodReq.(*v1alpha1.PodSandboxHookRequest).CgroupParent = hookPodResponse.CgroupParent
 		}
@@ -256,10 +262,19 @@ func BackfillContainerRequest(proxyContainerReq interface{}, hookContainerReq in
 			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).ContainerAnnotations = hookContainerResponse.ContainerAnnotations
 		}
 		if hookContainerResponse.ContainerResources != nil {
+			if proxyRequest.Config.Linux == nil {
+				proxyRequest.Config.Linux = &runtimeapi.LinuxContainerConfig{}
+			}
 			proxyRequest.Config.Linux.Resources = TransferToCRIResources(hookContainerResponse.ContainerResources)
 			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).ContainerResources = hookContainerResponse.ContainerResources
 		}
 		if hookContainerResponse.PodCgroupParent != "" {
+			if proxyRequest.SandboxConfig == nil {
+				proxyRequest.SandboxConfig = &runtimeapi.PodSandboxConfig{}
+			}
+			if proxyRequest.SandboxConfig.Linux == nil {
+				proxyRequest.SandboxConfig.Linux = &runtimeapi.LinuxPodSandboxConfig{}
+			}
 			proxyRequest.SandboxConfig.Linux.CgroupParent = hookContainerResponse.PodCgroupParent
 			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).PodCgroupParent = hookContainerResponse.PodCgroupParent
 		}
@@ -270,7 +285,7 @@ func BackfillContainerRequest(proxyContainerReq interface{}, hookContainerReq in
 			proxyRequest.HostConfig = utils.UpdateHostConfigByResource(proxyRequest.HostConfig, hookContainerResponse.ContainerResources)
 			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).ContainerResources = hookContainerResponse.ContainerResources
 		}
-		if hookContainerResponse.PodCgroupParent != "" {
+		if hookContainerResponse.PodCgroupParent != "" && proxyRequest.HostConfig != nil {
 			proxyRequest.HostConfig.CgroupParent = utils.GenerateExpectedCgroupParent(dockerCgroupDriver, hookContainerResponse.PodCgroupParent)
 			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).PodCgroupParent = hookContainerResponse.PodCgroupParent
 		}

@@ -210,7 +210,10 @@ func (p *TopologyAwarePolicy) PreCreateContainerHook(ctx policy.HookContext) (*p
 	if !ok {
 		return nil, fmt.Errorf("no grant found for container %s", gid)
 	}
-	grant := grantVal.(Grant)
+	grant, ok := grantVal.(Grant)
+	if !ok {
+		return nil, fmt.Errorf("invalid grant type for container %s", gid)
+	}
 
 	// 设置CPU集
 	cpus := grant.SharedCPUSet().String()
@@ -979,7 +982,11 @@ func (p *TopologyAwarePolicy) releasePool(containerCtx policy.ContainerContext) 
 		return nil, false
 	}
 
-	grant := grantVal.(Grant)
+	grant, ok := grantVal.(Grant)
+	if !ok {
+		klog.ErrorS(nil, "Invalid grant type in allocations", "gid", gid)
+		return nil, false
+	}
 
 	// 在释放资源前，先减少上层节点的资源使用情况
 	p.propagateResourceReleaseToParent(grant)

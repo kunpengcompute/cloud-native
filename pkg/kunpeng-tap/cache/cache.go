@@ -722,16 +722,21 @@ func (cch *cache) GetNodeResources() []NumaNodeResources {
 
 	for _, ctr := range cch.Containers {
 		res := ctr.GetLinuxResources()
+		if res == nil {
+			klog.V(3).InfoS("Container has no Linux resources", "container", ctr.PrettyName())
+			continue
+		}
 		if res.CpuPeriod == 0 {
 			klog.V(3).InfoS("Container has no CPU period", "container", ctr.PrettyName())
+			continue
 		}
 		// 按照 limits 计算 CPU 使用量
 		cpuTime := float64(res.CpuQuota) / float64(res.CpuPeriod)
 		cpuRequest := float64(res.CpuShares) / 1024
 		// 只计算 NUMA Node 亲和的 CPU 使用量
 		klog.V(5).InfoS("Getting Linux resources", "resources", res, "container", ctr, "cpuTime", cpuTime)
-		i := sysfs.GetNumaNodeFromCpuSet(cch.CpuInfo, ctr.GetLinuxResources().GetCpusetCpus())
-		klog.V(5).InfoS("Getting NUMA node from CPU set", "nodeID", i, "cpuSet", ctr.GetLinuxResources().GetCpusetCpus())
+		i := sysfs.GetNumaNodeFromCpuSet(cch.CpuInfo, res.GetCpusetCpus())
+		klog.V(5).InfoS("Getting NUMA node from CPU set", "nodeID", i, "cpuSet", res.GetCpusetCpus())
 		if i >= 0 {
 			// 依据使用量计算
 			nodes[i].CpuUsed += cpuTime

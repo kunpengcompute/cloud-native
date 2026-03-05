@@ -109,25 +109,46 @@ func (p *pod) convertNriLinuxResources(nriRes *api.LinuxResources) *v1alpha1.Lin
 
 	resources := &v1alpha1.LinuxContainerResources{}
 
-	// Convert CPU resources
+	// Convert CPU resources with value validation to prevent scope bypass
 	if cpu := nriRes.GetCpu(); cpu != nil {
 		if period := cpu.GetPeriod(); period != nil {
-			resources.CpuPeriod = int64(period.Value)
+			if int64(period.Value) > 0 {
+				resources.CpuPeriod = int64(period.Value)
+			} else {
+				klog.Warningf("Ignoring invalid CpuPeriod value in pod resource conversion: %d", period.Value)
+			}
 		}
 		if quota := cpu.GetQuota(); quota != nil {
-			resources.CpuQuota = quota.Value
+			if quota.Value > 0 {
+				resources.CpuQuota = quota.Value
+			} else {
+				klog.Warningf("Ignoring invalid CpuQuota value in pod resource conversion: %d", quota.Value)
+			}
 		}
 		if shares := cpu.GetShares(); shares != nil {
-			resources.CpuShares = int64(shares.Value)
+			if int64(shares.Value) > 0 {
+				resources.CpuShares = int64(shares.Value)
+			} else {
+				klog.Warningf("Ignoring invalid CpuShares value in pod resource conversion: %d", shares.Value)
+			}
 		}
-		resources.CpusetCpus = cpu.GetCpus()
-		resources.CpusetMems = cpu.GetMems()
+		// Validate CpusetCpus and CpusetMems before assignment to avoid bypassing scope
+		if cpus := cpu.GetCpus(); cpus != "" {
+			resources.CpusetCpus = cpus
+		}
+		if mems := cpu.GetMems(); mems != "" {
+			resources.CpusetMems = mems
+		}
 	}
 
-	// Convert Memory resources
+	// Convert Memory resources with value validation
 	if memory := nriRes.GetMemory(); memory != nil {
 		if limit := memory.GetLimit(); limit != nil {
-			resources.MemoryLimitInBytes = limit.Value
+			if limit.Value > 0 {
+				resources.MemoryLimitInBytes = limit.Value
+			} else {
+				klog.Warningf("Ignoring invalid MemoryLimitInBytes value in pod resource conversion: %d", limit.Value)
+			}
 		}
 	}
 
