@@ -32,6 +32,7 @@ type cpuPackage struct {
 	dies     cpuset.CPUSet        // dies in this package
 	dieCPUs  map[ID]cpuset.CPUSet // CPUs per die
 	dieNodes map[ID]cpuset.CPUSet // NUMA nodes per die
+	sys      *system              // back-reference to the system for node lookups
 }
 
 // Package methods
@@ -113,14 +114,15 @@ func (p *cpuPackage) MemoryInfo() (*MemInfo, error) {
 		MemSet:   cpuset.New(),
 	}
 
-	// 获取系统实例
-	sys := &system{
-		packages: map[ID]CPUPackage{p.id: p},
+	if p.sys == nil {
+		klog.ErrorS(nil, "cpuPackage has no system reference, cannot aggregate memory info",
+			"packageID", p.id)
+		return result, nil
 	}
 
 	// 遍历包中的所有 NUMA 节点
 	for _, nodeID := range p.NodeIDs() {
-		node := sys.Node(nodeID)
+		node := p.sys.Node(nodeID)
 		if node == nil {
 			continue
 		}

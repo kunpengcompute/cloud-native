@@ -28,14 +28,38 @@ import (
 // This is the first step in the filter-first-then-sort allocation strategy.
 func (p *TopologyAwarePolicy) filterPoolsByCapacity(request Request) []Node {
 	var filteredPools []Node
+	var rootPool Node
 
 	for _, pool := range p.pools {
+		// Track root separately - it should only be used as a last resort
+		// when no sub-node (cluster/numa/socket) has sufficient capacity.
+		if pool == p.root {
+			rootPool = pool
+			continue
+		}
 		if p.hasCapacity(request, pool) {
 			filteredPools = append(filteredPools, pool)
+		} else {
+			klog.V(3).InfoS("Pool rejected by capacity filter",
+				"pool", pool.Name(),
+				"kind", pool.Kind(),
+				"depth", pool.RootDistance(),
+				"request", request.String())
 		}
 	}
 
-	klog.V(4).InfoS("Filtered pools by capacity",
+	// Fall back to root only when no sub-node can accommodate the request.
+	// This handles large containers that exceed any single socket's capacity.
+	if len(filteredPools) == 0 && rootPool != nil {
+		filteredPools = append(filteredPools, rootPool)
+		klog.InfoS("WARNING: No sub-node has sufficient capacity, falling back to root",
+			"request", request.String(),
+			"cpuRequest", request.CPURequest(),
+			"cpuLimit", request.CPULimit(),
+			"memoryLimit", request.MemoryLimit())
+	}
+
+	klog.V(3).InfoS("Filtered pools by capacity",
 		"totalPools", len(p.pools),
 		"filteredPools", len(filteredPools),
 		"request", request.String())
@@ -200,12 +224,22 @@ func (p *TopologyAwarePolicy) findRegularPool(request Request, pools []Node) Nod
 
 // hasCapacity checks if a pool has sufficient capacity for the request.
 func (p *TopologyAwarePolicy) hasCapacity(request Request, pool Node) bool {
-	return p.checkCapacityByRequest(request, pool) && p.checkMemoryCapacity(request, pool)
+	if !p.checkCapacityByRequest(request, pool) {
+		return false
+	}
+	// Only check memory capacity when memory topology awareness is enabled.
+	// When disabled, NUMA nodes may report memoryTotal=0, which would
+	// incorrectly reject all pools.
+	if p.enableMemoryTopology && !p.checkMemoryCapacity(request, pool) {
+		return false
+	}
+	return true
 }
 
 // checkCapacityByRequest checks if pool has sufficient capacity for request.
 // Uses request value for capacity checking, consistent with actual allocation logic.
 func (p *TopologyAwarePolicy) checkCapacityByRequest(request Request, pool Node) bool {
+	origPool := pool
 	// Traverse up to root, checking capacity at each level
 	for pool != nil && pool != p.root {
 		freeResource := pool.FreeResource()
@@ -222,10 +256,16 @@ func (p *TopologyAwarePolicy) checkCapacityByRequest(request Request, pool Node)
 
 		// Use SharedCapacityByRequest for capacity checking (based on request value)
 		if score.SharedCapacityByRequest() < 0 {
-			klog.V(5).InfoS("Pool does not have enough capacity for request",
-				"pool", pool.Name(),
+			klog.V(3).InfoS("CPU capacity check failed",
+				"candidatePool", origPool.Name(),
+				"failedAtLevel", pool.Name(),
+				"totalSharedCPU", freeResource.AllocatableSharedCPU()+freeResource.GrantedShared(),
+				"grantedCPU", freeResource.GrantedShared(),
+				"grantedCPUByRequest", freeResource.GrantedCPUByRequest(),
+				"allocatableCPU", freeResource.AllocatableSharedCPU(),
 				"sharedCapacityByRequest", score.SharedCapacityByRequest(),
-				"request", request.String())
+				"cpuRequest", request.CPURequest(),
+				"cpuLimit", request.CPULimit())
 			return false
 		}
 
@@ -236,9 +276,27 @@ func (p *TopologyAwarePolicy) checkCapacityByRequest(request Request, pool Node)
 
 // checkMemoryCapacity checks if the pool has enough memory capacity for the request.
 func (p *TopologyAwarePolicy) checkMemoryCapacity(request Request, pool Node) bool {
+	memoryLimitKB := uint64(request.MemoryLimit() / 1024)
+	if memoryLimitKB == 0 {
+		return true // No memory requirement
+	}
+	origPool := pool
 	// Traverse up to root, checking memory capacity at each level
 	for pool != nil && pool != p.root {
-		if pool.FreeResource().GetScore(request, p).MemoryCapacity() < uint64(request.MemoryLimit()/1024) {
+		freeResource := pool.FreeResource()
+		if freeResource == nil {
+			return false
+		}
+		score := freeResource.GetScore(request, p)
+		if score == nil {
+			return false
+		}
+		if score.MemoryCapacity() < memoryLimitKB {
+			klog.V(3).InfoS("Memory capacity check failed",
+				"candidatePool", origPool.Name(),
+				"failedAtLevel", pool.Name(),
+				"availableMemoryKB", score.MemoryCapacity(),
+				"requiredMemoryKB", memoryLimitKB)
 			return false
 		}
 		pool = pool.Parent()
