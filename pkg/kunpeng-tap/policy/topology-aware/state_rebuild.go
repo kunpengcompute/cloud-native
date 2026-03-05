@@ -173,12 +173,9 @@ func (p *TopologyAwarePolicy) updateNodeResourceUsage(node Node, grant Grant) {
 	p.propagateResourceUsageToParent(grant)
 }
 
-// rebuildContainerAllocation rebuilds allocation for a single container.
-func (p *TopologyAwarePolicy) rebuildContainerAllocation(container cache.Container) error {
+// rebuildContainerAllocation rebuilds allocation for a single container on the given topology node.
+func (p *TopologyAwarePolicy) rebuildContainerAllocation(container cache.Container, targetNode Node) error {
 	cpus := container.GetCpusetCpus()
-	if cpus == "" {
-		return nil // Skip containers without CPU allocation
-	}
 
 	// Check if grant already exists
 	pod, ok := container.GetPod()
@@ -190,14 +187,6 @@ func (p *TopologyAwarePolicy) rebuildContainerAllocation(container cache.Contain
 		klog.V(5).InfoS("Grant already exists, skipping rebuild",
 			"containerID", container.GetID(),
 			"gid", gid)
-		return nil
-	}
-
-	// Find matching node
-	targetNode := p.findNodeByCPUSet(cpus)
-	if targetNode == nil {
-		klog.Warningf("Node not found when rebuilding allocation for container %s with cpuset %s",
-			container.GetID(), cpus)
 		return nil
 	}
 
@@ -248,13 +237,52 @@ func (p *TopologyAwarePolicy) RebuildAllocationsFromCache() error {
 
 	rebuiltCount := 0
 	skippedNoCpuset := 0
+	skippedNotRunning := 0
+	skippedNoAffinity := 0
+	skippedSystem := 0
 	for _, container := range containers {
+		// Only rebuild allocations for running containers.
+		// The cache may contain exited/stopped containers that still have their old cpuset,
+		// but those should not occupy resource pool capacity.
+		state := container.GetState()
+		if state != cache.ContainerStateRunning && state != cache.ContainerStateCreated {
+			skippedNotRunning++
+			continue
+		}
+
+		// Skip kube-system containers — in the normal allocation flow (allocatePool),
+		// kube-system containers go directly to root and don't consume
+		// NUMA/socket/cluster pool capacity. Rebuilding them into sub-nodes would
+		// incorrectly over-account resources, causing user containers to fail
+		// capacity checks and fall back to root.
+		if container.GetNamespace() == "kube-system" {
+			skippedSystem++
+			klog.V(3).InfoS("Skipping kube-system container during rebuild",
+				"containerID", container.GetID(),
+				"containerName", container.GetName())
+			continue
+		}
+
 		cpuset := container.GetCpusetCpus()
 		if cpuset == "" {
 			skippedNoCpuset++
 			continue
 		}
-		if err := p.rebuildContainerAllocation(container); err != nil {
+
+		// Check if cpuset is actually bound to a topology node (cluster/numa/socket).
+		// Containers with system-default cpusets (e.g., "0-95") that span all
+		// topology domains are not pinned and should not occupy pool capacity.
+		targetNode := p.findNodeByCPUSet(cpuset)
+		if targetNode == nil {
+			skippedNoAffinity++
+			klog.V(3).InfoS("Container cpuset not bound to any topology node, skipping rebuild",
+				"containerID", container.GetID(),
+				"containerName", container.GetName(),
+				"cpuset", cpuset)
+			continue
+		}
+
+		if err := p.rebuildContainerAllocation(container, targetNode); err != nil {
 			klog.ErrorS(err, "Failed to rebuild allocation for container",
 				"containerID", container.GetID(),
 				"containerName", container.GetName(),
@@ -267,7 +295,10 @@ func (p *TopologyAwarePolicy) RebuildAllocationsFromCache() error {
 	klog.InfoS("Completed rebuilding allocations from cache",
 		"totalContainers", len(containers),
 		"rebuiltAllocations", rebuiltCount,
-		"skippedNoCpuset", skippedNoCpuset)
+		"skippedNoCpuset", skippedNoCpuset,
+		"skippedNotRunning", skippedNotRunning,
+		"skippedNoAffinity", skippedNoAffinity,
+		"skippedSystem", skippedSystem)
 
 	// Log node resource usage after rebuild for verification
 	for _, node := range p.pools {

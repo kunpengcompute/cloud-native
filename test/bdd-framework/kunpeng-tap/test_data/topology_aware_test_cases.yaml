@@ -148,6 +148,54 @@ machine_configs:
     memory_per_numa: "64Gi"
     total_memory: "256Gi"
 
+  4numa_384_cluster:
+    name: "4NUMA-96核-Cluster(950型号)"
+    category: "cluster"
+    numa_topology_type: "4numa"
+    numa_count: 4
+    cores_per_numa: 96
+    total_cores: 384
+    socket_count: 2
+    cores_per_socket: 192
+    cluster_count: 24
+    clusters_per_numa: 6
+    cpus_per_cluster: 16
+    numa_topology:
+      numa0: "0-95"
+      numa1: "96-191"
+      numa2: "192-287"
+      numa3: "288-383"
+    socket_topology:
+      socket0: "0-191"
+      socket1: "192-383"
+    cluster_topology:
+      cluster0: "0-15"
+      cluster1: "16-31"
+      cluster2: "32-47"
+      cluster3: "48-63"
+      cluster4: "64-79"
+      cluster5: "80-95"
+      cluster6: "96-111"
+      cluster7: "112-127"
+      cluster8: "128-143"
+      cluster9: "144-159"
+      cluster10: "160-175"
+      cluster11: "176-191"
+      cluster12: "192-207"
+      cluster13: "208-223"
+      cluster14: "224-239"
+      cluster15: "240-255"
+      cluster16: "256-271"
+      cluster17: "272-287"
+      cluster18: "288-303"
+      cluster19: "304-319"
+      cluster20: "320-335"
+      cluster21: "336-351"
+      cluster22: "352-367"
+      cluster23: "368-383"
+    memory_per_numa: "128Gi"
+    total_memory: "512Gi"
+
 # QoS 类型定义
 qos_types:
   guaranteed:

@@ -118,6 +118,18 @@ def verify_socket_distribution(socket_count):
 
     print(f"✅ 容器分布在 {socket_count} 个 SOCKET")
 
+@then(parsers.parse('容器应该分布在 {cluster_count:d} 个 CLUSTER'))
+def verify_cluster_distribution(cluster_count):
+    """验证容器分布在指定数量的 CLUSTER"""
+    pods = _get_test_pods()
+
+    for pod in pods:
+        actual_cluster_count = _get_pod_cluster_count(pod)
+        if actual_cluster_count != cluster_count:
+            raise Exception(f"Pod {pod.metadata.name} 分布在 {actual_cluster_count} 个 CLUSTER，期望 {cluster_count} 个")
+
+    print(f"✅ 容器分布在 {cluster_count} 个 CLUSTER")
+
 @then(parsers.parse('容器的 QoS 类别应该是 {expected_qos}'))
 def verify_qos_class(expected_qos):
     """验证容器的 QoS 类别"""
@@ -547,7 +559,20 @@ def _verify_pod_topology_affinity(pod: client.V1Pod, topology_level: str) -> boo
             return False
 
         # 根据拓扑级别验证
-        if topology_level == 'NUMA':
+        if topology_level == 'CLUSTER':
+            # 验证 CPU 是否在单个 Cluster 内
+            clusters = _cpus_to_clusters(cpu_list, numa_topology)
+            if len(clusters) == 0:
+                print(f"⚠️  Pod {pod.metadata.name} 未分配到任何 Cluster")
+                return False
+            if len(clusters) == 1:
+                print(f"✅ Pod {pod.metadata.name} 分配到单个 Cluster: {clusters}")
+            else:
+                print(f"⚠️  Pod {pod.metadata.name} 分配到多个 Cluster: {clusters}，不符合 CLUSTER 级别要求")
+                return False
+            return True
+
+        elif topology_level == 'NUMA':
             # 验证 CPU 是否在单个或多个 NUMA 节点内
             numa_nodes = _cpus_to_numa_nodes(cpu_list, numa_topology)
             if len(numa_nodes) == 0:
@@ -563,6 +588,15 @@ def _verify_pod_topology_affinity(pod: client.V1Pod, topology_level: str) -> boo
                 print(f"⚠️  Pod {pod.metadata.name} 未分配到任何 SOCKET")
                 return False
             print(f"✅ Pod {pod.metadata.name} 分配到 SOCKET: {sockets}")
+            return True
+
+        elif topology_level == 'CROSS_NUMA':
+            # 验证 CPU 跨越多个 NUMA 节点
+            numa_nodes = _cpus_to_numa_nodes(cpu_list, numa_topology)
+            if len(numa_nodes) <= 1:
+                print(f"⚠️  Pod {pod.metadata.name} 只分配到 {len(numa_nodes)} 个 NUMA 节点，期望跨 NUMA")
+                return False
+            print(f"✅ Pod {pod.metadata.name} 跨 NUMA 分配: {numa_nodes}")
             return True
 
         else:
@@ -712,6 +746,35 @@ def _get_pod_socket_count(pod: client.V1Pod) -> int:
             return 2
         else:
             return 1
+
+def _get_pod_cluster_count(pod: client.V1Pod) -> int:
+    """获取 Pod 分布的 CLUSTER 数量（通过读取 cgroup cpuset.cpus）"""
+    try:
+        # 获取容器的 cpuset.cpus
+        cpuset_cpus = _get_container_cpuset_cpus(pod)
+        if not cpuset_cpus:
+            print(f"⚠️  无法获取 Pod {pod.metadata.name} 的 cpuset.cpus，使用默认值")
+            return 1
+
+        # 解析 cpuset 获取 CPU 列表
+        cpu_list = _parse_cpuset(cpuset_cpus)
+        if not cpu_list:
+            print(f"⚠️  Pod {pod.metadata.name} 的 cpuset.cpus 为空")
+            return 0
+
+        # 获取节点的 NUMA 拓扑信息
+        node_name = pod.spec.node_name
+        numa_topology = _get_node_numa_topology(node_name)
+
+        # 根据 CPU 列表确定使用了哪些 CLUSTER
+        clusters = _cpus_to_clusters(cpu_list, numa_topology)
+
+        print(f"📊 Pod {pod.metadata.name}: cpuset.cpus={cpuset_cpus}, CPUs={cpu_list}, CLUSTER={clusters}")
+        return len(clusters)
+
+    except Exception as e:
+        print(f"⚠️  获取 Pod {pod.metadata.name} CLUSTER 分布失败: {e}")
+        return 1
 
 def _get_pods_numa_distribution(pods: List[client.V1Pod], retry_on_incomplete: bool = False) -> Dict[int, int]:
     """获取 Pod 在各 NUMA 节点的分布
@@ -1089,6 +1152,36 @@ def _get_node_numa_topology(node_name: str) -> Dict[str, Any]:
             'numa_count': 4,
             'socket_count': 2
         }
+    elif machine_config == '4numa_384_cluster':
+        # 950 型号机器：4NUMA × 96核，每NUMA 6个Cluster（每Cluster 16核）
+        # Socket 0: NUMA 0 (0-95), NUMA 1 (96-191)
+        # Socket 1: NUMA 2 (192-287), NUMA 3 (288-383)
+        clusters = {}
+        cluster_id = 0
+        for numa_id in range(4):
+            base_cpu = numa_id * 96
+            for c in range(6):  # 6 clusters per NUMA
+                cluster_start = base_cpu + c * 16
+                clusters[cluster_id] = {
+                    'cpus': list(range(cluster_start, cluster_start + 16)),
+                    'numa': numa_id,
+                    'socket': 0 if numa_id < 2 else 1
+                }
+                cluster_id += 1
+        return {
+            'numa_nodes': {
+                0: {'cpus': list(range(0, 96)), 'socket': 0},
+                1: {'cpus': list(range(96, 192)), 'socket': 0},
+                2: {'cpus': list(range(192, 288)), 'socket': 1},
+                3: {'cpus': list(range(288, 384)), 'socket': 1}
+            },
+            'clusters': clusters,
+            'total_cpus': 384,
+            'numa_count': 4,
+            'socket_count': 2,
+            'cluster_count': 24,
+            'cpus_per_cluster': 16
+        }
     else:
         # 默认 2NUMA 配置
         return {
@@ -1124,6 +1217,33 @@ def _cpus_to_sockets(cpu_list: List[int], numa_topology: Dict[str, Any]) -> List
                 break
 
     return sorted(list(sockets))
+
+def _cpus_to_clusters(cpu_list: List[int], numa_topology: Dict[str, Any]) -> List[int]:
+    """根据 CPU 列表确定使用了哪些 Cluster
+
+    需要 numa_topology 中包含 'clusters' 字段。
+    如果没有 clusters 信息，则回退到按每8个CPU一个 cluster 的默认逻辑。
+
+    返回:
+        List[int]: 使用的 Cluster ID 列表
+    """
+    clusters = set()
+    cluster_info = numa_topology.get('clusters')
+
+    if cluster_info:
+        # 使用配置中的 cluster 拓扑
+        for cpu_id in cpu_list:
+            for cluster_id, cluster_data in cluster_info.items():
+                if cpu_id in cluster_data['cpus']:
+                    clusters.add(cluster_id)
+                    break
+    else:
+        # 回退：按每8个CPU一个 cluster（默认 950 型号布局）
+        cpus_per_cluster = numa_topology.get('cpus_per_cluster', 8)
+        for cpu_id in cpu_list:
+            clusters.add(cpu_id // cpus_per_cluster)
+
+    return sorted(list(clusters))
 
 # ============================================================================
 # 故障恢复测试步骤定义
