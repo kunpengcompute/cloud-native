@@ -418,6 +418,13 @@ func (cch *cache) processContainer(containerdClient criv1.RuntimeServiceClient, 
 		cInfo.ContainerEnvs = ContainerdEnvConvert(containerInfoInStatus.Config.Envs)
 	}
 	cch.InsertContainer(cInfo.ContainerMeta.Id, cInfo)
+
+	// Set the correct container state from the CRI response.
+	// InsertContainer -> fromDockerRunRequest hardcodes ContainerStateCreating,
+	// but we need the actual runtime state for proper state filtering.
+	if c, ok := cch.Containers[cInfo.ContainerMeta.Id]; ok {
+		c.State = ContainerState(int32(container.GetState()))
+	}
 	return nil
 }
 
@@ -436,8 +443,17 @@ func (cch *cache) LoadStoreContainerd(containerdClient criv1.RuntimeServiceClien
 		}
 	}
 
+	// Only list running containers, consistent with Docker's All: false behavior.
+	// Exited containers should not be cached as their stale cpusets would
+	// incorrectly consume resource pool capacity during state rebuild.
 	var containerResponse *criv1.ListContainersResponse
-	containerResponse, err = containerdClient.ListContainers(context.TODO(), &criv1.ListContainersRequest{})
+	containerResponse, err = containerdClient.ListContainers(context.TODO(), &criv1.ListContainersRequest{
+		Filter: &criv1.ContainerFilter{
+			State: &criv1.ContainerStateValue{
+				State: criv1.ContainerState_CONTAINER_RUNNING,
+			},
+		},
+	})
 	if err != nil {
 		return err
 	}
