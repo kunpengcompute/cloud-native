@@ -515,6 +515,7 @@ func (s *system) discoverPackages() error {
 				dies:     cpuset.New(),
 				dieCPUs:  make(map[ID]cpuset.CPUSet),
 				dieNodes: make(map[ID]cpuset.CPUSet),
+				sys:      s,
 			}
 			s.packages[cpu.PackageID()] = pkg
 		}
