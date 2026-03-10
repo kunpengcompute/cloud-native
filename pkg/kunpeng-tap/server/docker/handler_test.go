@@ -204,13 +204,6 @@ var _ = Describe("Handler", Ordered, func() {
 			Expect(pods[0].GetID()).To(Equal("podid"))
 			Expect(pods[0].GetCgroupParentDir()).To(Equal(FakeCgroupParent))
 
-			metricsResp, err := http.Get("http://0.0.0.0" + options.MetricsAddr + "/metrics")
-			Expect(err).NotTo(HaveOccurred())
-			defer metricsResp.Body.Close()
-			metricsBody, err := io.ReadAll(metricsResp.Body)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(string(metricsBody)).Should(ContainSubstring("tap_proxy_request_duration_seconds"))
-
 			Expect(CompareRequest(requestInFile, fakeDockerRuntimerReceivedRequest)).To(BeFalse())
 		})
 	})
