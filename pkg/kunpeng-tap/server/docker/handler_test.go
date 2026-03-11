@@ -206,19 +206,19 @@ var _ = Describe("Handler", Ordered, func() {
 	//      so only one such metrics server can be started per test process.
 	Describe("Metrics endpoint when enabled", func() {
 		BeforeAll(func() {
-			By("find a free port and start metrics server")
-			l, err := net.Listen("tcp", ":0")
+			By("find a free port and start metrics server on 127.0.0.1")
+			l, err := net.Listen("tcp", "127.0.0.1:0")
 			Expect(err).To(BeNil())
 			var port string
 			_, port, err = net.SplitHostPort(l.Addr().String())
 			Expect(err).To(BeNil())
 			l.Close()
-			options.MetricsAddr = ":" + port
+			options.MetricsAddr = "127.0.0.1:" + port
 			go monitoring.ExportMetrics()
 
 			By("wait for metrics server to be ready")
 			Eventually(func() error {
-				resp, err := http.Get("http://0.0.0.0" + options.MetricsAddr + "/metrics")
+				resp, err := http.Get("http://" + options.MetricsAddr + "/metrics")
 				if err != nil {
 					return err
 				}
@@ -228,7 +228,7 @@ var _ = Describe("Handler", Ordered, func() {
 		})
 
 		It("should expose prometheus metrics", func() {
-			metricsResp, err := http.Get("http://0.0.0.0" + options.MetricsAddr + "/metrics")
+			metricsResp, err := http.Get("http://" + options.MetricsAddr + "/metrics")
 			Expect(err).NotTo(HaveOccurred())
 			defer metricsResp.Body.Close()
 			metricsBody, err := io.ReadAll(metricsResp.Body)
