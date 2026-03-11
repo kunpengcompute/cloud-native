@@ -540,6 +540,15 @@ func (cch *cache) LookupContainer(id string) (Container, bool) {
 	return c, ok
 }
 
+// SetContainerState sets the state of a cached container in a thread-safe manner.
+func (cch *cache) SetContainerState(id string, state ContainerState) {
+	cch.Lock()
+	defer cch.Unlock()
+	if c, ok := cch.Containers[id]; ok {
+		c.State = state
+	}
+}
+
 // RefreshPods purges/inserts stale/new pods/containers using a pod sandbox list response.
 func (cch *cache) RefreshPods(msg *criv1.ListPodSandboxResponse, status map[string]*PodStatus) ([]Pod, []Pod, []Container) {
 	valid := make(map[string]struct{})

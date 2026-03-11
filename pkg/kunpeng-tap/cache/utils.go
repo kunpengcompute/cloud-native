@@ -417,14 +417,13 @@ func (cch *cache) processContainer(containerdClient criv1.RuntimeServiceClient, 
 	if containerInfoInStatus.Config != nil {
 		cInfo.ContainerEnvs = ContainerdEnvConvert(containerInfoInStatus.Config.Envs)
 	}
+
 	cch.InsertContainer(cInfo.ContainerMeta.Id, cInfo)
 
 	// Set the correct container state from the CRI response.
 	// InsertContainer -> fromDockerRunRequest hardcodes ContainerStateCreating,
 	// but we need the actual runtime state for proper state filtering.
-	if c, ok := cch.Containers[cInfo.ContainerMeta.Id]; ok {
-		c.State = ContainerState(int32(container.GetState()))
-	}
+	cch.SetContainerState(cInfo.ContainerMeta.Id, ContainerState(int32(container.GetState())))
 	return nil
 }
 
