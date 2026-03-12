@@ -152,16 +152,6 @@ var _ = Describe("Handler", Ordered, func() {
 		dockerServer = docker.NewDockerServer(dockerHandler, nil)
 		go dockerServer.Run()
 
-		l, err = net.Listen("tcp", ":0")
-		Expect(err).To(BeNil())
-		var port string
-		_, port, err = net.SplitHostPort(l.Addr().String())
-		Expect(err).To(BeNil())
-		l.Close()
-		options.MetricsAddr = ":" + port
-		// Expose the Prometheus http endpoint
-		go monitoring.ExportMetrics()
-
 		By("wait dockerServer start")
 		Eventually(func() error {
 			_, err := os.Stat(options.RuntimeProxyEndpoint)
@@ -204,14 +194,46 @@ var _ = Describe("Handler", Ordered, func() {
 			Expect(pods[0].GetID()).To(Equal("podid"))
 			Expect(pods[0].GetCgroupParentDir()).To(Equal(FakeCgroupParent))
 
-			metricsResp, err := http.Get("http://0.0.0.0" + options.MetricsAddr + "/metrics")
+			Expect(CompareRequest(requestInFile, fakeDockerRuntimerReceivedRequest)).To(BeFalse())
+		})
+	})
+
+	// This test simulates the scenario where the --metrics-bind-address flag is explicitly set (non-empty),
+	// which enables the Prometheus metrics server (see startMonitor in cmd/kunpeng-tap/proxy/main.go).
+	// Prerequisites:
+	//   1. A free TCP port must be available on the host for binding the metrics HTTP server.
+	//   2. The default Go HTTP mux (http.DefaultServeMux) must not have "/metrics" already registered,
+	//      so only one such metrics server can be started per test process.
+	Describe("Metrics endpoint when enabled", func() {
+		BeforeAll(func() {
+			By("find a free port and start metrics server on 127.0.0.1")
+			l, err := net.Listen("tcp", "127.0.0.1:0")
+			Expect(err).To(BeNil())
+			var port string
+			_, port, err = net.SplitHostPort(l.Addr().String())
+			Expect(err).To(BeNil())
+			l.Close()
+			options.MetricsAddr = "127.0.0.1:" + port
+			go monitoring.ExportMetrics()
+
+			By("wait for metrics server to be ready")
+			Eventually(func() error {
+				resp, err := http.Get("http://" + options.MetricsAddr + "/metrics")
+				if err != nil {
+					return err
+				}
+				resp.Body.Close()
+				return nil
+			}, timeout, interval).Should(BeNil())
+		})
+
+		It("should expose prometheus metrics", func() {
+			metricsResp, err := http.Get("http://" + options.MetricsAddr + "/metrics")
 			Expect(err).NotTo(HaveOccurred())
 			defer metricsResp.Body.Close()
 			metricsBody, err := io.ReadAll(metricsResp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(metricsBody)).Should(ContainSubstring("tap_proxy_request_duration_seconds"))
-
-			Expect(CompareRequest(requestInFile, fakeDockerRuntimerReceivedRequest)).To(BeFalse())
 		})
 	})
 
