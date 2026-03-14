@@ -718,8 +718,6 @@ spec:
 kubectl delete -f k8s-mpam-controller.yaml
 ```
 
-当不需要使用此插件时，可以使用如下命令卸载插件。
-
 
 ## 缩略语<a name="ZH-CN_TOPIC_0000002518691944"></a>
 
