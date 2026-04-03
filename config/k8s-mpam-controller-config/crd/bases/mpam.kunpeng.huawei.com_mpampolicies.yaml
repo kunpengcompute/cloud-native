@@ -1,0 +1,125 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: mpampolicies.mpam.kunpeng.huawei.com
+spec:
+  group: mpam.kunpeng.huawei.com
+  names:
+    kind: MPAMPolicy
+    listKind: MPAMPolicyList
+    plural: mpampolicies
+    shortNames:
+    - mpam
+    singular: mpampolicy
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.mbhdl
+      name: MBHDL
+      type: integer
+    - jsonPath: .spec.mbpri
+      name: MBPRI
+      type: integer
+    - jsonPath: .spec.l3pri
+      name: L3PRI
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: MPAMPolicy is the Schema for MPAM policy CRD.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: MPAMPolicySpec defines the desired state for MPAM settings.
+            properties:
+              l3:
+                description: |-
+                  L3 is the number of cache ways to allocate.
+                  This field validates only non-negative input; machine-specific upper bound
+                  should be checked by the controller on each node.
+                format: int32
+                minimum: 1
+                type: integer
+              l3max:
+                default: 100
+                description: L3MAX range is [0, 100]. Default is 100.
+                format: int32
+                maximum: 100
+                minimum: 0
+                type: integer
+              l3min:
+                default: 0
+                description: L3MIN range is [0, 100]. Default is 0.
+                format: int32
+                maximum: 100
+                minimum: 0
+                type: integer
+              l3pri:
+                default: 0
+                description: L3PRI range is [0, 3]. Default is 0.
+                format: int32
+                maximum: 3
+                minimum: 0
+                type: integer
+              mb:
+                default: 100
+                description: MB range is [0, 100]. Default is 100.
+                format: int32
+                maximum: 100
+                minimum: 0
+                type: integer
+              mbhdl:
+                default: 1
+                description: MBHDL can only be 0 or 1. Default is 1.
+                format: int32
+                maximum: 1
+                minimum: 0
+                type: integer
+              mbmin:
+                default: 0
+                description: MBMIN range is [0, 100]. Default is 0.
+                format: int32
+                maximum: 100
+                minimum: 0
+                type: integer
+              mbpri:
+                default: 3
+                description: MBPRI range is [0, 7]. Default is 3.
+                format: int32
+                maximum: 7
+                minimum: 0
+                type: integer
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: |-
+                  NodeSelector selects which nodes this policy applies to.
+                  If omitted, the controller should decide default behavior (typically all nodes).
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources: {}
