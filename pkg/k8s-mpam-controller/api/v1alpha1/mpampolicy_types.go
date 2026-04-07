@@ -20,61 +20,15 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // MPAMPolicySpec defines the desired state for MPAM settings.
 type MPAMPolicySpec struct {
-	// MBHDL can only be 0 or 1. Default is 1.
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=1
-	// +kubebuilder:default:=1
+	// MB groups memory-bandwidth related policy items.
+	// +kubebuilder:default:={}
 	// +optional
-	MBHDL int32 `json:"mbhdl,omitempty"`
+	MB MBPolicy `json:"mb,omitempty"`
 
-	// MBPRI range is [0, 7]. Default is 3.
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=7
-	// +kubebuilder:default:=3
+	// L3 groups cache related policy items.
+	// +kubebuilder:default:={}
 	// +optional
-	MBPRI int32 `json:"mbpri,omitempty"`
-
-	// L3PRI range is [0, 3]. Default is 0.
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=3
-	// +kubebuilder:default:=0
-	// +optional
-	L3PRI int32 `json:"l3pri,omitempty"`
-
-	// MBMIN range is [0, 100]. Default is 0.
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=100
-	// +kubebuilder:default:=0
-	// +optional
-	MBMIN int32 `json:"mbmin,omitempty"`
-
-	// L3MIN range is [0, 100]. Default is 0.
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=100
-	// +kubebuilder:default:=0
-	// +optional
-	L3MIN int32 `json:"l3min,omitempty"`
-
-	// L3MAX range is [0, 100]. Default is 100.
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=100
-	// +kubebuilder:default:=100
-	// +optional
-	L3MAX int32 `json:"l3max,omitempty"`
-
-	// MB range is [0, 100]. Default is 100.
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=100
-	// +kubebuilder:default:=100
-	// +optional
-	MB int32 `json:"mb,omitempty"`
-
-	// L3 is the number of cache ways to allocate.
-	// This field validates only non-negative input; machine-specific upper bound
-	// should be checked by the controller on each node.
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	L3 int32 `json:"l3,omitempty"`
+	L3 L3Policy `json:"l3,omitempty"`
 
 	// NodeSelector selects which nodes this policy applies to.
 	// If omitted, the controller should decide default behavior (typically all nodes).
@@ -82,11 +36,71 @@ type MPAMPolicySpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 }
 
+// MBPolicy defines memory-bandwidth related controls.
+type MBPolicy struct {
+	// HDL can only be 0 or 1. Default is 1.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1
+	// +kubebuilder:default:=1
+	// +optional
+	HDL int32 `json:"hdl,omitempty"`
+
+	// PRI range is [0, 7]. Default is 3.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=7
+	// +kubebuilder:default:=3
+	// +optional
+	PRI int32 `json:"pri,omitempty"`
+
+	// MIN range is [0, 100]. Default is 0.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:default:=0
+	// +optional
+	MIN int32 `json:"min,omitempty"`
+
+	// MAX range is [0, 100]. Default is 100.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:default:=100
+	// +optional
+	MAX int32 `json:"max,omitempty"`
+}
+
+// L3Policy defines cache related controls.
+type L3Policy struct {
+	// PRI range is [0, 3]. Default is 0.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=3
+	// +kubebuilder:default:=0
+	// +optional
+	PRI int32 `json:"pri,omitempty"`
+
+	// MIN range is [0, 100]. Default is 0.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:default:=0
+	// +optional
+	MIN int32 `json:"min,omitempty"`
+
+	// MAX range is [0, 100]. Default is 100.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:default:=100
+	// +optional
+	MAX int32 `json:"max,omitempty"`
+
+	// Ways is the number of cache ways to allocate. Minimum is 1.
+	// Machine-specific upper bound should be checked by the controller on each node.
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	Ways int32 `json:"ways,omitempty"`
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=mpampolicies,scope=Cluster,shortName=mpam
-// +kubebuilder:printcolumn:name="MBHDL",type="integer",JSONPath=".spec.mbhdl"
-// +kubebuilder:printcolumn:name="MBPRI",type="integer",JSONPath=".spec.mbpri"
-// +kubebuilder:printcolumn:name="L3PRI",type="integer",JSONPath=".spec.l3pri"
+// +kubebuilder:printcolumn:name="MBPRI",type="integer",JSONPath=".spec.mb.pri"
+// +kubebuilder:printcolumn:name="L3WAYS",type="integer",JSONPath=".spec.l3.ways"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // MPAMPolicy is the Schema for MPAM policy CRD.

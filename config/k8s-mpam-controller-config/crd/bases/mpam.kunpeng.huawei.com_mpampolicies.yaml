@@ -17,14 +17,11 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.mbhdl
-      name: MBHDL
-      type: integer
-    - jsonPath: .spec.mbpri
+    - jsonPath: .spec.mb.pri
       name: MBPRI
       type: integer
-    - jsonPath: .spec.l3pri
-      name: L3PRI
+    - jsonPath: .spec.l3.ways
+      name: L3WAYS
       type: integer
     - jsonPath: .metadata.creationTimestamp
       name: AGE
@@ -55,62 +52,71 @@ spec:
             description: MPAMPolicySpec defines the desired state for MPAM settings.
             properties:
               l3:
-                description: |-
-                  L3 is the number of cache ways to allocate.
-                  This field validates only non-negative input; machine-specific upper bound
-                  should be checked by the controller on each node.
-                format: int32
-                minimum: 1
-                type: integer
-              l3max:
-                default: 100
-                description: L3MAX range is [0, 100]. Default is 100.
-                format: int32
-                maximum: 100
-                minimum: 0
-                type: integer
-              l3min:
-                default: 0
-                description: L3MIN range is [0, 100]. Default is 0.
-                format: int32
-                maximum: 100
-                minimum: 0
-                type: integer
-              l3pri:
-                default: 0
-                description: L3PRI range is [0, 3]. Default is 0.
-                format: int32
-                maximum: 3
-                minimum: 0
-                type: integer
+                default: {}
+                description: L3 groups cache related policy items.
+                properties:
+                  max:
+                    default: 100
+                    description: MAX range is [0, 100]. Default is 100.
+                    format: int32
+                    maximum: 100
+                    minimum: 0
+                    type: integer
+                  min:
+                    default: 0
+                    description: MIN range is [0, 100]. Default is 0.
+                    format: int32
+                    maximum: 100
+                    minimum: 0
+                    type: integer
+                  pri:
+                    default: 0
+                    description: PRI range is [0, 3]. Default is 0.
+                    format: int32
+                    maximum: 3
+                    minimum: 0
+                    type: integer
+                  ways:
+                    description: |-
+                      Ways is the number of cache ways to allocate. Minimum is 1.
+                      Machine-specific upper bound should be checked by the controller on each node.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                type: object
               mb:
-                default: 100
-                description: MB range is [0, 100]. Default is 100.
-                format: int32
-                maximum: 100
-                minimum: 0
-                type: integer
-              mbhdl:
-                default: 1
-                description: MBHDL can only be 0 or 1. Default is 1.
-                format: int32
-                maximum: 1
-                minimum: 0
-                type: integer
-              mbmin:
-                default: 0
-                description: MBMIN range is [0, 100]. Default is 0.
-                format: int32
-                maximum: 100
-                minimum: 0
-                type: integer
-              mbpri:
-                default: 3
-                description: MBPRI range is [0, 7]. Default is 3.
-                format: int32
-                maximum: 7
-                minimum: 0
-                type: integer
+                default: {}
+                description: MB groups memory-bandwidth related policy items.
+                properties:
+                  hdl:
+                    default: 1
+                    description: HDL can only be 0 or 1. Default is 1.
+                    format: int32
+                    maximum: 1
+                    minimum: 0
+                    type: integer
+                  max:
+                    default: 100
+                    description: MAX range is [0, 100]. Default is 100.
+                    format: int32
+                    maximum: 100
+                    minimum: 0
+                    type: integer
+                  min:
+                    default: 0
+                    description: MIN range is [0, 100]. Default is 0.
+                    format: int32
+                    maximum: 100
+                    minimum: 0
+                    type: integer
+                  pri:
+                    default: 3
+                    description: PRI range is [0, 7]. Default is 3.
+                    format: int32
+                    maximum: 7
+                    minimum: 0
+                    type: integer
+                type: object
               nodeSelector:
                 additionalProperties:
                   type: string
