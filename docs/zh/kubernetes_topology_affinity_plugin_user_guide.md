@@ -1,4 +1,4 @@
-# 鲲鹏拓扑亲和插件 用户指南<a name="ZH-CN_TOPIC_0000002521090488"></a>
+# 鲲鹏拓扑亲和插件 用户指南
 
 ## 介绍<a name="ZH-CN_TOPIC_0000002525264761"></a>
 
@@ -38,7 +38,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 |容器运行时|负责创建、管理和运行容器。|
 
 
-在Containerd v1.7.0版本之后支持的NRI（Node Resource Interface）模式下，Kunpeng TAP以插件形式与Containerd进行通信，对原有容器请求链路无干扰，具备更优的稳定性。如[**图 2** NRI模式运行架构](#NRI模式运行架构) 所示。
+在Containerd v1.7.0版本及之后支持的NRI（Node Resource Interface）模式下，Kunpeng TAP以插件形式与Containerd进行通信，对原有容器请求链路无干扰，具备更优的稳定性。如[**图 2** NRI模式运行架构](#NRI模式运行架构) 所示。
 
 **图 2** NRI模式运行架构<a name="fig19472125713354"></a><a id="NRI模式运行架构"></a>
 
@@ -72,7 +72,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 |Kunpeng TAP|release-0.3|Kunpeng TAP的可执行文件，通过[编译Kunpeng TAP](#编译Kunpeng TAP)编译获得。|
 
 
-## 编译Kunpeng TAP<a name="ZH-CN_TOPIC_0000002525264763"></a>
+## 编译Kunpeng TAP<a id="编译Kunpeng TAP"></a>
 
 编译Kunpeng TAP源代码并生成插件可执行文件。
 
@@ -134,7 +134,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
         cd /path/to/cloud-native
         ```
 
-        其中“/path/to/topology-affinity-plugin”为Kunpeng TAP源码的实际路径，请根据实际情况修改。
+        其中“/path/to/cloud-native”为Kunpeng TAP源码的实际路径，请根据实际情况修改。
 
     2. 安装插件，默认以Docker模式启动。
 
@@ -382,8 +382,8 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
     ```
 
 4. 判断Kunpeng TAP是否生效。
-    1. 以Docker运行时为例，进入步骤二中**nodeSelector**所指定的集群节点_compute01_后，通过**docker**命令查询容器的CpusetCpus参数，判断容器是否与NUMA成功亲和。
-    2. 通过**docker ps**查询集群节点运行的容器任务，在**NAMES**列中找到步骤一中“spec.containers.name”指定的_tap-example_容器。
+    1. 以Docker运行时为例，进入步骤二中**nodeSelector**所指定的集群节点 _compute01_ 后，通过**docker**命令查询容器的CpusetCpus参数，判断容器是否与NUMA成功亲和。
+    2. 通过**docker ps**查询集群节点运行的容器任务，在**NAMES**列中找到步骤一中“spec.containers.name”指定的 _tap-example_ 容器。
 
         ```
         # docker ps | grep tap-example
@@ -404,7 +404,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
         ```
 
         >![](public_sys-resources/icon-note.gif) **说明：** 
-        >在不同的机器上查看时，绑定的NUMA节点不固定，_CpusetCpus_数字可能不一致。
+        >在不同的机器上查看时，绑定的NUMA节点不固定， _CpusetCpus_ 数字可能不一致。
 
         containerd运行时可以运行如下命令查看容器的可调度CPU范围。
 

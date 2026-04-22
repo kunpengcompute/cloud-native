@@ -1,4 +1,4 @@
-# MPAM插件 用户指南<a name="ZH-CN_TOPIC_0000002552291711"></a>
+# MPAM插件 用户指南
 
 ## 介绍<a name="ZH-CN_TOPIC_0000002518691938"></a>
 
@@ -68,7 +68,7 @@ Kubernetes使能MPAM特性后，可以在创建Pod时指定对应的资源组，
 |Docker|18.09.0及以上|通过配置Yum源安装|
 |Containerd|1.7.14及以上|通过配置Yum源安装|
 |Kubernetes|1.23.1及以上|通过配置Yum源安装|
-|k8s-mpam-controller源码|-|[获取链接](https://gitee.com/kunpeng_compute/kunpeng-cloud-computing)|
+|k8s-mpam-controller源码|-|[获取链接](https://gitcode.com/boostkit/cloud-native)|
 
 
 ### 安装MPAM插件<a name="ZH-CN_TOPIC_0000002550011791"></a>
@@ -490,7 +490,7 @@ data:
 
 ### 使用动态MPAM隔离功能<a name="ZH-CN_TOPIC_0000002550131803"></a>
 
-当需要动态调整某些离线业务的资源使用量时可以使用动态MPAM隔离功能。**注意动态隔离功能不能与静态创建MPAM资源组同时使用**
+当需要动态调整某些离线业务的资源使用量时可以使用动态MPAM隔离功能。**注意动态隔离功能不能与静态创建MPAM资源组同时使用。**
 
 **（可选）配置动态MPAM隔离参数<a name="section4141521171610"></a>**
 
