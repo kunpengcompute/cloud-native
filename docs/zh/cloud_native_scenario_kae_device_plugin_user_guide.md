@@ -1,4 +1,4 @@
-# KAE Device Plugin 用户指南<a name="ZH-CN_TOPIC_0000002521251718"></a>
+# KAE Device Plugin 用户指南
 
 ## 简介<a name="ZH-CN_TOPIC_0000002549772317"></a>
 
@@ -159,7 +159,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏920系列
 
 ## 使用插件<a name="ZH-CN_TOPIC_0000002518412468"></a>
 
-### KAE设备直通<a name="ZH-CN_TOPIC_0000002549772319"></a>
+### KAE设备直通<a id="KAE设备直通"></a>
 
 本节以直通HPRE设备为例，简单介绍如何将KAE设备直通到容器中。
 
@@ -238,11 +238,11 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏920系列
 
     ![](figures/zh-cn_image_0000002549892319.png)
 
-### 设置KAE设备QoS<a name="ZH-CN_TOPIC_0000002518252550"></a>
+### 设置KAE设备QoS<a id="设置KAE设备QoS"></a>
 
 KAE设备支持QoS（Quality of Service，服务质量）功能。通过设置QoS，可以为不同容器中的KAE设备分配不同的KAE设备带宽。为高优先级容器设置较高的KAE QoS可以确保高优先级容器内的KAE设备拥有较高的带宽，从而保障服务质量。
 
-1. 在Pod的yaml文件中添加注解**qos.kae.kunpeng.com/hisi\_hpre: "500"** 声明KAE设备的QoS，如果要设置其他设备的QoS参考[KAE设备QoS注解对照表](#table169724617483)。
+1. 在Pod的yaml文件中添加注解**qos.kae.kunpeng.com/hisi\_hpre: "500"** 声明KAE设备的QoS，如果要设置其他设备的QoS参考[KAE设备QoS注解对照表](#KAE设备QoS注解对照表)。
 
     ```
     apiVersion: v1
