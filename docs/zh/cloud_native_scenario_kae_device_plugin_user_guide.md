@@ -30,7 +30,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏920系列
 |软件|版本|获取地址|
 |--|--|--|
 |OS|openEuler 24.03 LTS SP2|[获取链接](https://www.openeuler.org/en/download/#openEuler%2024.03%20LTS%20SP2)|
-|K8s|1.25.16|请参见《[Kubernetes 部署指南（CentOS&openEuler）](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Kubernetes/kunpengk8s_04_0001.html)》进行下载部署。|
+|Kubernetes|1.25.16|请参见《[Kubernetes 部署指南（CentOS&openEuler）](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Kubernetes/kunpengk8s_04_0001.html)》进行下载部署。|
 |Containerd|1.7.10|请参见《[Containerd 安装指南（CentOS 8.1&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Containerd/kunpengcontainerd_03_0001.html)》进行下载部署。|
 |Docker|18.0.9|通过配置Yum源方式安装|
 |kae-device-plugin|1.0.0|[获取链接](https://gitcode.com/boostkit/cloud-native)|
@@ -273,11 +273,11 @@ KAE设备支持QoS（Quality of Service，服务质量）功能。通过设置Qo
 
     **表 1** KAE设备QoS注解对照表<a id="KAE设备QoS注解对照表"></a>
 
-|KAE设备|注解名|
-|--|--|
-|HPRE|qos.kae.kunpeng.com/hisi_hpre|
-|SEC|qos.kae.kunpeng.com/hisi_sec2|
-|ZIP|qos.kae.kunpeng.com/hisi_zip|
+   |KAE设备|注解名|
+   |--|--|
+   |HPRE|qos.kae.kunpeng.com/hisi_hpre|
+   |SEC|qos.kae.kunpeng.com/hisi_sec2|
+   |ZIP|qos.kae.kunpeng.com/hisi_zip|
 
 
 2. 按照[KAE设备直通](#KAE设备直通)的步骤部署Pod即可。

@@ -69,10 +69,10 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 |Docker|20.10.14|通过配置Yum源方式安装。|
 |Containerd|1.6.8或1.7.0（NRI模式下需高于1.7.0）|[获取链接](https://github.com/containerd/containerd/releases/tag/v1.6.8)|
 |Kunpeng TAP源代码|release-0.3|[获取链接](https://gitcode.com/boostkit/cloud-native)|
-|Kunpeng TAP|release-0.3|Kunpeng TAP的可执行文件，通过[编译Kunpeng TAP](#编译Kunpeng TAP)编译获得。|
+|Kunpeng TAP|release-0.3|Kunpeng TAP的可执行文件，通过[编译Kunpeng TAP](#编译Kunpeng-TAP)编译获得。|
 
 
-## 编译Kunpeng TAP<a id="编译Kunpeng TAP"></a>
+## 编译Kunpeng TAP<a id="编译Kunpeng-TAP"></a>
 
 编译Kunpeng TAP源代码并生成插件可执行文件。
 

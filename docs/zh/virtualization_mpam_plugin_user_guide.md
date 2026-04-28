@@ -266,22 +266,22 @@ Kubernetes使能MPAM特性后，可以在创建Pod时指定对应的资源组，
 
     **表 1** 配置类型及其说明<a id="配置类型及其说明"></a>
 
-|配置类型|配置名称|配置说明|
-|--|--|--|
-|node配置|rc-config.node.{NODE_NAME}|该配置提供了名为Node_NAME的节点的配置。|
-|node group配置|rc-config.group.{GROUP_NAME}|可以通过“ngroup”标签将Node节点加到对应的组中。例如，如果某个Node节点含有“ngroup=grp1”的标签，那么该节点就属于Node组grp1。如果Node节点特定的ConfigMap rc-config.node.{NODE_NAME}不存在，但节点属于名为{GROUP_NAME}的节点组，则将应用名称为rc-config.group.{GROUP_NAME}的ConfigMap。|
-|默认配置|rc-config.default|如果节点不属于任何节点组，并且节点特定的ConfigMap不存在，则将应用名称为rc-config.default的ConfigMap。|
+   |配置类型|配置名称|配置说明|
+   |--|--|--|
+   |node配置|rc-config.node.{NODE_NAME}|该配置提供了名为Node_NAME的节点的配置。|
+   |node group配置|rc-config.group.{GROUP_NAME}|可以通过“ngroup”标签将Node节点加到对应的组中。例如，如果某个Node节点含有“ngroup=grp1”的标签，那么该节点就属于Node组grp1。如果Node节点特定的ConfigMap rc-config.node.{NODE_NAME}不存在，但节点属于名为{GROUP_NAME}的节点组，则将应用名称为rc-config.group.{GROUP_NAME}的ConfigMap。|
+   |默认配置|rc-config.default|如果节点不属于任何节点组，并且节点特定的ConfigMap不存在，则将应用名称为rc-config.default的ConfigMap。|
  
  1. 打开文件。
 
-        ```
+       ```
         cd samples
         vi example-config.yaml
-        ```
+       ```
 
  2. 按“i”进入编辑模式，在文件中修改name字段指定为[**表 1** 配置类型及其说明](#配置类型及其说明)中的实际配置名称，将mpam字段下添加对应的资源组信息：
 
-        ```
+       ```
         apiVersion: v1
         kind: ConfigMap
         metadata:
@@ -299,7 +299,7 @@ Kubernetes使能MPAM特性后，可以在创建Pod时指定对应的资源组，
               group3:
                 llc: <schemata>
                 mb: <schemata>
-        ```
+      ```
 
     >![](public_sys-resources/icon-note.gif) **说明：** 
         >-   将llc中的schemata替换为对L3 Cache的限制，将mb中的schemata替换为对带宽的限制，请根据实际情况进行修改。example-config.yaml文件的完整配置样例请参见下方参考示例。
