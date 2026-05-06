@@ -30,43 +30,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	mpamv1alpha1 "kunpeng.huawei.com/kunpeng-cloud-computing/api/k8s-mpam-controller/v1alpha1"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 )
 
-const defaultQoSPolicyFinalizer = "mpam.kunpeng.huawei.com/finalizer"
-
-// ResctrlConfig is the normalized config written to /sys/fs/resctrl by node agent.
-type ResctrlConfig struct {
-	MBHDL int32
-	MBPRI int32
-	L3PRI int32
-	MBMIN int32
-	L3MIN int32
-	L3MAX int32
-	MB    int32
-	L3    int32 // Number of cache ways.
-}
+const defaultQoSPolicyFinalizer = "qos.kunpeng.huawei.com/finalizer"
 
 // NodeIdentity abstracts current DaemonSet instance's node identity and labels.
 type NodeIdentity interface {
 	NodeName() string
 	NodeLabels(ctx context.Context, c client.Client) (map[string]string, error)
-}
-
-// NodeSelectorMatcher decides whether a policy should be applied on this node.
-type NodeSelectorMatcher interface {
-	Match(nodeLabels map[string]string, selector map[string]string) bool
-}
-
-// PolicyTranslator converts CRD spec into low-level resctrl configuration.
-type PolicyTranslator interface {
-	Translate(spec mpamv1alpha1.QoSPolicySpec) (ResctrlConfig, error)
-}
-
-// ResctrlGroupManager performs local /sys/fs/resctrl operations.
-type ResctrlGroupManager interface {
-	EnsureGroup(ctx context.Context, groupName string) error
-	ApplyConfig(ctx context.Context, groupName string, cfg ResctrlConfig) error
-	DeleteGroup(ctx context.Context, groupName string) error
 }
 
 // QoSPolicyReconciler reconciles QoSPolicy CRs on a single node (DaemonSet instance).
@@ -75,11 +47,7 @@ type QoSPolicyReconciler struct {
 	Scheme *runtime.Scheme
 
 	NodeIdentity NodeIdentity
-	Matcher      NodeSelectorMatcher
-	Translator   PolicyTranslator
 	Resctrl      ResctrlGroupManager
-
-	FinalizerName string
 }
 
 // Reconcile handles create/update/delete of QoSPolicy for current node only.
@@ -96,8 +64,8 @@ func (r *QoSPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	finalizer := r.finalizerName()
-	groupName := groupNameForPolicy(&policy)
+	finalizer := defaultQoSPolicyFinalizer
+	groupName := policy.Name
 
 	// Deletion path: remove local resctrl group first, then release finalizer.
 	if !policy.DeletionTimestamp.IsZero() {
@@ -131,7 +99,7 @@ func (r *QoSPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// DaemonSet model: this reconciler applies only when current node matches selector.
-	if !r.matcher().Match(nodeLabels, policy.Spec.NodeSelector) {
+	if !util.MatchNodeSelector(nodeLabels, policy.Spec.NodeSelector) {
 		// Policy no longer targets this node. Best-effort local cleanup.
 		klog.V(4).Infof(
 			"QoSPolicy %s/%s does not match node %s, cleanup local group=%s",
@@ -143,16 +111,12 @@ func (r *QoSPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, nil
 	}
 
-	cfg, err := r.translator().Translate(policy.Spec)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
 	if err := r.resctrl().EnsureGroup(ctx, groupName); err != nil {
 		return ctrl.Result{}, err
 	}
 	klog.V(1).Infof("ensured resctrl group for QoSPolicy %s/%s: group=%s", policy.Namespace, policy.Name, groupName)
 
+	cfg := translateQoSPolicySpec(policy.Spec)
 	if err := r.resctrl().ApplyConfig(ctx, groupName, cfg); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -161,49 +125,6 @@ func (r *QoSPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// NOTE: status updates are intentionally skipped in daemonset mode to avoid
 	// multi-writer conflicts on one shared CR status from all nodes.
 	return ctrl.Result{}, nil
-}
-
-func (r *QoSPolicyReconciler) finalizerName() string {
-	if r.FinalizerName != "" {
-		return r.FinalizerName
-	}
-	return defaultQoSPolicyFinalizer
-}
-
-func (r *QoSPolicyReconciler) setDefaults() {
-	if r.NodeIdentity == nil {
-		r.NodeIdentity = NewDefaultNodeIdentity()
-	}
-	if r.Matcher == nil {
-		r.Matcher = DefaultNodeSelectorMatcher{}
-	}
-	if r.Translator == nil {
-		r.Translator = DefaultPolicyTranslator{}
-	}
-	if r.Resctrl == nil {
-		r.Resctrl = LocalResctrlGroupManager{}
-	}
-}
-
-func (r *QoSPolicyReconciler) validate() error {
-	if r.Client == nil {
-		return fmt.Errorf("client must not be nil")
-	}
-	return nil
-}
-
-func (r *QoSPolicyReconciler) matcher() NodeSelectorMatcher {
-	if r.Matcher != nil {
-		return r.Matcher
-	}
-	return DefaultNodeSelectorMatcher{}
-}
-
-func (r *QoSPolicyReconciler) translator() PolicyTranslator {
-	if r.Translator != nil {
-		return r.Translator
-	}
-	return DefaultPolicyTranslator{}
 }
 
 func (r *QoSPolicyReconciler) nodeIdentity() NodeIdentity {
@@ -220,19 +141,21 @@ func (r *QoSPolicyReconciler) resctrl() ResctrlGroupManager {
 	return LocalResctrlGroupManager{}
 }
 
-func groupNameForPolicy(policy *mpamv1alpha1.QoSPolicy) string {
-	// Keep the first version simple: map CR name to resctrl group name directly.
-	// A future version can add sanitization/truncation if needed.
-	return policy.Name
+func translateQoSPolicySpec(spec mpamv1alpha1.QoSPolicySpec) ResctrlConfig {
+	return ResctrlConfig{
+		MBHDL: spec.MB.HDL,
+		MBPRI: spec.MB.PRI,
+		L3PRI: spec.L3.PRI,
+		MBMIN: spec.MB.MIN,
+		L3MIN: spec.L3.MIN,
+		L3MAX: spec.L3.MAX,
+		MB:    spec.MB.MAX,
+		L3:    spec.L3.Ways,
+	}
 }
 
 // SetupWithManager registers controller with a focused event filter.
 func (r *QoSPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.setDefaults()
-	if err := r.validate(); err != nil {
-		return err
-	}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&mpamv1alpha1.QoSPolicy{}).
 		WithEventFilter(predicate.Funcs{
