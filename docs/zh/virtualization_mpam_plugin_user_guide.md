@@ -37,9 +37,7 @@ Kubernetes使能MPAM特性后，可以在创建Pod时指定对应的资源组，
     >![](public_sys-resources/icon-note.gif) **说明：** 
     >混合部署场景中在线业务的性能会受到各种因素的干扰，MPAM的隔离只针对内存子系统，因此对于内存带宽敏感型的在线业务效果会比较好，同时也要确保离线业务的CPU利用率不要过高，否则对在线业务的干扰会比较严重，建议在10%\~20%左右。
 
-## 安装和使用插件<a name="ZH-CN_TOPIC_0000002550131799"></a>
-
-### 环境要求<a name="ZH-CN_TOPIC_0000002518532050"></a>
+## 环境要求<a name="ZH-CN_TOPIC_0000002518532050"></a>
 
 在安装MPAM插件之前，需要确保使用环境均满足要求，包括硬件和软件配置。硬件配置包括CPU、内存和磁盘等。软件配置包括操作系统和应用程序。
 
@@ -70,6 +68,8 @@ Kubernetes使能MPAM特性后，可以在创建Pod时指定对应的资源组，
 |Kubernetes|1.23.1及以上|通过配置Yum源安装|
 |k8s-mpam-controller源码|-|[获取链接](https://gitcode.com/boostkit/cloud-native)|
 
+
+## 安装和使用插件<a name="ZH-CN_TOPIC_0000002550131799"></a>
 
 ### 安装MPAM插件<a name="ZH-CN_TOPIC_0000002550011791"></a>
 
