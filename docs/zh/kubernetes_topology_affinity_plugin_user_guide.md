@@ -60,9 +60,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
 |项目|版本|获取方法|
 |--|--|--|
-|OS|openEuler 20.03 LTS SP3|[获取链接](https://repo.openeuler.org/openEuler-20.03-LTS-SP3/ISO/aarch64/)|
-|OS|openEuler 22.03 LTS SP4|[获取链接](https://repo.openeuler.org/openEuler-22.03-LTS-SP4/ISO/aarch64/)|
-|OS|openEuler 24.03 LTS SP3|[获取链接](https://repo.openeuler.org/openEuler-24.03-LTS-SP3/ISO/aarch64/)|
+|OS|openEuler 20.03 LTS SP3<br>openEuler 22.03 LTS SP4<br>openEuler 24.03 LTS SP3|openEuler 20.03 LTS SP3：[获取链接](https://repo.openeuler.org/openEuler-20.03-LTS-SP3/ISO/aarch64/)<br>openEuler 22.03 LTS SP4：[获取链接](https://repo.openeuler.org/openEuler-22.03-LTS-SP4/ISO/aarch64/)<br>openEuler 24.03 LTS SP3：[获取链接](https://repo.openeuler.org/openEuler-24.03-LTS-SP3/ISO/aarch64/)|
 |Golang|1.25|获取链接建议Golang环境配置国内源，以便下载二进制依赖包进行安装。|
 |Make|-|通过配置Yum源方式安装。|
 |Kubernetes|1.23.6，1.25.16|-|
