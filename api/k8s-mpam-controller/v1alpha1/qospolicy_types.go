@@ -136,8 +136,3 @@ type QoSPolicyList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []QoSPolicy `json:"items"`
 }
-
-// Backward-compatible aliases for gradual migration.
-type MPAMPolicySpec = QoSPolicySpec
-type MPAMPolicy = QoSPolicy
-type MPAMPolicyList = QoSPolicyList
