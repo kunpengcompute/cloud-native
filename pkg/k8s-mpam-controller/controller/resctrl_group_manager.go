@@ -22,11 +22,11 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 )
 
 const (
@@ -34,7 +34,24 @@ const (
 	schemataFileName   = "schemata"
 )
 
-var groupNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+// ResctrlConfig is the normalized config written to /sys/fs/resctrl by node agent.
+type ResctrlConfig struct {
+	MBHDL int32
+	MBPRI int32
+	L3PRI int32
+	MBMIN int32
+	L3MIN int32
+	L3MAX int32
+	MB    int32
+	L3    int32 // Number of cache ways.
+}
+
+// ResctrlGroupManager performs local /sys/fs/resctrl operations.
+type ResctrlGroupManager interface {
+	EnsureGroup(ctx context.Context, groupName string) error
+	ApplyConfig(ctx context.Context, groupName string, cfg ResctrlConfig) error
+	DeleteGroup(ctx context.Context, groupName string) error
+}
 
 // LocalResctrlGroupManager is a local-node implementation for /sys/fs/resctrl.
 type LocalResctrlGroupManager struct {
@@ -51,11 +68,31 @@ type LocalResctrlGroupManager struct {
 	SupportedSchemataKeys []string
 }
 
+// NewLocalResctrlGroupManager discovers local resctrl topology from
+// /sys/fs/resctrl/schemata and returns a ready-to-use manager.
+func NewLocalResctrlGroupManager() (LocalResctrlGroupManager, error) {
+	numaIDs, err := util.GetResctrlNUMAIDs()
+	if err != nil {
+		return LocalResctrlGroupManager{}, fmt.Errorf("discover resctrl NUMA IDs: %w", err)
+	}
+	cacheIDs, err := util.GetResctrlCacheIDs()
+	if err != nil {
+		return LocalResctrlGroupManager{}, fmt.Errorf("discover resctrl cache IDs: %w", err)
+	}
+	supportedKeys, err := util.GetResctrlSupportedSchemataKeys()
+	if err != nil {
+		return LocalResctrlGroupManager{}, fmt.Errorf("discover supported resctrl schemata keys: %w", err)
+	}
+
+	return LocalResctrlGroupManager{
+		NumaIDs:               numaIDs,
+		CacheIDs:              cacheIDs,
+		SupportedSchemataKeys: supportedKeys,
+	}, nil
+}
+
 // EnsureGroup ensures the control group directory exists.
 func (m LocalResctrlGroupManager) EnsureGroup(_ context.Context, groupName string) error {
-	if err := validateGroupName(groupName); err != nil {
-		return err
-	}
 	groupPath := m.groupDir(groupName)
 	if fi, err := os.Stat(groupPath); err == nil && fi.IsDir() {
 		klog.V(4).Infof("resctrl group already exists: %s", groupPath)
@@ -90,10 +127,6 @@ func (m LocalResctrlGroupManager) ApplyConfig(ctx context.Context, groupName str
 
 // DeleteGroup removes a control group directory. Non-existent group is treated as success.
 func (m LocalResctrlGroupManager) DeleteGroup(_ context.Context, groupName string) error {
-	if err := validateGroupName(groupName); err != nil {
-		return err
-	}
-
 	err := os.Remove(m.groupDir(groupName))
 	if err == nil || os.IsNotExist(err) {
 		return nil
@@ -122,19 +155,6 @@ func (m LocalResctrlGroupManager) writeSchemataItem(path string, item string) er
 func (m LocalResctrlGroupManager) supportedSchemataKeySet() map[string]struct{} {
 	if len(m.SupportedSchemataKeys) > 0 {
 		return makeSchemataKeySet(m.SupportedSchemataKeys)
-	}
-	return nil
-}
-
-func validateGroupName(groupName string) error {
-	if groupName == "" {
-		return fmt.Errorf("group name must not be empty")
-	}
-	if strings.Contains(groupName, "/") || strings.Contains(groupName, "..") {
-		return fmt.Errorf("invalid group name %q: path separators are not allowed", groupName)
-	}
-	if !groupNamePattern.MatchString(groupName) {
-		return fmt.Errorf("invalid group name %q: only [a-zA-Z0-9._-] are allowed", groupName)
 	}
 	return nil
 }
