@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	mpamv1alpha1 "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/api/v1alpha1"
+	mpamv1alpha1 "kunpeng.huawei.com/kunpeng-cloud-computing/api/k8s-mpam-controller/v1alpha1"
 )
 
 const defaultQoSPolicyFinalizer = "mpam.kunpeng.huawei.com/finalizer"
