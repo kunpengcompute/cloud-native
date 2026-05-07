@@ -68,6 +68,16 @@
 6. 对比当前与目标 cpuset，不一致则执行写入。
 7. 写入失败时记录错误并继续处理后续 Pod（单 Pod 故障隔离）。
 
+### 4.4 cgroup 路径解析
+
+插件默认从 `/proc/self/mountinfo` 自动发现 cpuset 控制器挂载点，并将 NRI 提供的 Pod cgroup parent 解析为实际 `cpuset.cpus` 所在目录。
+
+解析顺序：
+1. 如果 NRI 提供的是完整路径，且路径下存在 `cpuset.cpus`，直接使用。
+2. 将 `cgroup-root` 与 NRI 提供的 cgroup parent 拼接，适配 `/kubepods.slice/...` 形态。
+3. 对 `kubepods-*.slice:cri-containerd:<id>` 形态尝试转换为 systemd scope 路径。
+4. 如果前面都不命中，在 `cgroup-root` 下按 cgroup basename 做有限 fallback 查找。
+
 ## 5. 核心算法
 
 ### 5.1 sibling 拓扑发现

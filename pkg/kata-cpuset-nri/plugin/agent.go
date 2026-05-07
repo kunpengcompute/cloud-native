@@ -170,7 +170,12 @@ func (a *Agent) reconcileOnce() error {
 			klog.InfoS("Skip pod without cgroup path", "pod", pod.name, "namespace", pod.namespace)
 			continue
 		}
-		cgroupPath := a.resolveCgroupPath(pod.cgroupPath)
+		cgroupPath, err := a.resolveCgroupPath(pod.cgroupPath)
+		if err != nil {
+			klog.ErrorS(err, "Resolve pod cgroup path failed", "pod", pod.name,
+				"namespace", pod.namespace, "cgroupPath", pod.cgroupPath)
+			continue
+		}
 		current, err := readCpuset(cgroupPath)
 		if err != nil {
 			klog.ErrorS(err, "Read pod cpuset failed", "pod", pod.name, "namespace", pod.namespace)
@@ -247,14 +252,24 @@ func (a *Agent) targetCpuset(current string, occupied map[string]struct{}) strin
 	return ""
 }
 
-func (a *Agent) resolveCgroupPath(cgroupPath string) string {
-	if a.cfg.CgroupRoot == "" {
-		return cgroupPath
+func (a *Agent) resolveCgroupPath(cgroupPath string) (string, error) {
+	candidates := []string{cgroupPath}
+	if a.cfg.CgroupRoot != "" {
+		trimmed := strings.TrimPrefix(cgroupPath, "/")
+		candidates = append(candidates, filepath.Join(a.cfg.CgroupRoot, trimmed))
+		candidates = append(candidates, systemdScopeCandidates(a.cfg.CgroupRoot, trimmed)...)
 	}
-	if strings.HasPrefix(cgroupPath, a.cfg.CgroupRoot) {
-		return cgroupPath
+	for _, candidate := range candidates {
+		if hasCpusetFile(candidate) {
+			return candidate, nil
+		}
 	}
-	return filepath.Join(a.cfg.CgroupRoot, strings.TrimPrefix(cgroupPath, "/"))
+	if a.cfg.CgroupRoot != "" {
+		if found, ok := findCgroupByBase(a.cfg.CgroupRoot, filepath.Base(cgroupPath)); ok {
+			return found, nil
+		}
+	}
+	return "", fmt.Errorf("cpuset.cpus not found for cgroup %q", cgroupPath)
 }
 
 func (a *Agent) replacePods(pods []*api.PodSandbox) {
@@ -302,6 +317,62 @@ func toSet(items []string) map[string]struct{} {
 		}
 	}
 	return out
+}
+
+func systemdScopeCandidates(root, cgroupPath string) []string {
+	if !strings.Contains(cgroupPath, ":") {
+		return nil
+	}
+	parts := strings.Split(cgroupPath, ":")
+	if len(parts) < 3 {
+		return nil
+	}
+	podSlice := parts[0]
+	scopeName := fmt.Sprintf("%s-%s.scope", parts[1], parts[2])
+	qosSlice := systemdQoSSlice(podSlice)
+	if qosSlice == "" {
+		return nil
+	}
+	return []string{filepath.Join(root, "kubepods.slice", qosSlice, podSlice, scopeName)}
+}
+
+func systemdQoSSlice(podSlice string) string {
+	switch {
+	case strings.HasPrefix(podSlice, "kubepods-burstable-"):
+		return "kubepods-burstable.slice"
+	case strings.HasPrefix(podSlice, "kubepods-besteffort-"):
+		return "kubepods-besteffort.slice"
+	case strings.HasPrefix(podSlice, "kubepods-pod"):
+		return ""
+	default:
+		return ""
+	}
+}
+
+func hasCpusetFile(cgroupPath string) bool {
+	info, err := os.Stat(filepath.Join(cgroupPath, "cpuset.cpus"))
+	return err == nil && !info.IsDir()
+}
+
+func findCgroupByBase(root, base string) (string, bool) {
+	if root == "" || base == "" || base == "." || base == "/" {
+		return "", false
+	}
+	var found string
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
+			return nil
+		}
+		if d.Name() != base {
+			return nil
+		}
+		if hasCpusetFile(path) {
+			found = path
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return found, err == nil && found != ""
 }
 
 // DiscoverCpusetRoot discovers the cpuset cgroup mount from the current mount namespace.
