@@ -78,6 +78,8 @@
 3. 对 `kubepods-*.slice:cri-containerd:<id>` 形态尝试转换为 systemd scope 路径。
 4. 如果前面都不命中，在 `cgroup-root` 下按 cgroup basename 做有限 fallback 查找。
 
+在 containerd + kata 场景下，Pod parent cgroup 和 sandbox cgroup 可能不是严格父子目录关系。插件会同时收敛 Pod parent cgroup 以及根据 sandbox ID 推导出的 sandbox cgroup，避免只写 parent 但实际 VM/shim 所在 cgroup 仍保留全量 CPU。
+
 ## 5. 核心算法
 
 ### 5.1 sibling 拓扑发现

@@ -183,13 +183,13 @@ func (a *Agent) reconcileOnce() error {
 			klog.InfoS("Skip pod without cgroup path", "pod", pod.name, "namespace", pod.namespace)
 			continue
 		}
-		cgroupPath, err := a.resolveCgroupPath(pod.cgroupPath)
+		cgroupPaths, err := a.resolveCgroupPaths(pod)
 		if err != nil {
 			klog.ErrorS(err, "Resolve pod cgroup path failed", "pod", pod.name,
 				"namespace", pod.namespace, "cgroupPath", pod.cgroupPath)
 			continue
 		}
-		current, err := readCpuset(cgroupPath)
+		current, err := readCpuset(cgroupPaths[0])
 		if err != nil {
 			klog.ErrorS(err, "Read pod cpuset failed", "pod", pod.name, "namespace", pod.namespace)
 			continue
@@ -207,11 +207,15 @@ func (a *Agent) reconcileOnce() error {
 			klog.InfoS("Dry-run pod cpuset update", "pod", pod.name, "namespace", pod.namespace, "current", current, "target", target)
 			continue
 		}
-		if err := writeCpuset(cgroupPath, target); err != nil {
-			klog.ErrorS(err, "Write pod cpuset failed", "pod", pod.name, "namespace", pod.namespace, "target", target)
-			continue
+		for _, cgroupPath := range cgroupPaths {
+			if err := writeCpuset(cgroupPath, target); err != nil {
+				klog.ErrorS(err, "Write pod cpuset failed", "pod", pod.name,
+					"namespace", pod.namespace, "cgroupPath", cgroupPath, "target", target)
+				continue
+			}
 		}
-		klog.InfoS("Pod cpuset updated", "pod", pod.name, "namespace", pod.namespace, "target", target)
+		klog.InfoS("Pod cpuset updated", "pod", pod.name, "namespace", pod.namespace,
+			"cgroups", cgroupPaths, "target", target)
 	}
 	return nil
 }
@@ -265,24 +269,49 @@ func (a *Agent) targetCpuset(current string, occupied map[string]struct{}) strin
 	return ""
 }
 
+func (a *Agent) resolveCgroupPaths(pod podInfo) ([]string, error) {
+	paths := a.resolveCgroupPathCandidates(pod.cgroupPath, pod.id)
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("cpuset.cpus not found for cgroup %q", pod.cgroupPath)
+	}
+	return paths, nil
+}
+
 func (a *Agent) resolveCgroupPath(cgroupPath string) (string, error) {
+	paths := a.resolveCgroupPathCandidates(cgroupPath, "")
+	if len(paths) == 0 {
+		return "", fmt.Errorf("cpuset.cpus not found for cgroup %q", cgroupPath)
+	}
+	return paths[0], nil
+}
+
+func (a *Agent) resolveCgroupPathCandidates(cgroupPath, sandboxID string) []string {
 	candidates := []string{cgroupPath}
 	if a.cfg.CgroupRoot != "" {
 		trimmed := strings.TrimPrefix(cgroupPath, "/")
 		candidates = append(candidates, filepath.Join(a.cfg.CgroupRoot, trimmed))
 		candidates = append(candidates, systemdScopeCandidates(a.cfg.CgroupRoot, trimmed)...)
+		candidates = append(candidates, sandboxCgroupCandidates(a.cfg.CgroupRoot, trimmed, sandboxID)...)
 	}
+	var out []string
+	seen := map[string]struct{}{}
 	for _, candidate := range candidates {
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
 		if hasCpusetFile(candidate) {
-			return candidate, nil
+			out = append(out, candidate)
 		}
 	}
 	if a.cfg.CgroupRoot != "" {
 		if found, ok := findCgroupByBase(a.cfg.CgroupRoot, filepath.Base(cgroupPath)); ok {
-			return found, nil
+			if _, exists := seen[found]; !exists {
+				out = append(out, found)
+			}
 		}
 	}
-	return "", fmt.Errorf("cpuset.cpus not found for cgroup %q", cgroupPath)
+	return out
 }
 
 func (a *Agent) replacePods(pods []*api.PodSandbox) {
@@ -347,6 +376,22 @@ func systemdScopeCandidates(root, cgroupPath string) []string {
 		return nil
 	}
 	return []string{filepath.Join(root, "kubepods.slice", qosSlice, podSlice, scopeName)}
+}
+
+func sandboxCgroupCandidates(root, cgroupPath, sandboxID string) []string {
+	if sandboxID == "" {
+		return nil
+	}
+	podSlice := filepath.Base(cgroupPath)
+	if !strings.HasPrefix(podSlice, "kubepods-") || !strings.HasSuffix(podSlice, ".slice") {
+		return nil
+	}
+	out := []string{filepath.Join(root, fmt.Sprintf("%s:cri-containerd:%s", podSlice, sandboxID))}
+	if qosSlice := systemdQoSSlice(podSlice); qosSlice != "" {
+		out = append(out, filepath.Join(root, "kubepods.slice", qosSlice, podSlice,
+			fmt.Sprintf("cri-containerd-%s.scope", sandboxID)))
+	}
+	return out
 }
 
 func systemdQoSSlice(podSlice string) string {

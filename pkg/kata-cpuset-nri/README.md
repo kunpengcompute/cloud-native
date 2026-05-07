@@ -6,6 +6,7 @@
 - 白名单过滤（namespace/runtimeClass）。
 - 扫描所有 Pod 的 `cpuset.cpus` 并收敛。
 - 固定目标：将 Pod 绑定到同物理核心的 2 个逻辑 CPU。
+- 同时收敛 Pod parent cgroup 和 kata sandbox cgroup，适配 containerd/kata 的 cgroup v1 路径形态。
 - 通过 `/proc/self/mountinfo` 自动发现 cpuset cgroup 根路径，也支持参数覆盖。
 
 运行参数：

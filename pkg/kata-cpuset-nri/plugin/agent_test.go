@@ -71,6 +71,30 @@ func TestResolveCgroupPathFallbackFindByBase(t *testing.T) {
 	}
 }
 
+func TestResolveCgroupPathsIncludesSandboxCgroup(t *testing.T) {
+	root := t.TempDir()
+	pod := podInfo{
+		id:         "sandboxid",
+		cgroupPath: "/kubepods.slice/kubepods-poduid.slice",
+	}
+	parent := filepath.Join(root, "kubepods.slice/kubepods-poduid.slice")
+	sandbox := filepath.Join(root, "kubepods-poduid.slice:cri-containerd:sandboxid")
+	mustWriteCpuset(t, parent)
+	mustWriteCpuset(t, sandbox)
+
+	agent := &Agent{cfg: Config{CgroupRoot: root}}
+	got, err := agent.resolveCgroupPaths(pod)
+	if err != nil {
+		t.Fatalf("resolve cgroup paths: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("resolved path count mismatch: got %d want 2 (%v)", len(got), got)
+	}
+	if got[0] != parent || got[1] != sandbox {
+		t.Fatalf("resolved paths mismatch: got %v want [%q %q]", got, parent, sandbox)
+	}
+}
+
 func mustWriteCpuset(t *testing.T, dir string) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
