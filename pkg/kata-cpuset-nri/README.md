@@ -21,6 +21,18 @@
 - `plugin/`：NRI 事件、Pod 快照、过滤和 cpuset 收敛。
 - `topology/`：SMT sibling 拓扑发现。
 
+镜像构建：
+
+```bash
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kata-cpuset-nri ./pkg/kata-cpuset-nri/cmd
+docker build -f Dockerfile.kata-cpuset-nri -t kata-cpuset-nri:latest .
+rm -f kata-cpuset-nri
+```
+
+Kubernetes 部署清单：
+- `config/kata-cpuset-nri/daemonset.yaml`
+- 默认启用 `--dry-run=true`，用于先验证 DaemonSet 形态启动和 NRI 注册。
+
 当前不包含：
 - 完整 e2e 测试。
 - 与 kubelet CPUManager 冲突检测。

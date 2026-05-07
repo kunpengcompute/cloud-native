@@ -1,0 +1,13 @@
+# Runtime image for kata-cpuset-nri.
+#
+# Build the binary first, then build this image:
+#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kata-cpuset-nri ./pkg/kata-cpuset-nri/cmd
+#   docker build -f Dockerfile.kata-cpuset-nri -t kata-cpuset-nri:latest .
+FROM scratch
+
+COPY kata-cpuset-nri /usr/local/bin/kata-cpuset-nri
+
+ENTRYPOINT ["/usr/local/bin/kata-cpuset-nri"]
+
+LABEL maintainer="Kunpeng Boostkit Team"
+LABEL description="NRI plugin for binding kata pod cpuset to physical-core sibling CPUs"
