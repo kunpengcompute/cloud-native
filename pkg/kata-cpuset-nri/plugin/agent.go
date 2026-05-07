@@ -79,6 +79,8 @@ type Agent struct {
 
 	mu   sync.RWMutex
 	pods map[string]podInfo
+
+	reconcileCh chan struct{}
 }
 
 // New creates an agent.
@@ -93,6 +95,7 @@ func New(cfg Config, siblingPairs []topology.SiblingPair) (*Agent, error) {
 		namespaces:     toSet(cfg.Namespaces),
 		runtimeClasses: toSet(cfg.RuntimeClasses),
 		pods:           map[string]podInfo{},
+		reconcileCh:    make(chan struct{}, 1),
 	}
 
 	opts := []stub.Option{
@@ -112,17 +115,29 @@ func New(cfg Config, siblingPairs []topology.SiblingPair) (*Agent, error) {
 
 // Run starts NRI stub and reconciliation loop.
 func (a *Agent) Run(ctx context.Context) error {
-	if err := a.stub.Start(ctx); err != nil {
-		return err
-	}
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- a.stub.Run(ctx)
+	}()
+
 	ticker := time.NewTicker(a.cfg.ScanInterval)
 	defer ticker.Stop()
+	a.requestReconcile()
 
 	for {
 		select {
 		case <-ctx.Done():
 			a.stub.Stop()
 			return nil
+		case err := <-errCh:
+			if ctx.Err() != nil {
+				return nil
+			}
+			return err
+		case <-a.reconcileCh:
+			if err := a.reconcileOnce(); err != nil {
+				klog.ErrorS(err, "Triggered reconciliation failed")
+			}
 		case <-ticker.C:
 			if err := a.reconcileOnce(); err != nil {
 				klog.ErrorS(err, "Periodic reconciliation failed")
@@ -139,28 +154,36 @@ func (a *Agent) Configure(_ context.Context, _ string, _ string, _ string) (stub
 // Synchronize handles initial snapshot.
 func (a *Agent) Synchronize(_ context.Context, pods []*api.PodSandbox, _ []*api.Container) ([]*api.ContainerUpdate, error) {
 	a.replacePods(pods)
-	if err := a.reconcileOnce(); err != nil {
-		klog.ErrorS(err, "Reconcile on synchronize failed")
-	}
+	a.requestReconcile()
 	return nil, nil
 }
 
 // RunPodSandbox handles pod creation event.
 func (a *Agent) RunPodSandbox(_ context.Context, pod *api.PodSandbox) error {
 	a.upsertPod(pod)
-	return a.reconcileOnce()
+	a.requestReconcile()
+	return nil
 }
 
 // StopPodSandbox handles pod stop event.
 func (a *Agent) StopPodSandbox(_ context.Context, pod *api.PodSandbox) error {
 	a.removePod(pod)
+	a.requestReconcile()
 	return nil
 }
 
 // RemovePodSandbox handles pod removal event.
 func (a *Agent) RemovePodSandbox(_ context.Context, pod *api.PodSandbox) error {
 	a.removePod(pod)
+	a.requestReconcile()
 	return nil
+}
+
+func (a *Agent) requestReconcile() {
+	select {
+	case a.reconcileCh <- struct{}{}:
+	default:
+	}
 }
 
 func (a *Agent) removePod(pod *api.PodSandbox) {
@@ -200,7 +223,12 @@ func (a *Agent) reconcileOnce() error {
 			continue
 		}
 		occupied[normalizeCpuset(target)] = struct{}{}
-		if normalizeCpuset(current) == normalizeCpuset(target) {
+		needsUpdate, err := needsCpusetUpdate(cgroupPaths, target)
+		if err != nil {
+			klog.ErrorS(err, "Read pod cpuset failed", "pod", pod.name, "namespace", pod.namespace)
+			continue
+		}
+		if !needsUpdate {
 			continue
 		}
 		if a.cfg.DryRun {
@@ -516,6 +544,20 @@ func readCpuset(cgroupPath string) (string, error) {
 
 func writeCpuset(cgroupPath, cpus string) error {
 	return os.WriteFile(filepath.Join(cgroupPath, "cpuset.cpus"), []byte(cpus), 0o644)
+}
+
+func needsCpusetUpdate(cgroupPaths []string, target string) (bool, error) {
+	targetSet := normalizeCpuset(target)
+	for _, cgroupPath := range cgroupPaths {
+		current, err := readCpuset(cgroupPath)
+		if err != nil {
+			return false, err
+		}
+		if normalizeCpuset(current) != targetSet {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func normalizeCpuset(raw string) string {
