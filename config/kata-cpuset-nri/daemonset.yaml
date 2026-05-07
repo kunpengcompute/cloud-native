@@ -19,6 +19,7 @@ spec:
       labels:
         app: kata-cpuset-nri
     spec:
+      automountServiceAccountToken: false
       priorityClassName: system-node-critical
       tolerations:
       - operator: Exists
@@ -33,7 +34,17 @@ spec:
         - --runtimeclass-whitelist=kata,kata-clh
         - --dry-run=true
         securityContext:
-          privileged: true
+          privileged: false
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsUser: 0
+          runAsGroup: 0
+          runAsNonRoot: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
         resources:
           requests:
             cpu: 50m
@@ -44,23 +55,22 @@ spec:
         volumeMounts:
         - name: nri-socket
           mountPath: /var/run/nri
-        - name: sys
-          mountPath: /sys
           readOnly: true
-          mountPropagation: HostToContainer
-        - name: cgroup
-          mountPath: /sys/fs/cgroup
-          mountPropagation: HostToContainer
+        - name: sys-cpu
+          mountPath: /sys/devices/system/cpu
+          readOnly: true
+        - name: cpuset-cgroup
+          mountPath: /sys/fs/cgroup/cpuset
       volumes:
       - name: nri-socket
         hostPath:
           path: /var/run/nri
           type: Directory
-      - name: sys
+      - name: sys-cpu
         hostPath:
-          path: /sys
+          path: /sys/devices/system/cpu
           type: Directory
-      - name: cgroup
+      - name: cpuset-cgroup
         hostPath:
-          path: /sys/fs/cgroup
+          path: /sys/fs/cgroup/cpuset
           type: Directory

@@ -34,6 +34,7 @@ Kubernetes 部署清单：
 - `config/kata-cpuset-nri/daemonset.yaml`
 - 默认启用 `--dry-run=true`，用于先验证 DaemonSet 形态启动和 NRI 注册。
 - 默认 runtimeClass 白名单包含 `kata,kata-clh`，便于分别测试 QEMU 和 cloud-hypervisor 后端。
+- DaemonSet 默认不使用 `privileged`，只读挂载 NRI socket 目录和 CPU topology，仅对 `/sys/fs/cgroup/cpuset` 保留写权限。
 
 测试 Pod 清单：
 - `config/kata-cpuset-nri/test-pods.yaml`
