@@ -30,7 +30,7 @@ spec:
         - --nri-socket-path=/var/run/nri/nri.sock
         - --scan-interval=10s
         - --namespace-whitelist=default
-        - --runtimeclass-whitelist=kata
+        - --runtimeclass-whitelist=kata,kata-clh
         - --dry-run=true
         securityContext:
           privileged: true
