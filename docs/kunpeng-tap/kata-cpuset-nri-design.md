@@ -97,20 +97,23 @@ coreID -> [cpuA, cpuB]
 
 ## 6. 配置设计
 
-```yaml
-socketPath: /var/run/nri/nri.sock
-scanInterval: 10s
-namespaceWhitelist:
-  - default
-  - workloads
-runtimeClassWhitelist:
-  - kata
-dryRun: false
+```bash
+kata-cpuset-nri \
+  --nri-socket-path=/var/run/nri/nri.sock \
+  --scan-interval=10s \
+  --cgroup-root="" \
+  --namespace-whitelist=default,workloads \
+  --runtimeclass-whitelist=kata \
+  --dry-run=false
 ```
 
 字段说明：
-- `scanInterval`：周期扫描间隔。
-- `dryRun`：仅输出计划写入，不实际执行写入。
+- `nri-socket-path`：NRI socket 路径。
+- `scan-interval`：周期扫描间隔。
+- `cgroup-root`：cpuset cgroup 根路径；为空时插件通过 `/proc/self/mountinfo` 自动发现 cpuset 控制器挂载点。
+- `namespace-whitelist`：逗号分隔的 namespace 白名单。
+- `runtimeclass-whitelist`：逗号分隔的 runtimeClass 白名单。
+- `dry-run`：仅输出计划写入，不实际执行写入。
 
 ## 7. 部署方案
 

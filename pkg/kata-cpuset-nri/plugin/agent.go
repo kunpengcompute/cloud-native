@@ -43,6 +43,7 @@ const (
 type Config struct {
 	SocketPath     string
 	ScanInterval   time.Duration
+	CgroupRoot     string
 	Namespaces     []string
 	RuntimeClasses []string
 	DryRun         bool
@@ -53,6 +54,7 @@ func DefaultConfig() Config {
 	return Config{
 		SocketPath:     "/var/run/nri/nri.sock",
 		ScanInterval:   10 * time.Second,
+		CgroupRoot:     "",
 		Namespaces:     []string{"default"},
 		RuntimeClasses: []string{"kata"},
 	}
@@ -168,7 +170,8 @@ func (a *Agent) reconcileOnce() error {
 			klog.InfoS("Skip pod without cgroup path", "pod", pod.name, "namespace", pod.namespace)
 			continue
 		}
-		current, err := readCpuset(pod.cgroupPath)
+		cgroupPath := a.resolveCgroupPath(pod.cgroupPath)
+		current, err := readCpuset(cgroupPath)
 		if err != nil {
 			klog.ErrorS(err, "Read pod cpuset failed", "pod", pod.name, "namespace", pod.namespace)
 			continue
@@ -186,7 +189,7 @@ func (a *Agent) reconcileOnce() error {
 			klog.InfoS("Dry-run pod cpuset update", "pod", pod.name, "namespace", pod.namespace, "current", current, "target", target)
 			continue
 		}
-		if err := writeCpuset(pod.cgroupPath, target); err != nil {
+		if err := writeCpuset(cgroupPath, target); err != nil {
 			klog.ErrorS(err, "Write pod cpuset failed", "pod", pod.name, "namespace", pod.namespace, "target", target)
 			continue
 		}
@@ -244,6 +247,16 @@ func (a *Agent) targetCpuset(current string, occupied map[string]struct{}) strin
 	return ""
 }
 
+func (a *Agent) resolveCgroupPath(cgroupPath string) string {
+	if a.cfg.CgroupRoot == "" {
+		return cgroupPath
+	}
+	if strings.HasPrefix(cgroupPath, a.cfg.CgroupRoot) {
+		return cgroupPath
+	}
+	return filepath.Join(a.cfg.CgroupRoot, strings.TrimPrefix(cgroupPath, "/"))
+}
+
 func (a *Agent) replacePods(pods []*api.PodSandbox) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -289,6 +302,79 @@ func toSet(items []string) map[string]struct{} {
 		}
 	}
 	return out
+}
+
+// DiscoverCpusetRoot discovers the cpuset cgroup mount from the current mount namespace.
+func DiscoverCpusetRoot() (string, error) {
+	data, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
+		return "", fmt.Errorf("read mountinfo: %w", err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if root, ok := parseCpusetMount(line); ok {
+			return root, nil
+		}
+	}
+	return "", fmt.Errorf("cpuset cgroup mount not found")
+}
+
+func parseCpusetMount(line string) (string, bool) {
+	if strings.TrimSpace(line) == "" {
+		return "", false
+	}
+	parts := strings.Split(line, " - ")
+	if len(parts) != 2 {
+		return "", false
+	}
+	left := strings.Fields(parts[0])
+	right := strings.Fields(parts[1])
+	if len(left) < 5 || len(right) < 3 {
+		return "", false
+	}
+	mountPoint := unescapeMountPath(left[4])
+	fsType := right[0]
+	superOptions := right[2]
+	switch fsType {
+	case "cgroup":
+		return mountPoint, hasMountOption(superOptions, "cpuset")
+	case "cgroup2":
+		if hasCgroup2Controller(mountPoint, "cpuset") {
+			return mountPoint, true
+		}
+	}
+	return "", false
+}
+
+func hasMountOption(options, target string) bool {
+	for _, option := range strings.Split(options, ",") {
+		if option == target {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCgroup2Controller(root, controller string) bool {
+	data, err := os.ReadFile(filepath.Join(root, "cgroup.controllers"))
+	if err != nil {
+		return false
+	}
+	for _, item := range strings.Fields(string(data)) {
+		if item == controller {
+			return true
+		}
+	}
+	return false
+}
+
+func unescapeMountPath(path string) string {
+	replacer := strings.NewReplacer(
+		`\\`, `\`,
+		`\040`, " ",
+		`\011`, "\t",
+		`\012`, "\n",
+	)
+	return replacer.Replace(path)
 }
 
 func readCpuset(cgroupPath string) (string, error) {

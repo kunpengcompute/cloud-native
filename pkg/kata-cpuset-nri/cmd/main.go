@@ -18,8 +18,10 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"k8s.io/klog/v2"
@@ -29,7 +31,7 @@ import (
 )
 
 func main() {
-	cfg := plugin.DefaultConfig()
+	cfg := parseConfig()
 	pairs, err := topology.DiscoverSiblingPairs()
 	if err != nil {
 		klog.Exitf("discover sibling pairs failed: %v", err)
@@ -46,4 +48,43 @@ func main() {
 	if err := agent.Run(ctx); err != nil {
 		klog.Exitf("plugin run failed: %v", err)
 	}
+}
+
+func parseConfig() plugin.Config {
+	cfg := plugin.DefaultConfig()
+	namespaces := strings.Join(cfg.Namespaces, ",")
+	runtimeClasses := strings.Join(cfg.RuntimeClasses, ",")
+
+	flag.StringVar(&cfg.SocketPath, "nri-socket-path", cfg.SocketPath, "NRI socket path")
+	flag.DurationVar(&cfg.ScanInterval, "scan-interval", cfg.ScanInterval, "cpuset reconciliation scan interval")
+	flag.StringVar(&cfg.CgroupRoot, "cgroup-root", cfg.CgroupRoot, "cpuset cgroup root, auto-detected when empty")
+	flag.StringVar(&namespaces, "namespace-whitelist", namespaces, "comma-separated namespace whitelist")
+	flag.StringVar(&runtimeClasses, "runtimeclass-whitelist", runtimeClasses, "comma-separated runtimeClass whitelist")
+	flag.BoolVar(&cfg.DryRun, "dry-run", cfg.DryRun, "log cpuset updates without writing cgroup files")
+	flag.Parse()
+
+	cfg.Namespaces = splitCSV(namespaces)
+	cfg.RuntimeClasses = splitCSV(runtimeClasses)
+	if cfg.CgroupRoot == "" {
+		root, err := plugin.DiscoverCpusetRoot()
+		if err != nil {
+			klog.Exitf("discover cpuset cgroup root failed: %v", err)
+		}
+		cfg.CgroupRoot = root
+	}
+	klog.InfoS("Using kata cpuset nri config", "nriSocketPath", cfg.SocketPath,
+		"scanInterval", cfg.ScanInterval, "cgroupRoot", cfg.CgroupRoot,
+		"namespaces", cfg.Namespaces, "runtimeClasses", cfg.RuntimeClasses, "dryRun", cfg.DryRun)
+	return cfg
+}
+
+func splitCSV(raw string) []string {
+	var out []string
+	for _, item := range strings.Split(raw, ",") {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			out = append(out, item)
+		}
+	}
+	return out
 }
