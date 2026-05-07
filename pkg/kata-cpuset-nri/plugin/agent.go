@@ -87,7 +87,7 @@ func New(cfg Config, siblingPairs []topology.SiblingPair) (*Agent, error) {
 		return nil, fmt.Errorf("no sibling pair available")
 	}
 	a := &Agent{
-		mask:           api.MustParseEventMask("RunPodSandbox,RemovePodSandbox"),
+		mask:           api.MustParseEventMask("RunPodSandbox,StopPodSandbox,RemovePodSandbox"),
 		cfg:            cfg,
 		siblingPairs:   siblingPairs,
 		namespaces:     toSet(cfg.Namespaces),
@@ -151,12 +151,25 @@ func (a *Agent) RunPodSandbox(_ context.Context, pod *api.PodSandbox) error {
 	return a.reconcileOnce()
 }
 
+// StopPodSandbox handles pod stop event.
+func (a *Agent) StopPodSandbox(_ context.Context, pod *api.PodSandbox) error {
+	a.removePod(pod)
+	return nil
+}
+
 // RemovePodSandbox handles pod removal event.
 func (a *Agent) RemovePodSandbox(_ context.Context, pod *api.PodSandbox) error {
+	a.removePod(pod)
+	return nil
+}
+
+func (a *Agent) removePod(pod *api.PodSandbox) {
+	if pod == nil {
+		return
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	delete(a.pods, pod.Id)
-	return nil
 }
 
 func (a *Agent) reconcileOnce() error {
