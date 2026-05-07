@@ -2,6 +2,8 @@
 
 `kata-cpuset-nri` 是一个基于 NRI 的 Pod 级 cpuset 收敛插件骨架。
 
+用户部署与验证步骤见 `docs/kunpeng-tap/kata-cpuset-nri-user-guide.md`。
+
 当前骨架能力：
 - 白名单过滤（namespace/runtimeClass）。
 - 扫描所有 Pod 的 `cpuset.cpus` 并收敛。
