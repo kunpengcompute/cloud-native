@@ -1,24 +1,25 @@
 # Kata Cpuset NRI 插件用户指南
 
-本文说明如何以 DaemonSet 方式部署 `kata-cpuset-nri`，并在 `containerd v2.1 + kata` 环境中验证 Pod 级物理核心绑定能力。
+本文说明如何以 DaemonSet 方式部署和使用 `kata-cpuset-nri`。插件通过 NRI 接入 containerd，对符合白名单条件的 Kata Pod 执行 Pod 级 cpuset 收敛，将 Pod 的 2 个逻辑 CPU 绑定到同一个物理核心的 SMT sibling pair。
 
-## 1. 使用场景
+本文中的 containerd、Kata、cloud-hypervisor 和 arm64 节点信息是当前已验证的测试条件。用户可在相同或等价条件下按本文步骤完成部署、参数配置和绑定结果检查。
 
-`kata-cpuset-nri` 通过 NRI 接入 containerd，对符合白名单条件的 Kata Pod 执行 cpuset 收敛：
+## 1. 功能范围
 
 - 只处理 Pod 层级，不处理 container 层级。
 - 目标 Pod 的 CPU request/limit 固定为 `2`。
-- 将 Pod 的 2 个逻辑 CPU 绑定到同一个物理核心的 SMT sibling pair。
+- 将 Pod 的 2 个逻辑 CPU 绑定到同一个物理核心的 sibling pair。
 - 不保存绑定状态；插件每轮从当前 Pod cgroup 的 `cpuset.cpus` 重新计算占用。
 - 不允许多个符合条件的 Pod 收敛到同一对 sibling。
+- 通过 namespace 和 runtimeClass 白名单限定处理范围。
 
 ## 2. 已验证测试条件
 
-当前仓库中的部署和验证流程已在以下远端 arm64 环境中通过：
+当前部署流程已在以下 arm64 测试环境中验证通过：
 
 | 项目 | 测试值 |
 | --- | --- |
-| 远端节点 | `root@192.168.25.61` |
+| 测试节点 | `root@192.168.25.61` |
 | CPU 架构 | `aarch64` |
 | Kubernetes | `v1.34.7` |
 | containerd | `v2.1.7` |
@@ -26,17 +27,83 @@
 | NRI socket | `/var/run/nri/nri.sock` |
 | Kata runtime handler | `kata-clh` |
 | Kata hypervisor | cloud-hypervisor |
-| 测试规模 | 100 个 `runtimeClassName: kata-clh` Pod |
+| 验证规模 | 100 个 `runtimeClassName: kata-clh` Pod |
 
-测试环境要求：
+部署前需要确认：
 
-- containerd 已启用 NRI，并存在 `/var/run/nri/nri.sock`。
-- Kata Containers 已安装并配置可用的 runtime handler，例如 `kata-clh`。
-- 节点 CPU 开启 SMT，且 `/sys/devices/system/cpu/cpu*/topology/thread_siblings_list` 可读取。
+- containerd 已启用 NRI，并生成 `/var/run/nri/nri.sock`。
+- Kata Containers 已安装，并配置可用的 runtime handler，例如 `kata-clh`。
+- 节点 CPU 开启 SMT，且可读取 `/sys/devices/system/cpu/cpu*/topology/thread_siblings_list`。
 - 目标 namespace 和 runtimeClass 已加入插件白名单。
 - 目标 Pod 使用 2 CPU request/limit。
 
-## 3. 编译镜像
+## 3. 启用 containerd NRI
+
+containerd v2.1 可通过 `/etc/containerd/config.toml` 启用 NRI。建议先备份配置文件：
+
+```bash
+cp /etc/containerd/config.toml /etc/containerd/config.toml.bak
+```
+
+确认或添加如下配置：
+
+```toml
+[plugins.'io.containerd.nri.v1.nri']
+  disable = false
+  socket_path = '/var/run/nri/nri.sock'
+  plugin_path = '/opt/nri/plugins'
+  plugin_config_path = '/etc/nri/conf.d'
+  plugin_registration_timeout = '10s'
+  plugin_request_timeout = '5s'
+  disable_connections = false
+```
+
+重启 containerd：
+
+```bash
+systemctl restart containerd
+```
+
+检查 NRI socket：
+
+```bash
+test -S /var/run/nri/nri.sock && echo "NRI socket is ready"
+```
+
+也可以通过 containerd 配置导出结果确认：
+
+```bash
+containerd config dump | grep -n -A8 "io.containerd.nri.v1.nri"
+```
+
+## 4. 准备 Kata RuntimeClass
+
+如果测试环境的 QEMU 后端存在 CPU hotplug 限制，可以使用 cloud-hypervisor 后端。仓库提供 `kata-clh` RuntimeClass 清单：
+
+```bash
+kubectl apply -f config/kata-cpuset-nri/runtimeclass-cloud-hypervisor.yaml
+kubectl get runtimeclass kata-clh
+```
+
+containerd 中需要存在与 RuntimeClass handler 同名的 runtime 配置。当前已验证环境使用如下配置形态：
+
+```toml
+[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.kata-clh]
+  runtime_type = 'io.containerd.kata.v2'
+  sandboxer = 'podsandbox'
+  privileged_without_host_devices = false
+  [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.kata-clh.options]
+    ConfigPath = '/opt/kata/share/defaults/kata-containers/configuration-clh.toml'
+```
+
+修改 containerd 配置后需要重启 containerd：
+
+```bash
+systemctl restart containerd
+crictl info | grep -A20 kata-clh
+```
+
+## 5. 编译镜像
 
 在仓库根目录执行：
 
@@ -46,23 +113,30 @@ docker build --platform=linux/arm64 -f Dockerfile.kata-cpuset-nri -t kata-cpuset
 rm -f kata-cpuset-nri
 ```
 
-如果远端测试节点没有连接镜像仓库，可以直接导入到远端 containerd 的 `k8s.io` namespace：
+如果测试节点无法从镜像仓库拉取镜像，可以直接导入到目标节点 containerd 的 `k8s.io` namespace。以下命令以当前已验证节点为例：
 
 ```bash
 docker save kata-cpuset-nri:latest | ssh root@192.168.25.61 'ctr -n k8s.io images import -'
 ```
 
-如果使用镜像仓库，将 `config/kata-cpuset-nri/daemonset.yaml` 中的镜像地址改为仓库地址，并在目标节点确认 kubelet 可以拉取该镜像。
+如果使用镜像仓库，将 `config/kata-cpuset-nri/daemonset.yaml` 中的镜像地址改为仓库地址，并确认 kubelet 可以拉取该镜像。
 
-## 4. DaemonSet 部署
+## 6. DaemonSet 部署
 
 DaemonSet 是默认部署形式。每个节点运行一个插件 Pod，只对本节点的 Kata Pod cgroup 做本地收敛。
 
-部署清单：
+部署插件：
 
 ```bash
 kubectl apply -f config/kata-cpuset-nri/daemonset.yaml
 kubectl rollout status daemonset/kata-cpuset-nri -n kata-cpuset-nri --timeout=180s
+```
+
+查看插件状态：
+
+```bash
+kubectl get pod -n kata-cpuset-nri -l app=kata-cpuset-nri
+kubectl logs -n kata-cpuset-nri -l app=kata-cpuset-nri --since=10m
 ```
 
 默认清单使用较小权限面：
@@ -75,7 +149,7 @@ kubectl rollout status daemonset/kata-cpuset-nri -n kata-cpuset-nri --timeout=18
 - 只读挂载 `/var/run/nri` 和 `/sys/devices/system/cpu`。
 - 仅将 `/sys/fs/cgroup/cpuset` 作为可写 hostPath 挂载。
 
-## 5. DaemonSet 参数设置
+## 7. DaemonSet 参数设置
 
 主要参数位于 `config/kata-cpuset-nri/daemonset.yaml` 的 container `args`：
 
@@ -107,36 +181,14 @@ kubectl patch ds kata-cpuset-nri -n kata-cpuset-nri --type=json \
 kubectl rollout status daemonset/kata-cpuset-nri -n kata-cpuset-nri --timeout=180s
 ```
 
-如果需要修改白名单，例如只处理 `kata-clh`：
+如果只处理 `kata-clh`，可以修改 runtimeClass 白名单：
 
 ```bash
 kubectl patch ds kata-cpuset-nri -n kata-cpuset-nri --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args/3","value":"--runtimeclass-whitelist=kata-clh"}]'
 ```
 
-## 6. cloud-hypervisor RuntimeClass
-
-在测试环境中，如果 QEMU 后端存在 CPU hotplug 限制，可以使用 cloud-hypervisor 后端。仓库提供 `kata-clh` RuntimeClass 清单：
-
-```bash
-kubectl apply -f config/kata-cpuset-nri/runtimeclass-cloud-hypervisor.yaml
-kubectl get runtimeclass kata-clh
-```
-
-containerd 中需要存在与 RuntimeClass handler 同名的 runtime 配置。测试环境使用的配置形态如下：
-
-```toml
-[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.kata-clh]
-  runtime_type = 'io.containerd.kata.v2'
-  sandboxer = 'podsandbox'
-  privileged_without_host_devices = false
-  [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.kata-clh.options]
-    ConfigPath = '/opt/kata/share/defaults/kata-containers/configuration-clh.toml'
-```
-
-修改 containerd 配置后需重启 containerd，并确认 `crictl info` 中能看到 `kata-clh` runtime handler。
-
-## 7. 功能验证
+## 8. 创建测试 Pod
 
 创建 2 个 cloud-hypervisor 测试 Pod：
 
@@ -152,23 +204,55 @@ kubectl apply -f config/kata-cpuset-nri/test-deployment-cloud-hypervisor-scale.y
 kubectl rollout status deployment/kata-clh-cpuset-scale -n default --timeout=900s
 ```
 
-查看插件状态和日志：
-
-```bash
-kubectl get pod -n kata-cpuset-nri -l app=kata-cpuset-nri
-kubectl logs -n kata-cpuset-nri -l app=kata-cpuset-nri --since=10m
-```
-
-确认无写入失败：
+确认插件日志没有写入失败：
 
 ```bash
 kubectl logs -n kata-cpuset-nri -l app=kata-cpuset-nri --since=10m | \
   grep -E 'Write pod cpuset failed|Resolve pod cgroup path failed|No free sibling|broken pipe|failed sending|panic|Error' || true
 ```
 
-## 8. 绑定结果检查
+## 9. 绑定结果检查
 
-以下脚本在节点上读取每个测试 Pod 的 Pod parent cgroup 与 Kata sandbox cgroup，检查二者是否一致，并统计 sibling pair 是否重复：
+### 9.1 直接查看 cpuset 范围
+
+以下命令在节点上执行，可以直接展示每个测试 Pod 当前观测到的 `cpuset.cpus` 范围值：
+
+```bash
+ns=default
+selector=app=kata-clh-cpuset-scale
+root=/sys/fs/cgroup/cpuset
+
+kubectl get pods -n "$ns" -l "$selector" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort | while read -r pod; do
+  uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}' | tr - _)
+  values=$(find "$root" -path "*pod${uid}.slice*/cpuset.cpus" -exec cat {} \; | sort -u | paste -sd, -)
+  printf '%s %s\n' "$pod" "${values:-NONE}"
+done
+```
+
+输出示例：
+
+```text
+kata-clh-cpuset-scale-56b8466877-254rp 0-1
+kata-clh-cpuset-scale-56b8466877-262nc 2-3
+kata-clh-cpuset-scale-56b8466877-26kwr 4-5
+```
+
+查看单个 Pod 的 parent cgroup 和 sandbox cgroup 文件：
+
+```bash
+pod=kata-clh-cpuset-scale-56b8466877-254rp
+uid=$(kubectl get pod "$pod" -n default -o jsonpath='{.metadata.uid}' | tr - _)
+find /sys/fs/cgroup/cpuset -path "*pod${uid}.slice*/cpuset.cpus" -print | sort | while read -r file; do
+  printf '%s = ' "$file"
+  cat "$file"
+done
+```
+
+输出中如果 parent cgroup 与 sandbox cgroup 均为同一个范围，例如 `0-1`，说明该 Pod 已被收敛到对应 sibling pair。
+
+### 9.2 检查 100 Pod 是否重复绑定
+
+以下脚本读取每个测试 Pod 的 Pod parent cgroup 与 Kata sandbox cgroup，检查二者是否一致，并统计 sibling pair 是否重复：
 
 ```bash
 ns=default
@@ -222,7 +306,7 @@ duplicate_pairs 0
 bad_records 0
 ```
 
-## 9. 清理
+## 10. 清理
 
 清理测试 workload：
 
