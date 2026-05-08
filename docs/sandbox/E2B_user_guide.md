@@ -1,14 +1,20 @@
-# E2B 管理平台部署用户指南
+# E2B 部署指南
 
 ## 特性描述
 
 ### 简介
 
-E2B 管理平台用于提供沙箱编排、镜像仓库、服务注册发现、数据库配置存储等能力，是“E2B 沙箱部署 OpenClaw”方案中的基础管理组件。
+E2B（English2Bits）是一个开源的 AI 代码沙箱平台，为 AI Agent 提供安全、隔离的代码执行环境。E2B 支持快速创建和销毁轻量级沙箱实例，每个沙箱运行在独立的容器或虚拟机中，通过资源限制和网络隔离确保执行环境的安全性。
 
-本文档基于鲲鹏社区《E2B管理平台部署》页面整理，面向本地部署和运维人员，提供 E2B 管理平台的环境准备、软件安装、服务部署、配置修改、服务验证和资源调整方法。
+E2B 管理平台的核心能力包括：
 
-原始资料：[鲲鹏社区 - E2B管理平台部署](https://www.hikunpeng.com/document/detail/zh/kunpengaiagent/bestpractice/aiagent-0078.html)
+- **沙箱编排**：基于 HashiCorp Nomad 实现沙箱任务的调度和生命周期管理，支持按模板批量创建和销毁沙箱实例。
+- **镜像仓库**：集成 Harbor 作为容器镜像仓库，管理沙箱模板镜像及运行时依赖。
+- **服务注册发现**：通过 Consul 实现各组件的服务注册、健康检查和发现。
+- **配置存储**：使用 Postgres 数据库持久化沙箱配置（超时时间、并发上限等），支持运行时动态调整。
+- **模板管理**：`template-manager-system` 负责沙箱模板的定义与分发，可根据业务规模调整资源配额。
+
+本文档面向本地部署和运维人员，提供 E2B 管理平台在鲲鹏 ARM 架构上的环境准备、软件安装、服务部署、配置修改、服务验证和资源调整方法。
 
 ### 版本支持
 
@@ -227,6 +233,8 @@ E2B 管理平台用于提供沙箱编排、镜像仓库、服务注册发现、�
 
     命令说明：执行部署脚本的依赖下载阶段，下载 arm64 所需依赖包。若遇到网络问题，可手动下载相关依赖并上传至 `/opt/e2b-infra/dep` 目录。
 
+    ![arm64 依赖包列表](images/arm64-deps.png)
+
 3. 安装 E2B 服务组件。
 
     ```bash
@@ -234,6 +242,8 @@ E2B 管理平台用于提供沙箱编排、镜像仓库、服务注册发现、�
     ```
 
     命令说明：安装 E2B 依赖组件并拉取所需 Docker 镜像。若镜像拉取失败，可临时配置 Docker 代理手动拉取镜像。
+
+    ![Docker 镜像列表](images/docker-images.png)
 
 4. 启动服务。
 
@@ -280,6 +290,8 @@ Harbor 默认访问信息如下：
 
     说明：将 `{server_ip}` 替换为实际 server 节点 IP。
 
+    ![Nomad 登录页面](images/nomad-login.png)
+
 2. 获取 Nomad 登录 Token。
 
     ```bash
@@ -291,6 +303,8 @@ Harbor 默认访问信息如下：
 3. 检查服务健康状态。
 
     在 Nomad 页面中查看各服务状态。如果服务状态显示为 `Healthy`，表示服务启动正常。
+
+    ![Healthy 状态示意](images/healthy-status.png)
 
 ### 修改沙箱超时时间
 
@@ -354,7 +368,11 @@ Nomad 中的 `template-manager-system` 任务在 Job Definition 中对 CPU、内
 
 3. 找到 `template-manager-system`。
 
+    ![Jobs 页面定位 template-manager-system](images/jobs-template-manager.png)
+
 4. 进入任务详情，打开 `Definition` 页签。
+
+    ![Job Definition 配置界面](images/job-definition.png)
 
 5. 修改 CPU、内存等资源配置。
 
@@ -490,17 +508,6 @@ bash build.sh --start
 4. 使用默认账号 `admin` 和默认密码 `Harbor12345` 登录；生产环境建议登录后修改默认密码。
 
 ## 附录
-
-### 原页面截图资源
-
-| 内容 | 图片链接 |
-| --- | --- |
-| arm64 依赖包列表 | https://www.hikunpeng.com/doc_center/source/zh/kunpengaiagent/bestpractice/figure/zh-cn_image_0000002566660711.png |
-| Docker 镜像列表 | https://www.hikunpeng.com/doc_center/source/zh/kunpengaiagent/bestpractice/figure/zh-cn_image_0000002535740802.png |
-| Nomad 登录/状态示意 | https://www.hikunpeng.com/doc_center/source/zh/kunpengaiagent/bestpractice/figure/zh-cn_image_0000002535002944.png |
-| Healthy 状态示意 | https://www.hikunpeng.com/doc_center/source/zh/kunpengaiagent/bestpractice/figure/zh-cn_image_0000002534843006.png |
-| Jobs 页面定位 `template-manager-system` | https://www.hikunpeng.com/doc_center/source/zh/kunpengaiagent/bestpractice/figure/zh-cn_image_0000002535580908.png |
-| Job Definition 配置界面 | https://www.hikunpeng.com/doc_center/source/zh/kunpengaiagent/bestpractice/figure/zh-cn_image_0000002566540685.png |
 
 ### 参考链接
 

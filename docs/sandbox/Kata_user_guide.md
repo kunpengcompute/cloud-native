@@ -1,30 +1,55 @@
-# 特性描述
+# Kata 部署用户指南
 
-### 简介
+## 简介
 
-### 版本支持
+Kata Containers 是一个开源的容器运行时项目，旨在将容器的轻量级特性与虚拟机的安全性隔离优势相结合。Kata Containers 通过为每个 Pod 或容器启动一个轻量级虚拟机（VM），利用硬件虚拟化技术（如 KVM）提供强隔离，同时兼容 OCI（Open Container Initiative）和 Kubernetes 容器编排生态。本文档基于鲲鹏 ARM 架构环境，指导用户完成 Kata Containers 的安装、配置及验证，并结合 Nydus 镜像加速方案实现高效的容器镜像分发。
 
-### 约束与限制
+## 版本支持
 
-### 应用场景
+本文档基于以下版本组合进行验证和适配：
 
-# 软件安装
+- **处理器架构**：AArch64（鲲鹏 920/950）
+- **操作系统**：openEuler 24.03 LTS SP3
+- **容器运行时**：Containerd 1.7.27
+- **Kata Containers**：3.27.0（Cloud-Hypervisor）
+- **Nydus**：2.4.0 + Nydus Snapshotter 0.15.12
+- **Kubernetes**：1.28.14
+
+各组件的详细版本及获取方式见下方"环境要求"章节。
+
+## 约束与限制
+
+- 本文档仅适用于 **AArch64（ARM64）** 架构，基于鲲鹏 920 新型号处理器和鲲鹏 950 处理器验证，不适用于 x86_64 架构。
+- Kata Containers 使用 Cloud-Hypervisor（CLH）作为虚拟机管理器，需要宿主机支持硬件虚拟化（KVM）。请确认宿主机内核已启用 KVM 模块（`ls /dev/kvm`）。
+- 单节点并发运行大量 Kata 沙箱（如 1000+）时，对宿主机的内存、文件描述符、PID 数量等系统资源消耗极大，需按本文档"千级沙箱并发调优"章节进行调整。
+- Nydus 镜像加速依赖远程 Registry 服务的网络连通性，请确保集群节点可访问配置的镜像仓库地址。
+- Kata 运行时中的 Pod 不支持 HostNetwork、HostPID 等共享宿主机命名空间的特性。
+- 部分 Kubernetes 特性（如 Privileged 特权模式、某些 Device Plugin）在 Kata 运行时中可能受限或不支持。
+
+## 应用场景
+
+- **多租户隔离**：在云平台或 PaaS 服务中，不同租户的工作负载需要强安全隔离。Kata Containers 通过虚拟机级隔离防止租户间的侧信道攻击和资源逃逸。
+- **不可信工作负载运行**：对于来源不可信或安全性要求较高的容器镜像（如第三方提交的代码执行环境），使用 Kata Containers 可将攻击面限制在虚拟机内部。
+- **安全合规场景**：金融、政务等行业对容器隔离有严格合规要求，Kata Containers 提供的硬件级隔离能够满足更高的安全标准。
+- **AI/代码沙箱**：结合 Nydus 镜像加速，适用于 AI Agent 代码执行沙箱等需要快速启动、强隔离的临时运行环境。
+
+## 软件安装
 ### 环境要求
 
 本文基于特定环境提供指导，在正式操作前请确保软硬件均满足要求。
 
 **表 1**  硬件要求
 
-<a name="table232mcpsimp"></a>
-<table><thead align="left"><tr id="row237mcpsimp"><th class="cellrowborder" valign="top" width="27%" id="mcps1.2.3.1.1"><p id="p239mcpsimp"><a name="p239mcpsimp"></a><a name="p239mcpsimp"></a>项目</p>
+
+<table><thead align="left"><tr id="row237mcpsimp"><th class="cellrowborder" valign="top" width="27%" id="mcps1.2.3.1.1"><p id="p239mcpsimp">项目</p>
 </th>
-<th class="cellrowborder" valign="top" width="73%" id="mcps1.2.3.1.2"><p id="p241mcpsimp"><a name="p241mcpsimp"></a><a name="p241mcpsimp"></a>说明</p>
+<th class="cellrowborder" valign="top" width="73%" id="mcps1.2.3.1.2"><p id="p241mcpsimp">说明</p>
 </th>
 </tr>
 </thead>
-<tbody><tr id="row243mcpsimp"><td class="cellrowborder" valign="top" width="27%" headers="mcps1.2.3.1.1 "><p id="p245mcpsimp"><a name="p245mcpsimp"></a><a name="p245mcpsimp"></a>处理器</p>
+<tbody><tr id="row243mcpsimp"><td class="cellrowborder" valign="top" width="27%" headers="mcps1.2.3.1.1 "><p id="p245mcpsimp">处理器</p>
 </td>
-<td class="cellrowborder" valign="top" width="73%" headers="mcps1.2.3.1.2 "><p id="p173486314562"><a name="p173486314562"></a><a name="p173486314562"></a>鲲鹏920新型号处理器、鲲鹏950处理器</p>
+<td class="cellrowborder" valign="top" width="73%" headers="mcps1.2.3.1.2 "><p id="p173486314562">鲲鹏920新型号处理器、鲲鹏950处理器</p>
 </td>
 </tr>
 </tbody>
@@ -32,62 +57,62 @@
 
 **表 2**  操作系统和软件要求
 
-<a name="table248mcpsimp"></a>
-<table><thead align="left"><tr id="row254mcpsimp"><th class="cellrowborder" valign="top" width="26.26262626262626%" id="mcps1.2.4.1.1"><p id="p256mcpsimp"><a name="p256mcpsimp"></a><a name="p256mcpsimp"></a>项目</p>
+
+<table><thead align="left"><tr id="row254mcpsimp"><th class="cellrowborder" valign="top" width="26.26262626262626%" id="mcps1.2.4.1.1"><p id="p256mcpsimp">项目</p>
 </th>
-<th class="cellrowborder" valign="top" width="38.38383838383838%" id="mcps1.2.4.1.2"><p id="p258mcpsimp"><a name="p258mcpsimp"></a><a name="p258mcpsimp"></a>版本</p>
+<th class="cellrowborder" valign="top" width="38.38383838383838%" id="mcps1.2.4.1.2"><p id="p258mcpsimp">版本</p>
 </th>
-<th class="cellrowborder" valign="top" width="35.35353535353536%" id="mcps1.2.4.1.3"><p id="p260mcpsimp"><a name="p260mcpsimp"></a><a name="p260mcpsimp"></a>获取方法</p>
+<th class="cellrowborder" valign="top" width="35.35353535353536%" id="mcps1.2.4.1.3"><p id="p260mcpsimp">获取方法</p>
 </th>
 </tr>
 </thead>
-<tbody><tr id="row262mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p264mcpsimp"><a name="p264mcpsimp"></a><a name="p264mcpsimp"></a>OS</p>
+<tbody><tr id="row262mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p264mcpsimp">OS</p>
 </td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p266mcpsimp"><a name="p266mcpsimp"></a><a name="p266mcpsimp"></a>openEuler 24.03 LTS SP3</p>
+<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p266mcpsimp">openEuler 24.03 LTS SP3</p>
 </td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p268mcpsimp"><a name="p268mcpsimp"></a><a name="p268mcpsimp"></a><a href="https://mirrors.huaweicloud.com/openeuler/openEuler-24.03-LTS-SP3/ISO/aarch64/openEuler-24.03-LTS-SP3-everything-aarch64-dvd.iso" target="_blank" rel="noopener noreferrer">获取链接</a></p>
-</td>
-</tr>
-<tr id="row270mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p272mcpsimp"><a name="p272mcpsimp"></a><a name="p272mcpsimp"></a>Kubernetes</p>
-</td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p274mcpsimp"><a name="p274mcpsimp"></a><a name="p274mcpsimp"></a>1.28.14</p>
-</td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p276mcpsimp"><a name="p276mcpsimp"></a><a name="p276mcpsimp"></a><a href="https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Kubernetes/kunpengk8s_04_0001.html" target="_blank" rel="noopener noreferrer">获取链接</a></p>
+<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p268mcpsimp"><a href="https://mirrors.huaweicloud.com/openeuler/openEuler-24.03-LTS-SP3/ISO/aarch64/openEuler-24.03-LTS-SP3-everything-aarch64-dvd.iso" target="_blank" rel="noopener noreferrer">获取链接</a></p>
 </td>
 </tr>
-<tr id="row278mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p280mcpsimp"><a name="p280mcpsimp"></a><a name="p280mcpsimp"></a>Containerd</p>
+<tr id="row270mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p272mcpsimp">Kubernetes</p>
 </td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p282mcpsimp"><a name="p282mcpsimp"></a><a name="p282mcpsimp"></a>1.7.27</p>
+<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p274mcpsimp">1.28.14</p>
 </td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p284mcpsimp"><a name="p284mcpsimp"></a><a name="p284mcpsimp"></a><a href="https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Containerd/kunpengcontainerd_03_0001.html" target="_blank" rel="noopener noreferrer">获取链接</a></p>
-</td>
-</tr>
-<tr id="row286mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p288mcpsimp"><a name="p288mcpsimp"></a><a name="p288mcpsimp"></a>Kata Containers</p>
-</td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p290mcpsimp"><a name="p290mcpsimp"></a><a name="p290mcpsimp"></a>3.27.0</p>
-</td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p292mcpsimp"><a name="p292mcpsimp"></a><a name="p292mcpsimp"></a><a href="https://github.com/kata-containers/kata-containers/releases/tag/3.27.0" target="_blank" rel="noopener noreferrer">获取链接</a></p>
+<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p276mcpsimp"><a href="https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Kubernetes/kunpengk8s_04_0001.html" target="_blank" rel="noopener noreferrer">获取链接</a></p>
 </td>
 </tr>
-<tr id="row294mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p296mcpsimp"><a name="p296mcpsimp"></a><a name="p296mcpsimp"></a>Nydus (核心组件)</p>
+<tr id="row278mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p280mcpsimp">Containerd</p>
 </td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p298mcpsimp"><a name="p298mcpsimp"></a><a name="p298mcpsimp"></a>2.4.0</p>
+<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p282mcpsimp">1.7.27</p>
 </td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p300mcpsimp"><a name="p300mcpsimp"></a><a name="p300mcpsimp"></a><a href="https://github.com/dragonflyoss/nydus/releases/tag/v2.4.0" target="_blank" rel="noopener noreferrer">获取链接</a></p>
-</td>
-</tr>
-<tr id="row302mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p304mcpsimp"><a name="p304mcpsimp"></a><a name="p304mcpsimp"></a>Nydus Snapshotter</p>
-</td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p306mcpsimp"><a name="p306mcpsimp"></a><a name="p306mcpsimp"></a>0.15.12</p>
-</td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p308mcpsimp"><a name="p308mcpsimp"></a><a name="p308mcpsimp"></a><a href="https://github.com/containerd/nydus-snapshotter/releases/tag/v0.15.12" target="_blank" rel="noopener noreferrer">获取链接</a></p>
+<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p284mcpsimp"><a href="https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Containerd/kunpengcontainerd_03_0001.html" target="_blank" rel="noopener noreferrer">获取链接</a></p>
 </td>
 </tr>
-<tr id="row6598192163914"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p05981928393"><a name="p05981928393"></a><a name="p05981928393"></a>Nerdctl</p>
+<tr id="row286mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p288mcpsimp">Kata Containers</p>
 </td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p8599112153918"><a name="p8599112153918"></a><a name="p8599112153918"></a>1.7.5</p>
+<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p290mcpsimp">3.27.0</p>
 </td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p1859919203919"><a name="p1859919203919"></a><a name="p1859919203919"></a><a href="https://github.com/containerd/nerdctl/releases/tag/v1.7.5" target="_blank" rel="noopener noreferrer">获取连接</a></p>
+<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p292mcpsimp"><a href="https://github.com/kata-containers/kata-containers/releases/tag/3.27.0" target="_blank" rel="noopener noreferrer">获取链接</a></p>
+</td>
+</tr>
+<tr id="row294mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p296mcpsimp">Nydus</p>
+</td>
+<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p298mcpsimp">2.4.0</p>
+</td>
+<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p300mcpsimp"><a href="https://github.com/dragonflyoss/nydus/releases/tag/v2.4.0" target="_blank" rel="noopener noreferrer">获取链接</a></p>
+</td>
+</tr>
+<tr id="row302mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p304mcpsimp">Nydus Snapshotter</p>
+</td>
+<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p306mcpsimp">0.15.12</p>
+</td>
+<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p308mcpsimp"><a href="https://github.com/containerd/nydus-snapshotter/releases/tag/v0.15.12" target="_blank" rel="noopener noreferrer">获取链接</a></p>
+</td>
+</tr>
+<tr id="row6598192163914"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p05981928393">Nerdctl</p>
+</td>
+<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p8599112153918">1.7.5</p>
+</td>
+<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p1859919203919"><a href="https://github.com/containerd/nerdctl/releases/tag/v1.7.5" target="_blank" rel="noopener noreferrer">获取连接</a></p>
 </td>
 </tr>
 </tbody>
@@ -151,9 +176,13 @@
     >![](public_sys-resources/icon-note.gif) **说明：** 
     >建议修改之前备份/etc/containerd/config.toml文件，防止出现问题之后无法恢复
 
+## Nydus 镜像加速（可选）
+
+Nydus 是一种容器镜像加速方案，可显著提升 Kata 容器的镜像拉取和启动速度。Nydus 为可选组件，不安装 Nydus 不影响 Kata 的正常使用。如需按以下流程操作，请先根据"环境要求"章节下载对应版本的 Nydus 安装包。
+
 ### 安装Nydus及配置
 
-本章节主要提供Nydus组件的安装，以及各项服务配置的操作指导。    
+本章节主要提供Nydus组件的安装，以及各项服务配置的操作指导。
 
 
 1.  安装核心组件RPM包
@@ -327,8 +356,9 @@
     virtio_fs_extra_args = []
     ```
 
-# 验证使用Kata和Nydus
-本章节主要提供在Kubernetes集群 + Containerd中Kata和Nydus的使用方式。
+## 验证使用Kata
+
+本章节主要提供在Kubernetes集群 + Containerd 中 Kata 的使用验证方式。
 
 ### 准备镜像
 
@@ -440,14 +470,16 @@
             memory: "1Gi"
     ```
 
-.  启动Pod，检查是否接入成功Kata
+4.  启动Pod，检查是否接入成功Kata
 
     ```
     ps aux | grep cloud-hypervisor
     ```
 
 
-### 验证使能启动Kata+Nydus
+### 验证使能启动Kata+Nydus（可选）
+
+以下验证依赖 Nydus 镜像加速组件，请先完成"## Nydus 镜像加速（可选）"章节的全部配置。
 
 1.  配置nydus-sandbox.yaml
 
@@ -486,11 +518,11 @@
     crictl run -r kata  nydus-container.yaml nydus-sandbox.yaml
     ```
 
-# 千级沙箱并发调优<a name="ZH-CN_TOPIC_0000002590641823"></a>
+## 千级沙箱并发调优
 
 单节点可并发创建1000个kata沙箱的调优配置
 
-### 最大Pod数量限制配置<a name="section16275145523814"></a>
+### 最大Pod数量限制配置
 
 1.  修改/var/lib/kubelet/config.yaml文件，把maxPods 参数放款到1000以上
 
@@ -507,7 +539,7 @@
     systemctl restart kubelet
     ```
 
-### 内核参数限制修改<a name="section428613567371"></a>
+### 内核参数限制修改
 
 Kata Containers 每个Pod都是一个cloud-hypervisor进程，这对宿主机的系统句柄、ARP 缓存表、PID 数量消耗极大，需要放大 Linux 内核的限制。
 
@@ -524,7 +556,8 @@ Kata Containers 每个Pod都是一个cloud-hypervisor进程，这对宿主机的
     net.ipv4.neigh.default.gc_thresh3 = 16384
     
     # 3. 扩大系统文件描述符和 PID 限制 
-    fs.file-max = 2097152 kernel.pid_max = 4194304
+    fs.file-max = 2097152
+    kernel.pid_max = 4194304
     
     # 4. 优化网络连接跟踪（Conntrack），防止高并发连接打满 
     net.netfilter.nf_conntrack_max = 2097152
