@@ -18,8 +18,8 @@ package v1alpha1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-// MPAMPolicySpec defines the desired state for MPAM settings.
-type MPAMPolicySpec struct {
+// QoSPolicySpec defines the desired state for QoS settings.
+type QoSPolicySpec struct {
 	// MB groups memory-bandwidth related policy items.
 	// +kubebuilder:default:={}
 	// +optional
@@ -34,6 +34,22 @@ type MPAMPolicySpec struct {
 	// If omitted, the controller should decide default behavior (typically all nodes).
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// CPU groups cpu-related controls.
+	// +kubebuilder:default:={}
+	// +optional
+	CPU CPUPolicy `json:"cpu,omitempty"`
+}
+
+// CPUPolicy defines CPU related controls.
+type CPUPolicy struct {
+	// QoSLevel controls cpu.qos_level for pods in this policy group.
+	// Current supported range is [-1, 1].
+	// +kubebuilder:validation:Minimum=-1
+	// +kubebuilder:validation:Maximum=1
+	// +kubebuilder:default:=0
+	// +optional
+	QoSLevel int32 `json:"qosLevel,omitempty"`
 }
 
 // MBPolicy defines memory-bandwidth related controls.
@@ -98,24 +114,25 @@ type L3Policy struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:path=mpampolicies,scope=Cluster,shortName=mpam
+// +kubebuilder:resource:path=qospolicies,scope=Cluster,shortName=qos
 // +kubebuilder:printcolumn:name="MBPRI",type="integer",JSONPath=".spec.mb.pri"
 // +kubebuilder:printcolumn:name="L3WAYS",type="integer",JSONPath=".spec.l3.ways"
+// +kubebuilder:printcolumn:name="CPUQOS",type="integer",JSONPath=".spec.cpu.qosLevel"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// MPAMPolicy is the Schema for MPAM policy CRD.
-type MPAMPolicy struct {
+// QoSPolicy is the Schema for QoS policy CRD.
+type QoSPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec MPAMPolicySpec `json:"spec,omitempty"`
+	Spec QoSPolicySpec `json:"spec,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// MPAMPolicyList contains a list of MPAMPolicy.
-type MPAMPolicyList struct {
+// QoSPolicyList contains a list of QoSPolicy.
+type QoSPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MPAMPolicy `json:"items"`
+	Items           []QoSPolicy `json:"items"`
 }

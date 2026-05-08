@@ -38,8 +38,8 @@ var (
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(GroupVersion,
-		&MPAMPolicy{},
-		&MPAMPolicyList{},
+		&QoSPolicy{},
+		&QoSPolicyList{},
 	)
 	metav1.AddToGroupVersion(scheme, GroupVersion)
 	return nil
