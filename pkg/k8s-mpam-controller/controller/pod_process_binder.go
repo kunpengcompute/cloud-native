@@ -37,16 +37,16 @@ const (
 	defaultCPUQoSFileName = "cpu.qos_level"
 )
 
-// LocalPodProcessBinder binds pod processes to target resctrl group by scanning
+// MPAMPodBinder binds pod processes to target resctrl group by scanning
 // cgroup tasks under local node filesystem.
-type LocalPodProcessBinder struct {
+type MPAMPodBinder struct {
 	CgroupRoot    string
 	CgroupCPURoot string
 	ResctrlRoot   string
 	TasksFile     string
 }
 
-func (b LocalPodProcessBinder) BindPodToGroup(ctx context.Context, pod *corev1.Pod, groupName string) error {
+func (b MPAMPodBinder) BindPodToGroup(ctx context.Context, pod *corev1.Pod, groupName string) error {
 	_ = ctx
 	if pod == nil {
 		return fmt.Errorf("pod must not be nil")
@@ -90,28 +90,28 @@ func (b LocalPodProcessBinder) BindPodToGroup(ctx context.Context, pod *corev1.P
 	return nil
 }
 
-func (b LocalPodProcessBinder) resctrlRoot() string {
+func (b MPAMPodBinder) resctrlRoot() string {
 	if b.ResctrlRoot != "" {
 		return b.ResctrlRoot
 	}
 	return defaultResctrlRoot
 }
 
-func (b LocalPodProcessBinder) cgroupCPURoot() string {
+func (b MPAMPodBinder) cgroupCPURoot() string {
 	if b.CgroupCPURoot != "" {
 		return b.CgroupCPURoot
 	}
 	return defaultCgroupCPURoot
 }
 
-func (b LocalPodProcessBinder) tasksFile() string {
+func (b MPAMPodBinder) tasksFile() string {
 	if b.TasksFile != "" {
 		return b.TasksFile
 	}
 	return defaultTasksFileName
 }
 
-func (b LocalPodProcessBinder) SetPodCPUQoSLevel(ctx context.Context, pod *corev1.Pod, level string) error {
+func (b MPAMPodBinder) SetPodCPUQoSLevel(ctx context.Context, pod *corev1.Pod, level string) error {
 	_ = ctx
 	if pod == nil {
 		return fmt.Errorf("pod must not be nil")
@@ -165,7 +165,7 @@ func (b LocalPodProcessBinder) SetPodCPUQoSLevel(ctx context.Context, pod *corev
 	return nil
 }
 
-func (b LocalPodProcessBinder) resolvePodTaskFiles(pod *corev1.Pod) ([]string, error) {
+func (b MPAMPodBinder) resolvePodTaskFiles(pod *corev1.Pod) ([]string, error) {
 	podParentDir := util.GetPodCgroupParentDir(pod)
 	containerIDs := collectContainerIDs(pod)
 	if len(containerIDs) == 0 {
@@ -183,7 +183,7 @@ func (b LocalPodProcessBinder) resolvePodTaskFiles(pod *corev1.Pod) ([]string, e
 	return out, nil
 }
 
-func (b LocalPodProcessBinder) resolvePodCPUQoSFiles(pod *corev1.Pod) ([]string, error) {
+func (b MPAMPodBinder) resolvePodCPUQoSFiles(pod *corev1.Pod) ([]string, error) {
 	podParentDir := util.GetPodCgroupParentDir(pod)
 	containerIDs := collectContainerIDs(pod)
 	if len(containerIDs) == 0 {

@@ -41,25 +41,25 @@ type PodAction interface {
 func DefaultPodActions(enableDynamicControl bool) []PodAction {
 	actions := make([]PodAction, 0, 2)
 	if enableDynamicControl {
-		actions = append(actions, EnsureOfflineGroupLabelAction{})
+		actions = append(actions, SetDynamicGroupLabelAction{})
 	}
-	actions = append(actions, BindGroupAction{})
-	actions = append(actions, SetGroupCPUQoSFromPolicyAction{})
+	actions = append(actions, BindResctrlGroupAction{})
+	actions = append(actions, SetCPUQoSAction{})
 	return actions
 }
 
-// EnsureOfflineGroupLabelAction sets QoS group label for offline pods.
-type EnsureOfflineGroupLabelAction struct{}
+// SetDynamicGroupLabelAction sets QoS group label for offline pods.
+type SetDynamicGroupLabelAction struct{}
 
-func (a EnsureOfflineGroupLabelAction) Name() string {
-	return "ensure-offline-group-label"
+func (a SetDynamicGroupLabelAction) Name() string {
+	return "set-dynamic-group-label"
 }
 
-func (a EnsureOfflineGroupLabelAction) Match(pod *corev1.Pod) bool {
-	return isOfflineWorkload(pod)
+func (a SetDynamicGroupLabelAction) Match(pod *corev1.Pod) bool {
+	return isdynamicWorkload(pod)
 }
 
-func (a EnsureOfflineGroupLabelAction) Apply(ctx context.Context, r *PodBindingReconciler, pod *corev1.Pod) error {
+func (a SetDynamicGroupLabelAction) Apply(ctx context.Context, r *PodBindingReconciler, pod *corev1.Pod) error {
 	changed, err := r.ensureOfflineGroupLabel(ctx, pod)
 	if err != nil {
 		return err
@@ -75,26 +75,26 @@ func (a EnsureOfflineGroupLabelAction) Apply(ctx context.Context, r *PodBindingR
 	return nil
 }
 
-// BindGroupAction binds pod processes into target resctrl group.
-type BindGroupAction struct{}
+// BindResctrlGroupAction binds pod processes into target resctrl group.
+type BindResctrlGroupAction struct{}
 
-func (a BindGroupAction) Name() string {
-	return "bind-group"
+func (a BindResctrlGroupAction) Name() string {
+	return "bind-resctrl-group"
 }
 
-// SetGroupCPUQoSFromPolicyAction applies cpu.qos_level based on group-named policy.
-type SetGroupCPUQoSFromPolicyAction struct{}
+// SetCPUQoSAction applies cpu.qos_level based on group-named policy.
+type SetCPUQoSAction struct{}
 
-func (a SetGroupCPUQoSFromPolicyAction) Name() string {
-	return "set-group-cpu-qos-from-policy"
+func (a SetCPUQoSAction) Name() string {
+	return "set-cpu-qos"
 }
 
-func (a SetGroupCPUQoSFromPolicyAction) Match(pod *corev1.Pod) bool {
+func (a SetCPUQoSAction) Match(pod *corev1.Pod) bool {
 	_, ok := resolvePodGroup(pod)
 	return ok
 }
 
-func (a SetGroupCPUQoSFromPolicyAction) Apply(ctx context.Context, r *PodBindingReconciler, pod *corev1.Pod) error {
+func (a SetCPUQoSAction) Apply(ctx context.Context, r *PodBindingReconciler, pod *corev1.Pod) error {
 	groupName, ok := resolvePodGroup(pod)
 	if !ok {
 		return nil
@@ -118,17 +118,17 @@ func (a SetGroupCPUQoSFromPolicyAction) Apply(ctx context.Context, r *PodBinding
 	return nil
 }
 
-func (a BindGroupAction) Match(pod *corev1.Pod) bool {
+func (a BindResctrlGroupAction) Match(pod *corev1.Pod) bool {
 	_, ok := resolvePodGroup(pod)
 	return ok
 }
 
-func (a BindGroupAction) Apply(ctx context.Context, r *PodBindingReconciler, pod *corev1.Pod) error {
+func (a BindResctrlGroupAction) Apply(ctx context.Context, r *PodBindingReconciler, pod *corev1.Pod) error {
 	groupName, ok := resolvePodGroup(pod)
 	if !ok {
 		return nil
 	}
-	if err := r.Binder.BindPodToGroup(ctx, pod, groupName); err != nil {
+	if err := r.MPAMBinder.BindPodToGroup(ctx, pod, groupName); err != nil {
 		return err
 	}
 	klog.V(1).Infof(

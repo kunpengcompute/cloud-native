@@ -57,7 +57,7 @@ type PodBindingReconciler struct {
 	Scheme *runtime.Scheme
 
 	NodeIdentity         NodeIdentity
-	Binder               PodProcessBinder
+	MPAMBinder           PodProcessBinder
 	CPUQoSSetter         PodCPUQoSSetter
 	EnableDynamicControl bool
 	Actions              []PodAction
@@ -73,8 +73,8 @@ func NewPodBindingReconciler(
 		Client:               k8sClient,
 		Scheme:               scheme,
 		NodeIdentity:         NewDefaultNodeIdentity(),
-		Binder:               LocalPodProcessBinder{},
-		CPUQoSSetter:         LocalPodProcessBinder{},
+		MPAMBinder:           MPAMPodBinder{},
+		CPUQoSSetter:         MPAMPodBinder{},
 		EnableDynamicControl: enableDynamicControl,
 	}
 	reconciler.Actions = DefaultPodActions(enableDynamicControl)
@@ -97,10 +97,6 @@ func (r *PodBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	if !r.shouldProcessPod(&pod) {
-		return ctrl.Result{}, nil
-	}
-
 	if err := runPodActions(ctx, r, &pod); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -119,7 +115,7 @@ func (r *PodBindingReconciler) cpuQoSSetter() PodCPUQoSSetter {
 	if r.CPUQoSSetter != nil {
 		return r.CPUQoSSetter
 	}
-	return LocalPodProcessBinder{}
+	return MPAMPodBinder{}
 }
 
 func resolvePodGroup(pod *corev1.Pod) (string, bool) {
@@ -163,7 +159,7 @@ func (r *PodBindingReconciler) shouldProcessPod(pod *corev1.Pod) bool {
 	return false
 }
 
-func isOfflineWorkload(pod *corev1.Pod) bool {
+func isdynamicWorkload(pod *corev1.Pod) bool {
 	if pod == nil || len(pod.Labels) == 0 {
 		return false
 	}
@@ -174,7 +170,7 @@ func (r *PodBindingReconciler) ensureOfflineGroupLabel(ctx context.Context, pod 
 	if pod == nil {
 		return false, nil
 	}
-	if !isOfflineWorkload(pod) {
+	if !isdynamicWorkload(pod) {
 		return false, nil
 	}
 	nodeName := strings.TrimSpace(pod.Spec.NodeName)
