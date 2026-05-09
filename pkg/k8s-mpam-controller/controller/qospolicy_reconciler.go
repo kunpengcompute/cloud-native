@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	mpamv1alpha1 "kunpeng.huawei.com/kunpeng-cloud-computing/api/k8s-mpam-controller/v1alpha1"
+	qosv1alpha1 "kunpeng.huawei.com/kunpeng-cloud-computing/api/k8s-mpam-controller/v1alpha1"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 )
 
@@ -54,7 +54,7 @@ type QoSPolicyReconciler struct {
 func (r *QoSPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	klog.V(4).Infof("reconcile QoSPolicy %s/%s on node %s", req.Namespace, req.Name, r.nodeIdentity().NodeName())
 
-	var policy mpamv1alpha1.QoSPolicy
+	var policy qosv1alpha1.QoSPolicy
 	if err := r.Get(ctx, req.NamespacedName, &policy); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Object already deleted from API server. Nothing to do here because
@@ -141,7 +141,7 @@ func (r *QoSPolicyReconciler) resctrl() ResctrlGroupManager {
 	return LocalResctrlGroupManager{}
 }
 
-func translateQoSPolicySpec(spec mpamv1alpha1.QoSPolicySpec) ResctrlConfig {
+func translateQoSPolicySpec(spec qosv1alpha1.QoSPolicySpec) ResctrlConfig {
 	return ResctrlConfig{
 		MBHDL: spec.MB.HDL,
 		MBPRI: spec.MB.PRI,
@@ -157,7 +157,7 @@ func translateQoSPolicySpec(spec mpamv1alpha1.QoSPolicySpec) ResctrlConfig {
 // SetupWithManager registers controller with a focused event filter.
 func (r *QoSPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&mpamv1alpha1.QoSPolicy{}).
+		For(&qosv1alpha1.QoSPolicy{}).
 		WithEventFilter(predicate.Funcs{
 			CreateFunc: func(_ event.CreateEvent) bool {
 				return true
