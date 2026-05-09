@@ -30,7 +30,7 @@ import (
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 )
 
-func TestLocalPodProcessBinderBindPodToGroup(t *testing.T) {
+func TestMPAMPodBinderBindPodToGroup(t *testing.T) {
 	root := t.TempDir()
 	cgroupRoot := filepath.Join(root, "cgroup")
 	resctrlRoot := filepath.Join(root, "resctrl")
@@ -71,8 +71,8 @@ func TestLocalPodProcessBinderBindPodToGroup(t *testing.T) {
 		t.Fatalf("create target tasks failed: %v", err)
 	}
 
-	binder := LocalPodProcessBinder{
-		CgroupRoot:  cgroupRoot,
+	binder := MPAMPodBinder{
+		CgroupCPURoot: cgroupRoot,
 		ResctrlRoot: resctrlRoot,
 		TasksFile:   defaultTasksFileName,
 	}
@@ -91,10 +91,10 @@ func TestLocalPodProcessBinderBindPodToGroup(t *testing.T) {
 	}
 }
 
-func TestLocalPodProcessBinderBindPodToGroupNoTaskFile(t *testing.T) {
+func TestMPAMPodBinderBindPodToGroupNoTaskFile(t *testing.T) {
 	root := t.TempDir()
-	binder := LocalPodProcessBinder{
-		CgroupRoot:  filepath.Join(root, "cgroup"),
+	binder := MPAMPodBinder{
+		CgroupCPURoot: filepath.Join(root, "cgroup"),
 		ResctrlRoot: filepath.Join(root, "resctrl"),
 	}
 	pod := &corev1.Pod{
@@ -111,10 +111,10 @@ func TestLocalPodProcessBinderBindPodToGroupNoTaskFile(t *testing.T) {
 	}
 }
 
-func TestLocalPodProcessBinderBindPodToGroupEmptyUID(t *testing.T) {
+func TestMPAMPodBinderBindPodToGroupEmptyUID(t *testing.T) {
 	root := t.TempDir()
-	binder := LocalPodProcessBinder{
-		CgroupRoot:  filepath.Join(root, "cgroup"),
+	binder := MPAMPodBinder{
+		CgroupCPURoot: filepath.Join(root, "cgroup"),
 		ResctrlRoot: filepath.Join(root, "resctrl"),
 	}
 	pod := &corev1.Pod{}
@@ -123,7 +123,7 @@ func TestLocalPodProcessBinderBindPodToGroupEmptyUID(t *testing.T) {
 	}
 }
 
-func TestLocalPodProcessBinderSetPodCPUQoSLevel(t *testing.T) {
+func TestMPAMPodBinderSetPodCPUQoSLevel(t *testing.T) {
 	root := t.TempDir()
 	cgroupCPURoot := filepath.Join(root, "cpu")
 	podUID := "123e4567-e89b-12d3-a456-426614174000"
@@ -162,7 +162,7 @@ func TestLocalPodProcessBinderSetPodCPUQoSLevel(t *testing.T) {
 		}
 	}
 
-	binder := LocalPodProcessBinder{CgroupCPURoot: cgroupCPURoot}
+	binder := MPAMPodBinder{CgroupCPURoot: cgroupCPURoot}
 	if err := binder.SetPodCPUQoSLevel(context.Background(), pod, "-1"); err != nil {
 		t.Fatalf("SetPodCPUQoSLevel() unexpected error: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestLocalPodProcessBinderSetPodCPUQoSLevel(t *testing.T) {
 	}
 }
 
-func TestLocalPodProcessBinderSetPodCPUQoSLevelIdempotentSkipWrite(t *testing.T) {
+func TestMPAMPodBinderSetPodCPUQoSLevelIdempotentSkipWrite(t *testing.T) {
 	root := t.TempDir()
 	cgroupCPURoot := filepath.Join(root, "cpu")
 	podUID := "123e4567-e89b-12d3-a456-426614174001"
@@ -213,13 +213,13 @@ func TestLocalPodProcessBinderSetPodCPUQoSLevelIdempotentSkipWrite(t *testing.T)
 		t.Fatalf("chmod cpu qos file failed: %v", err)
 	}
 
-	binder := LocalPodProcessBinder{CgroupCPURoot: cgroupCPURoot}
+	binder := MPAMPodBinder{CgroupCPURoot: cgroupCPURoot}
 	if err := binder.SetPodCPUQoSLevel(context.Background(), pod, "-1"); err != nil {
 		t.Fatalf("SetPodCPUQoSLevel() should skip write when value unchanged, got error: %v", err)
 	}
 }
 
-func TestLocalPodProcessBinderSetPodCPUQoSLevelSkipRollback(t *testing.T) {
+func TestMPAMPodBinderSetPodCPUQoSLevelSkipRollback(t *testing.T) {
 	root := t.TempDir()
 	cgroupCPURoot := filepath.Join(root, "cpu")
 	podUID := "123e4567-e89b-12d3-a456-426614174002"
@@ -251,7 +251,7 @@ func TestLocalPodProcessBinderSetPodCPUQoSLevelSkipRollback(t *testing.T) {
 		t.Fatalf("write initial cpu qos failed: %v", err)
 	}
 
-	binder := LocalPodProcessBinder{CgroupCPURoot: cgroupCPURoot}
+	binder := MPAMPodBinder{CgroupCPURoot: cgroupCPURoot}
 	if err := binder.SetPodCPUQoSLevel(context.Background(), pod, "0"); err != nil {
 		t.Fatalf("SetPodCPUQoSLevel() should skip rollback without error, got: %v", err)
 	}

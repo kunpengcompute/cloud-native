@@ -48,7 +48,7 @@ func TestNewPodBindingReconciler(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 	r := NewPodBindingReconciler(cl, scheme, true)
-	if r.Client == nil || r.NodeIdentity == nil || r.Binder == nil || r.CPUQoSSetter == nil {
+	if r.Client == nil || r.NodeIdentity == nil || r.MPAMBinder == nil || r.CPUQoSSetter == nil {
 		t.Fatalf("constructor did not initialize required fields: %#v", r)
 	}
 	if len(r.Actions) == 0 {
@@ -61,8 +61,8 @@ func TestPodBindingReconcilerShouldProcessPod(t *testing.T) {
 		NodeIdentity: DefaultNodeIdentity{nodeName: "node-a"},
 		CPUQoSSetter: noopCPUQoSSetter{},
 		Actions: []PodAction{
-			EnsureOfflineGroupLabelAction{},
-			BindGroupAction{},
+			SetDynamicGroupLabelAction{},
+			BindResctrlGroupAction{},
 		},
 	}
 

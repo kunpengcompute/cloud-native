@@ -47,6 +47,32 @@ func TestMatchNodeSelector(t *testing.T) {
 			selector:   map[string]string{"qos.kunpeng.huawei.com/enabled": "true"},
 			want:       false,
 		},
+		{
+			name: "multi keys all match",
+			nodeLabels: map[string]string{
+				"qos.kunpeng.huawei.com/enabled": "true",
+				"kubernetes.io/hostname":         "node-a",
+				"topology.kubernetes.io/zone":    "zone-a",
+			},
+			selector: map[string]string{
+				"qos.kunpeng.huawei.com/enabled": "true",
+				"topology.kubernetes.io/zone":    "zone-a",
+			},
+			want: true,
+		},
+		{
+			name: "multi keys one mismatch",
+			nodeLabels: map[string]string{
+				"qos.kunpeng.huawei.com/enabled": "true",
+				"kubernetes.io/hostname":         "node-a",
+				"topology.kubernetes.io/zone":    "zone-b",
+			},
+			selector: map[string]string{
+				"qos.kunpeng.huawei.com/enabled": "true",
+				"topology.kubernetes.io/zone":    "zone-a",
+			},
+			want: false,
+		},
 	}
 
 	for _, tt := range tests {
