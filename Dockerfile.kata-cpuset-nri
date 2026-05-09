@@ -1,7 +1,7 @@
 # Runtime image for kata-cpuset-nri.
 #
 # Build the binary first, then build this image:
-#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kata-cpuset-nri ./pkg/kata-cpuset-nri/cmd
+#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kata-cpuset-nri ./cmd/kata-cpuset-nri
 #   docker build -f Dockerfile.kata-cpuset-nri -t kata-cpuset-nri:latest .
 FROM scratch
 

@@ -108,7 +108,7 @@ crictl info | grep -A20 kata-clh
 在仓库根目录执行：
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kata-cpuset-nri ./pkg/kata-cpuset-nri/cmd
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kata-cpuset-nri ./cmd/kata-cpuset-nri
 docker build --platform=linux/arm64 -f Dockerfile.kata-cpuset-nri -t kata-cpuset-nri:latest .
 rm -f kata-cpuset-nri
 ```

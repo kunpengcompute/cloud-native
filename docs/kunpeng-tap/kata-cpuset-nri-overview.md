@@ -2,7 +2,7 @@
 
 `kata-cpuset-nri` 是一个基于 NRI 的 Pod 级 cpuset 收敛插件骨架。
 
-用户部署与验证步骤见 `docs/kunpeng-tap/kata-cpuset-nri-user-guide.md`。
+用户部署与验证步骤见 [Kata Cpuset NRI 插件用户指南](kata-cpuset-nri-user-guide.md)。
 
 当前骨架能力：
 - 白名单过滤（namespace/runtimeClass）。
@@ -20,15 +20,17 @@
 - `--dry-run`：只打印计划，不写 cgroup。
 
 目录结构：
-- `cmd/`：启动入口。
-- `plugin/`：NRI 事件、Pod 快照、过滤和 cpuset 收敛。
-- `topology/`：SMT sibling 拓扑发现。
+- `cmd/kata-cpuset-nri/`：启动入口。
+- `pkg/kata-cpuset-nri/plugin/`：NRI 事件、Pod 快照、过滤和 cpuset 收敛。
+- `pkg/kata-cpuset-nri/topology/`：SMT sibling 拓扑发现。
+- `config/kata-cpuset-nri/`：DaemonSet、RuntimeClass 和测试 Pod 清单。
+- `docs/kunpeng-tap/`：设计文档和用户指南。
 
 镜像构建：
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kata-cpuset-nri ./pkg/kata-cpuset-nri/cmd
-docker build -f Dockerfile.kata-cpuset-nri -t kata-cpuset-nri:latest .
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kata-cpuset-nri ./cmd/kata-cpuset-nri
+docker build --platform=linux/arm64 -f Dockerfile.kata-cpuset-nri -t kata-cpuset-nri:latest .
 rm -f kata-cpuset-nri
 ```
 
