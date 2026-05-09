@@ -23,7 +23,7 @@ E2B 管理平台的核心能力包括：
 | 项目 | 版本或说明 | 获取方法 |
 | --- | --- | --- |
 | OS | openEuler 24.03 LTS SP3，aarch64 | [openEuler 24.03 LTS SP3 aarch64](https://mirrors.huaweicloud.com/openeuler/openEuler-24.03-LTS-SP3/ISO/aarch64/openEuler-24.03-LTS-SP3-everything-aarch64-dvd.iso) |
-| e2b-infra | `2026.09-3.oe2403sp3.aarch64` | [RPM 包下载](https://eulermaker.openeuler.openatom.cn/api/ems5/repositories/2403sp3/openEuler%3A24.03-LTS-SP3/aarch64/history/5f3f217a-2daa-11f1-9840-fa163e47408d/last/Packages/e2b-infra-2026.09-3.oe2403sp3.aarch64.rpm) |
+| e2b-infra | `2026.09-3.oe2403sp3.aarch64` | [RPM 包下载](https://eulermaker.openeuler.openatom.cn/api/ems5/repositories/2403sp3/openEuler%3A24.03-LTS-SP3/aarch64/history/5bce9a46-4aad-11f1-a4a9-fa163e474048/last/Packages/e2b-infra-2026.09-3.oe2403sp3.aarch64.rpm) |
 | Docker | 随部署脚本用于拉取和运行镜像 | 请使用操作系统或现场环境提供的 Docker 源安装 |
 | Postgres | 由 E2B 部署脚本拉起容器服务 | 无需单独安装，按部署脚本执行 |
 | Harbor | 由 E2B 部署脚本拉起容器服务 | 无需单独安装，按部署脚本执行 |
@@ -251,7 +251,7 @@ E2B 管理平台的核心能力包括：
     bash build.sh --start
     ```
 
-    命令说明：启动E2B管理平台及相关服务。若安装阶段使用过Docker代理，执行该命令前需要关闭Docker代理。
+    命令说明：启动E2B管理平台及相关服务，安装过程需要输入邮箱等必要信息。此外，若安装阶段使用过HTTP或Docker代理，执行该命令前需要关闭。
 
 5. 启动失败时清理并重试。
 
@@ -412,7 +412,7 @@ template-manager-system 内存 = 单个沙箱内存 * 最大沙箱数 + 20GB
 以下命令适用于在线环境快速部署。执行前请根据实际环境修改`/opt/e2b-infra/dep/.env`。
 
 ```bash
-wget https://eulermaker.openeuler.openatom.cn/api/ems5/repositories/2403sp3/openEuler%3A24.03-LTS-SP3/aarch64/history/5f3f217a-2daa-11f1-9840-fa163e47408d/last/Packages/e2b-infra-2026.09-3.oe2403sp3.aarch64.rpm
+wget https://eulermaker.openeuler.openatom.cn/api/ems5/repositories/2403sp3/openEuler%3A24.03-LTS-SP3/aarch64/history/5bce9a46-4aad-11f1-a4a9-fa163e474048/last/Packages/e2b-infra-2026.09-3.oe2403sp3.aarch64.rpm
 rpm -e e2b-infra
 rpm -ivh e2b-infra-2026.09-3.oe2403sp3.aarch64.rpm
 vi /opt/e2b-infra/dep/.env
