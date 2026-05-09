@@ -18,6 +18,7 @@ package dynamiccontrol
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -51,6 +52,19 @@ func NewSyncScheduler(c *Coordinator) *SyncScheduler {
 
 // Start runs periodic loops until manager context is canceled.
 func (r *SyncScheduler) Start(ctx context.Context) error {
+	if r.Coordinator == nil {
+		return fmt.Errorf("coordinator must not be nil")
+	}
+	if r.PublishInterval <= 0 {
+		return fmt.Errorf("publish interval must be > 0")
+	}
+	if r.ApplyInterval <= 0 {
+		return fmt.Errorf("apply interval must be > 0")
+	}
+	if r.TaskTimeout <= 0 {
+		return fmt.Errorf("task timeout must be > 0")
+	}
+
 	klog.Infof(
 		"starting dynamic-control runner: publishInterval=%s applyInterval=%s timeout=%s",
 		r.PublishInterval, r.ApplyInterval, r.TaskTimeout,
