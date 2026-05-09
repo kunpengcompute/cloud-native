@@ -18,21 +18,20 @@ package dynamiccontrol
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"k8s.io/klog/v2"
 )
 
 const (
-	defaultPublishInterval = 3 * time.Second
-	defaultApplyInterval   = 5 * time.Second
-	defaultTaskTimeout     = 2 * time.Second
+	defaultPublishInterval = 30 * time.Second
+	defaultApplyInterval   = 30 * time.Second
+	defaultTaskTimeout     = 10 * time.Second
 )
 
-// Runner executes dynamic-control periodic tasks under controller-runtime manager.
-// It should be added via mgr.Add(runner).
-type Runner struct {
+// SyncScheduler executes dynamic-control periodic tasks under controller-runtime manager.
+// It should be added via mgr.Add(scheduler).
+type SyncScheduler struct {
 	Coordinator *Coordinator
 
 	PublishInterval time.Duration
@@ -40,9 +39,9 @@ type Runner struct {
 	TaskTimeout     time.Duration
 }
 
-// NewRunner creates a periodic runner with defaults.
-func NewRunner(c *Coordinator) *Runner {
-	return &Runner{
+// NewSyncScheduler creates a periodic scheduler with defaults.
+func NewSyncScheduler(c *Coordinator) *SyncScheduler {
+	return &SyncScheduler{
 		Coordinator:     c,
 		PublishInterval: defaultPublishInterval,
 		ApplyInterval:   defaultApplyInterval,
@@ -50,41 +49,8 @@ func NewRunner(c *Coordinator) *Runner {
 	}
 }
 
-func (r *Runner) setDefaults() {
-	if r.PublishInterval <= 0 {
-		r.PublishInterval = defaultPublishInterval
-	}
-	if r.ApplyInterval <= 0 {
-		r.ApplyInterval = defaultApplyInterval
-	}
-	if r.TaskTimeout <= 0 {
-		r.TaskTimeout = defaultTaskTimeout
-	}
-}
-
-func (r *Runner) validate() error {
-	if r.Coordinator == nil {
-		return fmt.Errorf("coordinator must not be nil")
-	}
-	if r.PublishInterval <= 0 {
-		return fmt.Errorf("publish interval must be > 0")
-	}
-	if r.ApplyInterval <= 0 {
-		return fmt.Errorf("apply interval must be > 0")
-	}
-	if r.TaskTimeout <= 0 {
-		return fmt.Errorf("task timeout must be > 0")
-	}
-	return nil
-}
-
 // Start runs periodic loops until manager context is canceled.
-func (r *Runner) Start(ctx context.Context) error {
-	r.setDefaults()
-	if err := r.validate(); err != nil {
-		return err
-	}
-
+func (r *SyncScheduler) Start(ctx context.Context) error {
 	klog.Infof(
 		"starting dynamic-control runner: publishInterval=%s applyInterval=%s timeout=%s",
 		r.PublishInterval, r.ApplyInterval, r.TaskTimeout,
@@ -98,7 +64,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	return nil
 }
 
-func (r *Runner) runLoop(
+func (r *SyncScheduler) runLoop(
 	ctx context.Context,
 	name string,
 	interval time.Duration,
@@ -119,7 +85,7 @@ func (r *Runner) runLoop(
 	}
 }
 
-func (r *Runner) runWithTimeout(
+func (r *SyncScheduler) runWithTimeout(
 	ctx context.Context,
 	name string,
 	task func(context.Context) error,

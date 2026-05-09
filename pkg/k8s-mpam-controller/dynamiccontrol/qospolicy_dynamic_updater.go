@@ -38,6 +38,12 @@ const (
 	defaultDynamicL3MaxStep  = int32(10)
 )
 
+// DynamicPolicyUpdater updates per-node dynamic QoSPolicy CR.
+// QoSPolicyDynamicUpdater is the default implementation.
+type DynamicPolicyUpdater interface {
+	ApplyReason(ctx context.Context, nodeName string, reason InterferenceReason) error
+}
+
 // QoSPolicyDynamicUpdater upserts one per-node dynamic QoSPolicy CR.
 type QoSPolicyDynamicUpdater struct {
 	Client client.Client
@@ -48,30 +54,20 @@ type QoSPolicyDynamicUpdater struct {
 	L3MaxStep  int32
 }
 
-func (u *QoSPolicyDynamicUpdater) setDefaults() {
-	if u.MBStep <= 0 {
-		u.MBStep = defaultDynamicMBStep
+// NewQoSPolicyDynamicUpdater creates updater with default tuning steps.
+func NewQoSPolicyDynamicUpdater(c client.Client) *QoSPolicyDynamicUpdater {
+	return &QoSPolicyDynamicUpdater{
+		Client:     c,
+		MBStep:     defaultDynamicMBStep,
+		L3WaysStep: defaultDynamicL3WaysStep,
+		L3MaxStep:  defaultDynamicL3MaxStep,
 	}
-	if u.L3WaysStep <= 0 {
-		u.L3WaysStep = defaultDynamicL3WaysStep
-	}
-	if u.L3MaxStep <= 0 {
-		u.L3MaxStep = defaultDynamicL3MaxStep
-	}
-}
-
-func (u *QoSPolicyDynamicUpdater) validate() error {
-	if u.Client == nil {
-		return fmt.Errorf("client must not be nil")
-	}
-	return nil
 }
 
 // ApplyReason ensures and updates one dynamic QoSPolicy for given node.
 func (u *QoSPolicyDynamicUpdater) ApplyReason(ctx context.Context, nodeName string, reason InterferenceReason) error {
-	u.setDefaults()
-	if err := u.validate(); err != nil {
-		return err
+	if u.Client == nil {
+		return fmt.Errorf("client must not be nil")
 	}
 	if strings.TrimSpace(nodeName) == "" {
 		return fmt.Errorf("node name must not be empty")
@@ -88,10 +84,10 @@ func (u *QoSPolicyDynamicUpdater) ApplyReason(ctx context.Context, nodeName stri
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			spec := defaultDynamicPolicySpec(nodeName)
-			u.applyReasonToSpec(&spec, reason)
+			u.applyReasonToSpec(&spec, reason, u.MBStep, u.L3WaysStep, u.L3MaxStep)
 			newObj := &qosv1alpha1.QoSPolicy{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "mpam.kunpeng.huawei.com/v1alpha1",
+					APIVersion: "qos.kunpeng.huawei.com/v1alpha1",
 					Kind:       "QoSPolicy",
 				},
 				ObjectMeta: metav1.ObjectMeta{
@@ -113,7 +109,7 @@ func (u *QoSPolicyDynamicUpdater) ApplyReason(ctx context.Context, nodeName stri
 		// Ensure valid baseline for current CRD validation.
 		desired.L3.Ways = 1
 	}
-	u.applyReasonToSpec(&desired, reason)
+	u.applyReasonToSpec(&desired, reason, u.MBStep, u.L3WaysStep, u.L3MaxStep)
 	if reflect.DeepEqual(current.Spec, desired) {
 		return nil
 	}
@@ -128,7 +124,7 @@ func dynamicPolicyName(nodeName string) string {
 	if name == "" {
 		name = "unknown-node"
 	}
-	return "mpam-dynamic-offline-" + name
+	return "qos-dynamic-offline-" + name
 }
 
 func defaultDynamicPolicySpec(nodeName string) qosv1alpha1.QoSPolicySpec {
@@ -148,21 +144,28 @@ func defaultDynamicPolicySpec(nodeName string) qosv1alpha1.QoSPolicySpec {
 			MAX:  100,
 			Ways: 4,
 		},
+		CPU: qosv1alpha1.CPUPolicy{
+			QoSLevel: 0,
+		},
 	}
 }
 
-func (u *QoSPolicyDynamicUpdater) applyReasonToSpec(spec *qosv1alpha1.QoSPolicySpec, reason InterferenceReason) {
+func (u *QoSPolicyDynamicUpdater) applyReasonToSpec(
+	spec *qosv1alpha1.QoSPolicySpec,
+	reason InterferenceReason,
+	mbStep int32,
+	l3WaysStep int32,
+	l3MaxStep int32,
+) {
 	switch reason {
 	case InterferenceReasonMB:
-		spec.MB.MAX = maxInt32(spec.MB.MAX-u.MBStep, 1)
+		spec.MB.MAX = maxInt32(spec.MB.MAX-mbStep, 1)
 	case InterferenceReasonL3:
-		spec.L3.Ways = maxInt32(spec.L3.Ways-u.L3WaysStep, 1)
-		spec.L3.MAX = maxInt32(spec.L3.MAX-u.L3MaxStep, 1)
+		spec.L3.Ways = maxInt32(spec.L3.Ways-l3WaysStep, 1)
+		spec.L3.MAX = maxInt32(spec.L3.MAX-l3MaxStep, 1)
 	case InterferenceReasonCPU:
-		// CPU-specific controls are not represented in current QoSPolicy fields.
-		// Use a light placeholder reduction on MB/L3 limits for now.
-		spec.MB.MAX = maxInt32(spec.MB.MAX-u.MBStep, 1)
-		spec.L3.MAX = maxInt32(spec.L3.MAX-u.L3MaxStep, 1)
+		// CPU interference maps to cpu.qos_level control through QoSPolicy.
+		spec.CPU.QoSLevel = -1
 	}
 }
 

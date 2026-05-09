@@ -28,23 +28,23 @@ import (
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/k8s-mpam-controller/util"
 )
 
+// OnlinePodSource provides online pod cgroup paths for local node.
+type OnlinePodSource interface {
+	ListOnlinePodCgroups(ctx context.Context, nodeName string) ([]OnlinePodCgroup, error)
+}
+
 // LocalOnlinePodSource lists online pod cgroup paths from kube-apiserver.
 type LocalOnlinePodSource struct {
 	Client client.Client
 }
 
-func (s *LocalOnlinePodSource) validate() error {
-	if s.Client == nil {
-		return fmt.Errorf("client must not be nil")
-	}
-	return nil
+// NewLocalOnlinePodSource creates online pod source from controller-runtime client.
+func NewLocalOnlinePodSource(c client.Client) *LocalOnlinePodSource {
+	return &LocalOnlinePodSource{Client: c}
 }
 
 // ListOnlinePodCgroups returns online pod cgroup paths on one node.
 func (s *LocalOnlinePodSource) ListOnlinePodCgroups(ctx context.Context, nodeName string) ([]OnlinePodCgroup, error) {
-	if err := s.validate(); err != nil {
-		return nil, err
-	}
 	if nodeName == "" {
 		return nil, fmt.Errorf("node name must not be empty")
 	}

@@ -24,7 +24,7 @@ import (
 
 const (
 	// WorkloadClassLabelKey marks workload class for dynamic interference control.
-	WorkloadClassLabelKey = "mpam.kunpeng.huawei.com/workload-class"
+	WorkloadClassLabelKey = "qos.kunpeng.huawei.com/workload-class"
 	// WorkloadClassOnline marks pods that should be treated as online workloads.
 	WorkloadClassOnline = "online"
 	// WorkloadClassOffline marks pods that should be treated as offline workloads.
@@ -74,136 +74,35 @@ type AgentAnalyzeResult struct {
 	Items      []InterferenceItem
 }
 
-// DynamicTuningDecision is a generic output from planner to execution layer.
-// Concrete knobs (MB/L3/L3MAX/MBMIN/L3MIN/CPU QoS) can be expanded later.
-type DynamicTuningDecision struct {
-	ShouldApply        bool
-	NodeName           string
-	InterferenceReason InterferenceReason
-	Reason             string
-}
-
-// OnlinePodSource provides online pod cgroup paths for local node.
-type OnlinePodSource interface {
-	ListOnlinePodCgroups(ctx context.Context, nodeName string) ([]OnlinePodCgroup, error)
-}
-
-// OnlinePodPublisher sends online pod list to external agent.
-type OnlinePodPublisher interface {
-	PublishOnlinePods(ctx context.Context, req AgentAnalyzeRequest) error
-}
-
-// InterferenceResultSource provides interference analysis from external agent.
-type InterferenceResultSource interface {
-	GetInterference(ctx context.Context, nodeName string) (AgentAnalyzeResult, error)
-}
-
-// DynamicTuningPlanner converts agent analysis into local tuning decisions.
-type DynamicTuningPlanner interface {
-	Plan(ctx context.Context, nodeName string, result AgentAnalyzeResult) (DynamicTuningDecision, error)
-}
-
-// DynamicTuningApplier applies planned tuning decisions to local node.
-type DynamicTuningApplier interface {
-	Apply(ctx context.Context, decision DynamicTuningDecision) error
-}
-
-// DefaultDynamicTuningPlanner is a no-op planner placeholder for initial skeleton.
-type DefaultDynamicTuningPlanner struct{}
-
-// Plan returns no-op decision. Real tuning policy can be added later.
-func (p DefaultDynamicTuningPlanner) Plan(_ context.Context, nodeName string, _ AgentAnalyzeResult) (DynamicTuningDecision, error) {
-	return DynamicTuningDecision{
-		ShouldApply: false,
-		NodeName:    nodeName,
-		Reason:      "default no-op planner",
-	}, nil
-}
-
 // Coordinator orchestrates one dynamic-control cycle:
 // collect online pods -> ask interference agent -> plan tuning -> apply tuning.
 type Coordinator struct {
 	NodeIdentity NodeIdentity
 	OnlineSource OnlinePodSource
-	Publisher    OnlinePodPublisher
-	ResultSource InterferenceResultSource
-	Planner      DynamicTuningPlanner
-	Applier      DynamicTuningApplier
+	Agent        AgentClient
+	Engine       TuningEngine
 	Clock        func() time.Time
 }
 
-func (c *Coordinator) setDefaults() {
-	if c.Planner == nil {
-		c.Planner = DefaultDynamicTuningPlanner{}
+// NewCoordinator creates a dynamic-control coordinator with explicit dependencies.
+func NewCoordinator(
+	nodeIdentity NodeIdentity,
+	onlineSource OnlinePodSource,
+	agent AgentClient,
+	engine TuningEngine,
+) *Coordinator {
+	return &Coordinator{
+		NodeIdentity: nodeIdentity,
+		OnlineSource: onlineSource,
+		Agent:        agent,
+		Engine:       engine,
+		Clock:        time.Now,
 	}
-	if c.Clock == nil {
-		c.Clock = time.Now
-	}
-}
-
-// Validate checks mandatory dependencies for minimal runnable coordinator.
-func (c *Coordinator) Validate() error {
-	c.setDefaults()
-
-	if c.NodeIdentity == nil {
-		return fmt.Errorf("node identity must not be nil")
-	}
-	if c.OnlineSource == nil {
-		return fmt.Errorf("online source must not be nil")
-	}
-	if c.Publisher == nil {
-		return fmt.Errorf("publisher must not be nil")
-	}
-	if c.ResultSource == nil {
-		return fmt.Errorf("result source must not be nil")
-	}
-	if c.Planner == nil {
-		return fmt.Errorf("planner must not be nil")
-	}
-	if c.Applier == nil {
-		return fmt.Errorf("applier must not be nil")
-	}
-	return nil
-}
-
-func (c *Coordinator) validatePublishDeps() error {
-	c.setDefaults()
-	if c.NodeIdentity == nil {
-		return fmt.Errorf("node identity must not be nil")
-	}
-	if c.OnlineSource == nil {
-		return fmt.Errorf("online source must not be nil")
-	}
-	if c.Publisher == nil {
-		return fmt.Errorf("publisher must not be nil")
-	}
-	return nil
-}
-
-func (c *Coordinator) validateApplyDeps() error {
-	c.setDefaults()
-	if c.NodeIdentity == nil {
-		return fmt.Errorf("node identity must not be nil")
-	}
-	if c.ResultSource == nil {
-		return fmt.Errorf("result source must not be nil")
-	}
-	if c.Planner == nil {
-		return fmt.Errorf("planner must not be nil")
-	}
-	if c.Applier == nil {
-		return fmt.Errorf("applier must not be nil")
-	}
-	return nil
 }
 
 // PublishOnlinePodsOnce executes one publish cycle:
 // collect online pod cgroup paths and publish to external agent.
 func (c *Coordinator) PublishOnlinePodsOnce(ctx context.Context) error {
-	if err := c.validatePublishDeps(); err != nil {
-		return err
-	}
-
 	nodeName := c.NodeIdentity.NodeName()
 	if nodeName == "" {
 		return fmt.Errorf("node name must not be empty")
@@ -214,7 +113,7 @@ func (c *Coordinator) PublishOnlinePodsOnce(ctx context.Context) error {
 		return err
 	}
 
-	return c.Publisher.PublishOnlinePods(ctx, AgentAnalyzeRequest{
+	return c.Agent.PublishOnlinePods(ctx, AgentAnalyzeRequest{
 		NodeName: nodeName,
 		Time:     c.Clock(),
 		Pods:     pods,
@@ -224,27 +123,15 @@ func (c *Coordinator) PublishOnlinePodsOnce(ctx context.Context) error {
 // ApplyInterferenceOnce executes one apply cycle:
 // pull interference result, plan tuning decision, and apply if needed.
 func (c *Coordinator) ApplyInterferenceOnce(ctx context.Context) error {
-	if err := c.validateApplyDeps(); err != nil {
-		return err
-	}
-
 	nodeName := c.NodeIdentity.NodeName()
 	if nodeName == "" {
 		return fmt.Errorf("node name must not be empty")
 	}
 
-	result, err := c.ResultSource.GetInterference(ctx, nodeName)
+	result, err := c.Agent.GetInterference(ctx, nodeName)
 	if err != nil {
 		return err
 	}
 
-	decision, err := c.Planner.Plan(ctx, nodeName, result)
-	if err != nil {
-		return err
-	}
-	if !decision.ShouldApply {
-		return nil
-	}
-
-	return c.Applier.Apply(ctx, decision)
+	return c.Engine.HandleInterference(ctx, nodeName, result)
 }

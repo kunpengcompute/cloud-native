@@ -58,6 +58,13 @@ type getInterferenceResponse struct {
 	Items      []InterferenceItem `json:"items"`
 }
 
+// AgentClient encapsulates two-way communication with external agent.
+// HTTPAgentClient is the default implementation.
+type AgentClient interface {
+	PublishOnlinePods(ctx context.Context, req AgentAnalyzeRequest) error
+	GetInterference(ctx context.Context, nodeName string) (AgentAnalyzeResult, error)
+}
+
 // HTTPAgentClient communicates with local agent via HTTP JSON.
 // It implements both OnlinePodPublisher and InterferenceResultSource.
 type HTTPAgentClient struct {
@@ -82,28 +89,6 @@ func NewTCPHTTPAgentClient(baseURL string) *HTTPAgentClient {
 	}
 }
 
-func (c *HTTPAgentClient) setDefaults() {
-	if c.BaseURL == "" {
-		c.BaseURL = defaultAgentTCPBaseURL
-	}
-	if c.Version == "" {
-		c.Version = defaultAgentAPIVersion
-	}
-	if c.HTTPClient == nil {
-		c.HTTPClient = &http.Client{Timeout: defaultAgentHTTPTimeout}
-	}
-}
-
-func (c *HTTPAgentClient) validate() error {
-	if c.HTTPClient == nil {
-		return fmt.Errorf("http client must not be nil")
-	}
-	if c.BaseURL == "" {
-		return fmt.Errorf("base url must not be empty")
-	}
-	return nil
-}
-
 func (c *HTTPAgentClient) endpoint(p string) (string, error) {
 	base, err := url.Parse(c.BaseURL)
 	if err != nil {
@@ -115,10 +100,6 @@ func (c *HTTPAgentClient) endpoint(p string) (string, error) {
 
 // PublishOnlinePods sends latest online pod cgroup paths to local agent.
 func (c *HTTPAgentClient) PublishOnlinePods(ctx context.Context, req AgentAnalyzeRequest) error {
-	c.setDefaults()
-	if err := c.validate(); err != nil {
-		return err
-	}
 	if req.NodeName == "" {
 		return fmt.Errorf("node name must not be empty")
 	}
@@ -170,10 +151,6 @@ func (c *HTTPAgentClient) PublishOnlinePods(ctx context.Context, req AgentAnalyz
 
 // GetInterference fetches latest interference result for one node from local agent.
 func (c *HTTPAgentClient) GetInterference(ctx context.Context, nodeName string) (AgentAnalyzeResult, error) {
-	c.setDefaults()
-	if err := c.validate(); err != nil {
-		return AgentAnalyzeResult{}, err
-	}
 	if nodeName == "" {
 		return AgentAnalyzeResult{}, fmt.Errorf("node name must not be empty")
 	}
