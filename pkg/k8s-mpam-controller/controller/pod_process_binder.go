@@ -32,10 +32,9 @@ import (
 )
 
 const (
-	defaultCgroupCpusetRoot = "/sys/fs/cgroup/cpuset"
-	defaultCgroupCPURoot    = "/sys/fs/cgroup/cpu"
-	defaultTasksFileName    = "tasks"
-	defaultCPUQoSFileName   = "cpu.qos_level"
+	defaultCgroupCPURoot  = "/sys/fs/cgroup/cpu"
+	defaultTasksFileName  = "tasks"
+	defaultCPUQoSFileName = "cpu.qos_level"
 )
 
 // LocalPodProcessBinder binds pod processes to target resctrl group by scanning
@@ -89,13 +88,6 @@ func (b LocalPodProcessBinder) BindPodToGroup(ctx context.Context, pod *corev1.P
 		pod.Namespace, pod.Name, pod.UID, len(pids), groupName, targetTasks,
 	)
 	return nil
-}
-
-func (b LocalPodProcessBinder) cgroupRoot() string {
-	if b.CgroupRoot != "" {
-		return b.CgroupRoot
-	}
-	return defaultCgroupCpusetRoot
 }
 
 func (b LocalPodProcessBinder) resctrlRoot() string {
@@ -186,7 +178,7 @@ func (b LocalPodProcessBinder) resolvePodTaskFiles(pod *corev1.Pod) ([]string, e
 		if err != nil {
 			return nil, fmt.Errorf("resolve container cgroup path for %s failed: %w", cid, err)
 		}
-		out = append(out, filepath.Join(b.cgroupRoot(), containerParentDir, b.tasksFile()))
+		out = append(out, filepath.Join(b.cgroupCPURoot(), containerParentDir, b.tasksFile()))
 	}
 	return out, nil
 }
