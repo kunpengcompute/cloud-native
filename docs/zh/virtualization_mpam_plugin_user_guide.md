@@ -66,7 +66,7 @@ Kubernetes使能MPAM特性后，可以在创建Pod时指定对应的资源组，
 |Docker|18.09.0及以上|通过配置Yum源安装|
 |Containerd|1.7.14及以上|通过配置Yum源安装|
 |Kubernetes|1.23.1及以上|通过配置Yum源安装|
-|k8s-mpam-controller源码|-|[获取链接](https://gitcode.com/boostkit/cloud-native)|
+|k8s-mpam-controller源码|0.1.0|[获取链接](https://gitcode.com/boostkit/cloud-native)|
 
 
 ## 安装和使用插件<a name="ZH-CN_TOPIC_0000002550131799"></a>
@@ -101,7 +101,7 @@ Kubernetes使能MPAM特性后，可以在创建Pod时指定对应的资源组，
     k8s-mpam-controller                 0.1.0               9f363522bbc9   42 hours ago    259MB
     ```
 
-    如果集群使用的runtime是containerd，则执行如下命令把镜像导入containerd的镜像仓库。
+    如果集群使用的容器运行时是containerd，则执行如下命令把镜像导入containerd的镜像仓库。
 
     ```
     docker save k8s-mpam-controller:0.1.0 -o k8s-mpam-controller.tar
