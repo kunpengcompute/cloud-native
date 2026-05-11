@@ -1,0 +1,17 @@
+apiVersion: qos.kunpeng.huawei.com/v1alpha1
+kind: QoSPolicy
+metadata:
+  name: e2e-global-policy
+spec:
+  # nodeSelector omitted: policy should be considered globally applicable.
+  mb:
+    hdl: 1
+    pri: 3
+    min: 0
+    max: 100
+  l3:
+    pri: 0
+    min: 0
+    max: 100
+    ways: 2
+

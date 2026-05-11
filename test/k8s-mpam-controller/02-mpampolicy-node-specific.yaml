@@ -1,0 +1,19 @@
+apiVersion: qos.kunpeng.huawei.com/v1alpha1
+kind: QoSPolicy
+metadata:
+  name: e2e-node-specific-policy
+spec:
+  nodeSelector:
+    # Replace with a real node hostname label value in your cluster.
+    kubernetes.io/hostname: "REPLACE_WITH_NODE_NAME"
+  mb:
+    hdl: 1
+    pri: 4
+    min: 10
+    max: 80
+  l3:
+    pri: 1
+    min: 10
+    max: 80
+    ways: 3
+
