@@ -1,0 +1,53 @@
+apiVersion: qos.kunpeng.huawei.com/v1alpha1
+kind: QoSPolicy
+metadata:
+  name: offline-small
+spec:
+  mb:
+    hdl: 1
+    pri: 2
+    min: 10
+    max: 60
+  l3:
+    pri: 1
+    min: 10
+    max: 60
+    ways: 4
+  cpu:
+    qosLevel: -1
+---
+apiVersion: qos.kunpeng.huawei.com/v1alpha1
+kind: QoSPolicy
+metadata:
+  name: offline-large
+spec:
+  mb:
+    hdl: 1
+    pri: 4
+    min: 20
+    max: 80
+  l3:
+    pri: 2
+    min: 20
+    max: 80
+    ways: 8
+  cpu:
+    qosLevel: 0
+---
+apiVersion: qos.kunpeng.huawei.com/v1alpha1
+kind: QoSPolicy
+metadata:
+  name: latency-sensitive
+spec:
+  mb:
+    hdl: 1
+    pri: 6
+    min: 30
+    max: 90
+  l3:
+    pri: 3
+    min: 30
+    max: 90
+    ways: 12
+  cpu:
+    qosLevel: 1
