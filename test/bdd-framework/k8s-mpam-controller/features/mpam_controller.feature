@@ -34,8 +34,8 @@ Feature: MPAM Operator 核心闭环
 
   @e2e @smoke @lifecycle
   Scenario: 离线标签路径 - Pod 的 cpu.qos_level 被设置为 -1
-    Given 已创建默认全局 QoSPolicy "offline-small"
-    When 创建带离线标签和控制组标签 "offline-small" 的测试 Pod "offline-qos-pod"
+    Given 创建 cpu.qos_level 为 -1 的全局 QoSPolicy "offline-small"
+    When 创建带控制组标签 "offline-small" 的测试 Pod "offline-qos-pod"
     Then Pod "offline-qos-pod" 最终应为 Running
     And Pod "offline-qos-pod" 的所有容器 cpu.qos_level 应为 "-1"
 

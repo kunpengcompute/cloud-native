@@ -517,6 +517,19 @@ def create_default_policy(name: str):
     test_context["current_group"] = name
 
 
+@when(parsers.parse('创建 cpu.qos_level 为 -1 的全局 QoSPolicy "{name}"'))
+def create_cpu_qos_minus_one_policy(name: str):
+    doc = _default_policy_doc(name)
+    doc["spec"]["cpu"] = {"qosLevel": -1}
+    _apply_policy(doc)
+    test_context["current_group"] = name
+
+
+@given(parsers.parse('创建 cpu.qos_level 为 -1 的全局 QoSPolicy "{name}"'))
+def given_cpu_qos_minus_one_policy(name: str):
+    create_cpu_qos_minus_one_policy(name)
+
+
 @when(parsers.parse('创建仅在当前节点生效的 QoSPolicy "{name}"'))
 def create_node_selector_match_policy(name: str):
     key, value = _select_node_label_for_policy_selector()
