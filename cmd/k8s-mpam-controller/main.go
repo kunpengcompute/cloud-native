@@ -19,6 +19,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -41,7 +42,17 @@ import (
 
 func main() {
 	klog.InitFlags(nil)
+	defer klog.Flush()
 
+	if err := run(); err != nil {
+		klog.Errorf("k8s-mpam-controller failed: %v", err)
+		// Explicit flush before os.Exit because deferred calls are skipped on os.Exit.
+		klog.Flush()
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	runLocal := flag.Bool("run-local", false, "run controller out of cluster for local debugging")
 	enableDynamicControl := flag.Bool("enable-dynamic-control", false, "enable dynamic interference control loops")
 	agentAddr := flag.String("dynamic-agent-addr", "http://127.0.0.1:18080", "dynamic-control agent address, e.g. http://127.0.0.1:18080")
@@ -49,13 +60,26 @@ func main() {
 	applyInterval := flag.Duration("dynamic-apply-interval", 30*time.Second, "interval for pulling interference and applying tuning decisions")
 	taskTimeout := flag.Duration("dynamic-task-timeout", 10*time.Second, "timeout for one dynamic-control task execution")
 	flag.Parse()
-	defer klog.Flush()
 	ctrl.SetLogger(klogr.New())
+
+	if *publishInterval <= 0 {
+		return fmt.Errorf("invalid --dynamic-publish-interval: must be > 0")
+	}
+	if *applyInterval <= 0 {
+		return fmt.Errorf("invalid --dynamic-apply-interval: must be > 0")
+	}
+	if *taskTimeout <= 0 {
+		return fmt.Errorf("invalid --dynamic-task-timeout: must be > 0")
+	}
+	if *enableDynamicControl {
+		if err := dynamiccontrol.ValidateAgentBaseURL(*agentAddr); err != nil {
+			return fmt.Errorf("invalid --dynamic-agent-addr: %w", err)
+		}
+	}
 
 	cfg, err := buildRESTConfig(*runLocal)
 	if err != nil {
-		klog.Errorf("failed to build kube config: %v", err)
-		os.Exit(1)
+		return err
 	}
 
 	scheme := runtime.NewScheme()
@@ -70,20 +94,17 @@ func main() {
 		LeaderElectionID:       "k8s-mpam-controller.kunpeng.huawei.com",
 	})
 	if err != nil {
-		klog.Errorf("failed to create manager: %v", err)
-		os.Exit(1)
+		return err
 	}
 
 	nodeIdentity := controller.NewDefaultNodeIdentity()
 	if nodeIdentity.NodeName() == "" {
-		klog.Error("NODE_NAME is empty, please set NODE_NAME env")
-		os.Exit(1)
+		return fmt.Errorf("NODE_NAME is empty, please set NODE_NAME env")
 	}
 
 	resctrlMgr, err := controller.NewLocalResctrlGroupManager()
 	if err != nil {
-		klog.Errorf("failed to initialize local resctrl manager: %v", err)
-		os.Exit(1)
+		return err
 	}
 
 	if err := (&controller.QoSPolicyReconciler{
@@ -92,8 +113,7 @@ func main() {
 		NodeIdentity: nodeIdentity,
 		Resctrl:      resctrlMgr,
 	}).SetupWithManager(mgr); err != nil {
-		klog.Errorf("failed to setup QoSPolicyReconciler: %v", err)
-		os.Exit(1)
+		return err
 	}
 
 	if err := controller.NewPodBindingReconciler(
@@ -101,8 +121,7 @@ func main() {
 		mgr.GetScheme(),
 		*enableDynamicControl,
 	).SetupWithManager(mgr); err != nil {
-		klog.Errorf("failed to setup PodBindingReconciler: %v", err)
-		os.Exit(1)
+		return err
 	}
 
 	if *enableDynamicControl {
@@ -123,8 +142,7 @@ func main() {
 		scheduler.TaskTimeout = *taskTimeout
 
 		if err := mgr.Add(scheduler); err != nil {
-			klog.Errorf("failed to add dynamic-control scheduler: %v", err)
-			os.Exit(1)
+			return err
 		}
 		klog.Infof(
 			"dynamic-control enabled, agent=%s publishInterval=%s applyInterval=%s timeout=%s",
@@ -134,9 +152,9 @@ func main() {
 
 	klog.Info("starting k8s-mpam-controller manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		klog.Errorf("manager exited with error: %v", err)
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
 
 func buildRESTConfig(runLocal bool) (*rest.Config, error) {

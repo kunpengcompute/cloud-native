@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -89,7 +90,49 @@ func NewTCPHTTPAgentClient(baseURL string) *HTTPAgentClient {
 	}
 }
 
+// ValidateAgentBaseURL restricts agent endpoint to local loopback HTTP address
+// to reduce SSRF risk from unexpected remote targets.
+func ValidateAgentBaseURL(baseURL string) error {
+	u, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil {
+		return fmt.Errorf("parse agent address failed: %w", err)
+	}
+	if u.Scheme != "http" {
+		return fmt.Errorf("agent address must use http scheme")
+	}
+	if u.User != nil {
+		return fmt.Errorf("agent address must not contain user info")
+	}
+	if u.RawQuery != "" || u.Fragment != "" {
+		return fmt.Errorf("agent address must not contain query or fragment")
+	}
+	if u.Path != "" && u.Path != "/" {
+		return fmt.Errorf("agent address path must be empty")
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("agent address host is empty")
+	}
+	if u.Port() == "" {
+		return fmt.Errorf("agent address port is required")
+	}
+	if host == "localhost" {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return fmt.Errorf("agent address host must be localhost or loopback ip")
+	}
+	if !ip.IsLoopback() {
+		return fmt.Errorf("agent address host must be loopback ip")
+	}
+	return nil
+}
+
 func (c *HTTPAgentClient) endpoint(p string) (string, error) {
+	if err := ValidateAgentBaseURL(c.BaseURL); err != nil {
+		return "", err
+	}
 	base, err := url.Parse(c.BaseURL)
 	if err != nil {
 		return "", fmt.Errorf("parse base url %q failed: %w", c.BaseURL, err)
@@ -194,7 +237,10 @@ func (c *HTTPAgentClient) GetInterference(ctx context.Context, nodeName string) 
 }
 
 func decodeAgentHTTPError(resp *http.Response) error {
-	snippet, _ := io.ReadAll(io.LimitReader(resp.Body, maxAgentErrorBodySnippet))
+	snippet, err := io.ReadAll(io.LimitReader(resp.Body, maxAgentErrorBodySnippet))
+	if err != nil {
+		return fmt.Errorf("agent http error: status=%d, read body failed: %w", resp.StatusCode, err)
+	}
 	if len(snippet) == 0 {
 		return fmt.Errorf("agent http error: status=%d", resp.StatusCode)
 	}
