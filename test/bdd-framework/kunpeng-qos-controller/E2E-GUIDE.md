@@ -1,6 +1,6 @@
 # QoS Controller E2E 编写与扩展指南
 
-本文档用于指导在 `test/bdd-framework/k8s-mpam-controller` 下编写和扩展 BDD E2E 测试。
+本文档用于指导在 `test/bdd-framework/kunpeng-qos-controller` 下编写和扩展 BDD E2E 测试。
 
 ## 1. 测试代码结构与执行链路
 
@@ -111,7 +111,7 @@
 快速检查步骤绑定：
 
 ```bash
-cd test/bdd-framework/k8s-mpam-controller
+cd test/bdd-framework/kunpeng-qos-controller
 pytest --collect-only -q
 ```
 

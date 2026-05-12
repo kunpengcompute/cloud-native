@@ -10,13 +10,13 @@ It only does two things:
 ## Run
 
 ```bash
-python3 test/k8s-mpam-controller/fake-agent/fake_agent.py --host 127.0.0.1 --port 18080
+python3 test/kunpeng-qos-controller/fake-agent/fake_agent.py --host 127.0.0.1 --port 18080
 ```
 
 Optional:
 
 ```bash
-python3 test/k8s-mpam-controller/fake-agent/fake_agent.py --seed 123
+python3 test/kunpeng-qos-controller/fake-agent/fake_agent.py --seed 123
 ```
 
 ## API

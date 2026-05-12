@@ -20,4 +20,4 @@ make -f pkg/k8s-mpam-controller/api/Makefile manifests
 
 Generated CRDs are written to:
 
-- `config/k8s-mpam-controller-config/crd/bases`
+- `config/kunpeng-qos-controller-config/crd/bases`

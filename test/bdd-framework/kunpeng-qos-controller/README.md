@@ -32,8 +32,8 @@ k8s-mpam-controller/
 - 节点已挂载并可用：`/sys/fs/resctrl`、`/sys/fs/cgroup`
 - 可执行 `kubectl` 且有足够权限（创建 CRD/DaemonSet/Pod/CR）
 - 仓库内存在以下清单：
-  - `config/k8s-mpam-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml`
-  - `config/k8s-mpam-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml`
+  - `config/kunpeng-qos-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml`
+  - `config/kunpeng-qos-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml`
 
 ## 环境变量
 
@@ -50,7 +50,7 @@ k8s-mpam-controller/
 在仓库根目录执行：
 
 ```bash
-cd test/bdd-framework/k8s-mpam-controller
+cd test/bdd-framework/kunpeng-qos-controller
 pytest -m "e2e and smoke"
 ```
 

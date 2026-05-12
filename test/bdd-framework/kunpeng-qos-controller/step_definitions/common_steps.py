@@ -14,8 +14,8 @@ from kubernetes.stream import stream
 from pytest_bdd import given, parsers, then, when
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-CRD_MANIFEST = REPO_ROOT / "config/k8s-mpam-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml"
-DAEMONSET_MANIFEST = REPO_ROOT / "config/k8s-mpam-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml"
+CRD_MANIFEST = REPO_ROOT / "config/kunpeng-qos-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml"
+DAEMONSET_MANIFEST = REPO_ROOT / "config/kunpeng-qos-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml"
 
 OPERATOR_LABEL_SELECTOR = "app=qos-controller"
 RUN_LABEL_KEY = "qos-e2e-run"
