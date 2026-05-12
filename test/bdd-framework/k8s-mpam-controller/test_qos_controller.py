@@ -1,4 +1,4 @@
-"""BDD scenarios for MPAM controller core lifecycle."""
+"""BDD scenarios for QoS controller core lifecycle."""
 
 import pytest
 from pytest_bdd import scenarios

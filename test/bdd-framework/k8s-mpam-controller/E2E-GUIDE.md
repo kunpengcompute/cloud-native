@@ -1,4 +1,4 @@
-# MPAM Controller E2E 编写与扩展指南
+# QoS Controller E2E 编写与扩展指南
 
 本文档用于指导在 `test/bdd-framework/k8s-mpam-controller` 下编写和扩展 BDD E2E 测试。
 
@@ -6,14 +6,14 @@
 
 当前套件的核心文件：
 
-- `features/mpam_controller.feature`：业务场景定义（Gherkin）
-- `test_mpam_controller.py`：将 feature 场景加载为 pytest 测试函数
+- `features/qos_controller.feature`：业务场景定义（Gherkin）
+- `test_qos_controller.py`：将 feature 场景加载为 pytest 测试函数
 - `step_definitions/common_steps.py`：Given/When/Then 的具体实现
 - `conftest.py`：测试配置、环境变量映射、pytest hook
 
 执行链路：
 
-1. `pytest` 读取 `test_mpam_controller.py`
+1. `pytest` 读取 `test_qos_controller.py`
 2. `pytest-bdd` 将 `.feature` 场景转换为测试函数
 3. 每个步骤文本匹配 `common_steps.py` 中对应装饰器函数
 4. 场景结束后统一执行清理；失败时输出诊断信息
@@ -22,7 +22,7 @@
 
 建议遵循以下步骤：
 
-1. 在 `features/mpam_controller.feature` 新增 Scenario
+1. 在 `features/qos_controller.feature` 新增 Scenario
 2. 复用已有步骤文本；仅在必要时新增步骤实现
 3. 在 `common_steps.py` 实现新步骤（优先组合已有 helper）
 4. 执行 `pytest --collect-only -q` 验证步骤绑定
@@ -99,8 +99,8 @@
 
 必要时临时调大：
 
-- `MPAM_E2E_TIMEOUT`
-- `MPAM_E2E_POLL_INTERVAL`
+- `QOS_E2E_TIMEOUT`
+- `QOS_E2E_POLL_INTERVAL`
 
 ### 6.3 `tasks` 误判为空
 

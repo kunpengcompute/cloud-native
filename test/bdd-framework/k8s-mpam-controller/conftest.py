@@ -1,4 +1,4 @@
-"""k8s-mpam-controller BDD pytest configuration."""
+"""k8s-mpam-controller (QoS) BDD pytest configuration."""
 
 import os
 import sys
@@ -30,18 +30,18 @@ def test_config():
 
 
 @pytest.fixture(scope="session")
-def mpam_test_config(test_config):
-    """MPAM suite specific runtime configuration."""
+def qos_test_config(test_config):
+    """QoS suite specific runtime configuration."""
     cfg = dict(test_config)
     cfg.update(
         {
-            "namespace": os.getenv("MPAM_E2E_NAMESPACE", "mpam-e2e"),
-            "operator_namespace": os.getenv("MPAM_OPERATOR_NAMESPACE", "qos-system"),
-            "operator_image": os.getenv("MPAM_OPERATOR_IMAGE", "k8s-mpam-controller:0.1.0"),
-            "pod_image": os.getenv("MPAM_E2E_POD_IMAGE", "busybox:1.36"),
-            "node_selector": os.getenv("MPAM_E2E_NODE_SELECTOR", ""),
-            "reconcile_timeout_seconds": int(os.getenv("MPAM_E2E_TIMEOUT", "180")),
-            "poll_interval_seconds": int(os.getenv("MPAM_E2E_POLL_INTERVAL", "3")),
+            "namespace": os.getenv("QOS_E2E_NAMESPACE", "qos-e2e"),
+            "operator_namespace": os.getenv("QOS_OPERATOR_NAMESPACE", "qos-system"),
+            "operator_image": os.getenv("QOS_OPERATOR_IMAGE", "k8s-mpam-controller:0.1.0"),
+            "pod_image": os.getenv("QOS_E2E_POD_IMAGE", "busybox:1.36"),
+            "node_selector": os.getenv("QOS_E2E_NODE_SELECTOR", ""),
+            "reconcile_timeout_seconds": int(os.getenv("QOS_E2E_TIMEOUT", "180")),
+            "poll_interval_seconds": int(os.getenv("QOS_E2E_POLL_INTERVAL", "3")),
         }
     )
     return cfg

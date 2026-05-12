@@ -1,4 +1,4 @@
-"""BDD steps for k8s-mpam-controller E2E lifecycle tests."""
+"""BDD steps for QoS controller E2E lifecycle tests."""
 
 from __future__ import annotations
 
@@ -15,23 +15,23 @@ from pytest_bdd import given, parsers, then, when
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 CRD_MANIFEST = REPO_ROOT / "config/k8s-mpam-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml"
-DAEMONSET_MANIFEST = REPO_ROOT / "config/k8s-mpam-controller-config/samples/mpam-controller-daemonset-v1alpha1.yaml"
+DAEMONSET_MANIFEST = REPO_ROOT / "config/k8s-mpam-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml"
 
 OPERATOR_LABEL_SELECTOR = "app=qos-controller"
-RUN_LABEL_KEY = "mpam-e2e-run"
+RUN_LABEL_KEY = "qos-e2e-run"
 GROUP_LABEL_KEY = "qos.kunpeng.huawei.com/group"
 WORKLOAD_CLASS_LABEL_KEY = "qos.kunpeng.huawei.com/workload-class"
 WORKLOAD_CLASS_OFFLINE = "offline"
 
 
 test_context: Dict[str, object] = {
-    "run_id": f"mpam-e2e-{int(time.time())}",
-    "namespace": "mpam-e2e",
+    "run_id": f"qos-e2e-{int(time.time())}",
+    "namespace": "qos-e2e",
     "operator_namespace": "qos-system",
     "operator_image": "k8s-mpam-controller:0.1.0",
     "pod_image": "busybox:1.36",
     "node_selector": "",
-    "timeout": 180,
+    "timeout": 30,
     "poll_interval": 3,
     "operator_installed": False,
     "target_node_name": "",
@@ -209,7 +209,7 @@ def _select_node_label_for_policy_selector() -> Tuple[str, str]:
 
 
 def _mismatch_selector_from_match(key: str, value: str) -> Dict[str, str]:
-    mismatched = f"{value}-mpam-e2e-miss"
+    mismatched = f"{value}-qos-e2e-miss"
     return {key: mismatched}
 
 
@@ -443,15 +443,15 @@ def _all_containers_cpu_qos_level(pod: client.V1Pod, expected_level: str) -> boo
 
 
 @given("QoS controller 已部署并且节点具备 resctrl")
-def deploy_mpam_controller(mpam_test_config):
+def deploy_qos_controller(qos_test_config):
     _ensure_k8s_clients()
-    test_context["namespace"] = mpam_test_config["namespace"]
-    test_context["operator_namespace"] = mpam_test_config["operator_namespace"]
-    test_context["operator_image"] = mpam_test_config["operator_image"]
-    test_context["pod_image"] = mpam_test_config["pod_image"]
-    test_context["node_selector"] = mpam_test_config["node_selector"]
-    test_context["timeout"] = mpam_test_config["reconcile_timeout_seconds"]
-    test_context["poll_interval"] = mpam_test_config["poll_interval_seconds"]
+    test_context["namespace"] = qos_test_config["namespace"]
+    test_context["operator_namespace"] = qos_test_config["operator_namespace"]
+    test_context["operator_image"] = qos_test_config["operator_image"]
+    test_context["pod_image"] = qos_test_config["pod_image"]
+    test_context["node_selector"] = qos_test_config["node_selector"]
+    test_context["timeout"] = qos_test_config["reconcile_timeout_seconds"]
+    test_context["poll_interval"] = qos_test_config["poll_interval_seconds"]
 
     _ensure_namespace(str(test_context["namespace"]))
 
@@ -788,7 +788,7 @@ def assert_invalid_group_not_created(group_name: str):
 def collect_failure_diagnostics() -> None:
     """Print useful debugging info when a scenario fails."""
     _ensure_k8s_clients()
-    print("\n========== MPAM E2E failure diagnostics ==========")
+    print("\n========== QoS E2E failure diagnostics ==========")
 
     op_ns = str(test_context["operator_namespace"])
     try:

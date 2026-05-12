@@ -1,6 +1,6 @@
-# k8s-mpam-controller BDD E2E
+# k8s-mpam-controller (QoS) BDD E2E
 
-本目录是 MPAM Operator 的首批 BDD E2E 套件，覆盖核心闭环：
+本目录是 QoS Operator 的 BDD E2E 套件，覆盖核心闭环：
 
 - `QoSPolicy` 创建/更新/删除
 - 带 `qos.kunpeng.huawei.com/group=<policy-name>` 标签的 Pod 加组
@@ -17,13 +17,13 @@
 k8s-mpam-controller/
 ├── conftest.py
 ├── features/
-│   └── mpam_controller.feature
+│   └── qos_controller.feature
 ├── pytest.ini
 ├── README.md
 ├── step_definitions/
 │   ├── __init__.py
 │   └── common_steps.py
-└── test_mpam_controller.py
+└── test_qos_controller.py
 ```
 
 ## 前置条件
@@ -33,17 +33,17 @@ k8s-mpam-controller/
 - 可执行 `kubectl` 且有足够权限（创建 CRD/DaemonSet/Pod/CR）
 - 仓库内存在以下清单：
   - `config/k8s-mpam-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml`
-  - `config/k8s-mpam-controller-config/samples/mpam-controller-daemonset-v1alpha1.yaml`
+  - `config/k8s-mpam-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml`
 
 ## 环境变量
 
-- `MPAM_E2E_NAMESPACE`：测试业务 Pod 所在命名空间，默认 `mpam-e2e`
-- `MPAM_OPERATOR_NAMESPACE`：operator 命名空间，默认 `qos-system`
-- `MPAM_OPERATOR_IMAGE`：operator 镜像，默认 `k8s-mpam-controller:0.1.0`
-- `MPAM_E2E_POD_IMAGE`：测试 Pod 镜像，默认 `busybox:1.36`
-- `MPAM_E2E_NODE_SELECTOR`：可选，格式 `key=value`，用于限制 DaemonSet 测试节点
-- `MPAM_E2E_TIMEOUT`：轮询超时秒数，默认 `180`
-- `MPAM_E2E_POLL_INTERVAL`：轮询间隔秒数，默认 `3`
+- `QOS_E2E_NAMESPACE`：测试业务 Pod 所在命名空间，默认 `qos-e2e`
+- `QOS_OPERATOR_NAMESPACE`：operator 命名空间，默认 `qos-system`
+- `QOS_OPERATOR_IMAGE`：operator 镜像，默认 `k8s-mpam-controller:0.1.0`
+- `QOS_E2E_POD_IMAGE`：测试 Pod 镜像，默认 `busybox:1.36`
+- `QOS_E2E_NODE_SELECTOR`：可选，格式 `key=value`，用于限制 DaemonSet 测试节点
+- `QOS_E2E_TIMEOUT`：轮询超时秒数，默认 `180`
+- `QOS_E2E_POLL_INTERVAL`：轮询间隔秒数，默认 `3`
 
 ## 运行方式
 
