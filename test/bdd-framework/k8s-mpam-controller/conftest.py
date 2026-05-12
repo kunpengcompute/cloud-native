@@ -22,7 +22,7 @@ def test_config():
     return {
         "cluster_config": os.getenv("KUBECONFIG", "~/.kube/config"),
         "namespace": os.getenv("TEST_NAMESPACE", "bdd-test"),
-        "test_timeout": int(os.getenv("TEST_TIMEOUT", "300")),
+        "test_timeout": int(os.getenv("TEST_TIMEOUT", "30")),
         "cleanup_on_failure": os.getenv("CLEANUP_ON_FAILURE", "true").lower() == "true",
         "metrics_endpoint": os.getenv("METRICS_ENDPOINT", "http://localhost:8080/metrics"),
         "log_level": os.getenv("LOG_LEVEL", "INFO"),
