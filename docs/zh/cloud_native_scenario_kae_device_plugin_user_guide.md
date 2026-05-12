@@ -4,7 +4,10 @@
 
 本文主要介绍如何在使用openEuler操作系统的服务器中部署和使用KAE设备直通插件（KAE Device Plugin）。
 
-KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏920系列处理器提供的硬件加速解决方案，包含了KAE加解密和KAE解压缩。KAE加解密用于加速SSL（Secure Sockets Layer）/TLS（Transport Layer Security）应用，KAE解压缩用于加速数据压缩、解压，可以显著降低处理器消耗，提高处理器效率。此外，加速引擎对应用层屏蔽了其内部实现细节，用户通过OpenSSL、Tongsuo、BoringSSL、Zlib、ZSTD、LZ4标准接口即可实现快速迁移现有业务。本插件的主要功能是自动管理服务器上所有的KAE设备，并简化KAE设备的直通操作，让用户可以通过简单的声明将KAE设备直通到容器中来加速加解密和数据压缩场景。
+KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器提供的硬件加速解决方案，包含了KAE加解密和KAE解压缩。KAE加解密用于加速SSL（Secure Sockets Layer）/TLS（Transport Layer Security）应用，KAE解压缩用于加速数据压缩、解压，可以显著降低处理器消耗，提高处理器效率。
+
+本插件的主要功能是自动管理服务器上所有的KAE设备，并简化KAE设备的直通操作，让用户可以通过简单的声明将KAE设备直通到容器中来加速加解密和数据压缩场景。
+
 
 ## 环境要求<a name="ZH-CN_TOPIC_0000002518412470"></a>
 
@@ -30,7 +33,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏920系列
 |软件|版本|获取地址|
 |--|--|--|
 |OS|openEuler 24.03 LTS SP2|[获取链接](https://www.openeuler.org/en/download/#openEuler%2024.03%20LTS%20SP2)|
-|K8s|1.25.16|请参见《[Kubernetes 部署指南（CentOS&openEuler）](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Kubernetes/kunpengk8s_04_0001.html)》进行下载部署。|
+|Kubernetes|1.25.16|请参见《[Kubernetes 部署指南（CentOS&openEuler）](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Kubernetes/kunpengk8s_04_0001.html)》进行下载部署。|
 |Containerd|1.7.10|请参见《[Containerd 安装指南（CentOS 8.1&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Containerd/kunpengcontainerd_03_0001.html)》进行下载部署。|
 |Docker|18.0.9|通过配置Yum源方式安装|
 |kae-device-plugin|1.0.0|[获取链接](https://gitcode.com/boostkit/cloud-native)|
@@ -273,11 +276,11 @@ KAE设备支持QoS（Quality of Service，服务质量）功能。通过设置Qo
 
     **表 1** KAE设备QoS注解对照表<a id="KAE设备QoS注解对照表"></a>
 
-|KAE设备|注解名|
-|--|--|
-|HPRE|qos.kae.kunpeng.com/hisi_hpre|
-|SEC|qos.kae.kunpeng.com/hisi_sec2|
-|ZIP|qos.kae.kunpeng.com/hisi_zip|
+   |KAE设备|注解名|
+   |--|--|
+   |HPRE|qos.kae.kunpeng.com/hisi_hpre|
+   |SEC|qos.kae.kunpeng.com/hisi_sec2|
+   |ZIP|qos.kae.kunpeng.com/hisi_zip|
 
 
 2. 按照[KAE设备直通](#KAE设备直通)的步骤部署Pod即可。

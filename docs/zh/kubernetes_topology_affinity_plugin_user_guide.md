@@ -60,19 +60,17 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
 |项目|版本|获取方法|
 |--|--|--|
-|OS|openEuler 20.03 LTS SP3|[获取链接](https://repo.openeuler.org/openEuler-20.03-LTS-SP3/ISO/aarch64/)|
-|OS|openEuler 22.03 LTS SP4|[获取链接](https://repo.openeuler.org/openEuler-22.03-LTS-SP4/ISO/aarch64/)|
-|OS|openEuler 24.03 LTS SP3|[获取链接](https://repo.openeuler.org/openEuler-24.03-LTS-SP3/ISO/aarch64/)|
+|OS|openEuler 20.03 LTS SP3<br>openEuler 22.03 LTS SP4<br>openEuler 24.03 LTS SP3|openEuler 20.03 LTS SP3：[获取链接](https://repo.openeuler.org/openEuler-20.03-LTS-SP3/ISO/aarch64/)<br>openEuler 22.03 LTS SP4：[获取链接](https://repo.openeuler.org/openEuler-22.03-LTS-SP4/ISO/aarch64/)<br>openEuler 24.03 LTS SP3：[获取链接](https://repo.openeuler.org/openEuler-24.03-LTS-SP3/ISO/aarch64/)|
 |Golang|1.25|获取链接建议Golang环境配置国内源，以便下载二进制依赖包进行安装。|
 |Make|-|通过配置Yum源方式安装。|
-|Kubernetes|1.23.6，1.25.16|-|
+|Kubernetes|1.23.6，1.25.16|通过配置Yum源方式安装。|
 |Docker|20.10.14|通过配置Yum源方式安装。|
 |Containerd|1.6.8或1.7.0（NRI模式下需高于1.7.0）|[获取链接](https://github.com/containerd/containerd/releases/tag/v1.6.8)|
 |Kunpeng TAP源代码|release-0.3|[获取链接](https://gitcode.com/boostkit/cloud-native)|
-|Kunpeng TAP|release-0.3|Kunpeng TAP的可执行文件，通过[编译Kunpeng TAP](#编译Kunpeng TAP)编译获得。|
+|Kunpeng TAP|release-0.3|Kunpeng TAP的可执行文件，通过[编译Kunpeng TAP](#编译Kunpeng-TAP)编译获得。|
 
 
-## 编译Kunpeng TAP<a id="编译Kunpeng TAP"></a>
+## 编译Kunpeng TAP<a id="编译Kunpeng-TAP"></a>
 
 编译Kunpeng TAP源代码并生成插件可执行文件。
 
