@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package v1alpha1 contains API Schema definitions for MPAM resources.
 // +kubebuilder:object:generate=true
-// +groupName=mpam.kunpeng.huawei.com
+// +groupName=qos.kunpeng.huawei.com
 package v1alpha1
 
 import (
@@ -27,7 +27,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects.
-	GroupVersion = schema.GroupVersion{Group: "mpam.kunpeng.huawei.com", Version: "v1alpha1"}
+	GroupVersion = schema.GroupVersion{Group: "qos.kunpeng.huawei.com", Version: "v1alpha1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme.
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)

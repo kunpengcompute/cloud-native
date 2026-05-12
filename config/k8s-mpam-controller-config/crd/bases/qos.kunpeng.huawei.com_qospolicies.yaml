@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: mpampolicies.mpam.kunpeng.huawei.com
+  name: qospolicies.qos.kunpeng.huawei.com
 spec:
-  group: mpam.kunpeng.huawei.com
+  group: qos.kunpeng.huawei.com
   names:
-    kind: MPAMPolicy
-    listKind: MPAMPolicyList
-    plural: mpampolicies
+    kind: QoSPolicy
+    listKind: QoSPolicyList
+    plural: qospolicies
     shortNames:
-    - mpam
-    singular: mpampolicy
+    - qos
+    singular: qospolicy
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -23,13 +23,16 @@ spec:
     - jsonPath: .spec.l3.ways
       name: L3WAYS
       type: integer
+    - jsonPath: .spec.cpu.qosLevel
+      name: CPUQOS
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: MPAMPolicy is the Schema for MPAM policy CRD.
+        description: QoSPolicy is the Schema for QoS policy CRD.
         properties:
           apiVersion:
             description: |-
@@ -49,8 +52,22 @@ spec:
           metadata:
             type: object
           spec:
-            description: MPAMPolicySpec defines the desired state for MPAM settings.
+            description: QoSPolicySpec defines the desired state for QoS settings.
             properties:
+              cpu:
+                default: {}
+                description: CPU groups cpu-related controls.
+                properties:
+                  qosLevel:
+                    default: 0
+                    description: |-
+                      QoSLevel controls cpu.qos_level for pods in this policy group.
+                      Current supported range is [-1, 1].
+                    format: int32
+                    maximum: 1
+                    minimum: -1
+                    type: integer
+                type: object
               l3:
                 default: {}
                 description: L3 groups cache related policy items.
