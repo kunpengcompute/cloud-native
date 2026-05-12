@@ -6,7 +6,7 @@ from pytest_bdd import scenarios
 from step_definitions.common_steps import cleanup_test_resources, collect_failure_diagnostics
 from step_definitions.common_steps import *  # noqa: F401,F403
 
-scenarios("features/mpam_controller.feature")
+scenarios("features/qos_controller.feature")
 
 
 @pytest.fixture(scope="function", autouse=True)
