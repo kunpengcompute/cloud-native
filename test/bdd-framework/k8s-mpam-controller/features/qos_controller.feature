@@ -1,8 +1,8 @@
-Feature: MPAM Operator 核心闭环
+Feature: QoS Operator 核心闭环
   首批 BDD E2E 只覆盖核心闭环：QoSPolicy 生命周期 + Pod 绑定 + resctrl 断言。
 
   Background:
-    Given MPAM controller 已部署并且节点具备 resctrl
+    Given QoS controller 已部署并且节点具备 resctrl
 
   @e2e @smoke @lifecycle @resctrl
   Scenario: 创建路径 - 创建策略并绑定 Pod 到控制组

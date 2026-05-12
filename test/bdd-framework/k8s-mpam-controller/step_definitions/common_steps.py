@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 CRD_MANIFEST = REPO_ROOT / "config/k8s-mpam-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml"
 DAEMONSET_MANIFEST = REPO_ROOT / "config/k8s-mpam-controller-config/samples/mpam-controller-daemonset-v1alpha1.yaml"
 
-OPERATOR_LABEL_SELECTOR = "app=mpam-controller"
+OPERATOR_LABEL_SELECTOR = "app=qos-controller"
 RUN_LABEL_KEY = "mpam-e2e-run"
 GROUP_LABEL_KEY = "qos.kunpeng.huawei.com/group"
 WORKLOAD_CLASS_LABEL_KEY = "qos.kunpeng.huawei.com/workload-class"
@@ -27,7 +27,7 @@ WORKLOAD_CLASS_OFFLINE = "offline"
 test_context: Dict[str, object] = {
     "run_id": f"mpam-e2e-{int(time.time())}",
     "namespace": "mpam-e2e",
-    "operator_namespace": "mpam-system",
+    "operator_namespace": "qos-system",
     "operator_image": "k8s-mpam-controller:0.1.0",
     "pod_image": "busybox:1.36",
     "node_selector": "",
@@ -99,7 +99,7 @@ def _refresh_controller_pod() -> str:
     if node_name:
         running = [p for p in running if p.spec.node_name == node_name]
     if not running:
-        raise RuntimeError("no running mpam-controller pod found")
+        raise RuntimeError("no running qos-controller pod found")
     pod_name = running[0].metadata.name
     test_context["controller_pod_name"] = pod_name
     if not test_context.get("target_node_name"):
@@ -442,7 +442,7 @@ def _all_containers_cpu_qos_level(pod: client.V1Pod, expected_level: str) -> boo
     return True
 
 
-@given("MPAM controller 已部署并且节点具备 resctrl")
+@given("QoS controller 已部署并且节点具备 resctrl")
 def deploy_mpam_controller(mpam_test_config):
     _ensure_k8s_clients()
     test_context["namespace"] = mpam_test_config["namespace"]
@@ -478,13 +478,13 @@ def deploy_mpam_controller(mpam_test_config):
     op_ns = str(test_context["operator_namespace"])
 
     def _daemonset_ready() -> bool:
-        ds = k8s_apps_v1.read_namespaced_daemon_set(name="mpam-controller", namespace=op_ns)
+        ds = k8s_apps_v1.read_namespaced_daemon_set(name="qos-controller", namespace=op_ns)
         desired = ds.status.desired_number_scheduled or 0
         ready = ds.status.number_ready or 0
         return desired > 0 and ready >= desired
 
     _wait_until(
-        "mpam-controller daemonset ready",
+        "qos-controller daemonset ready",
         _daemonset_ready,
         int(test_context["timeout"]),
         int(test_context["poll_interval"]),

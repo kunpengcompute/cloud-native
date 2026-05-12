@@ -38,7 +38,7 @@ k8s-mpam-controller/
 ## 环境变量
 
 - `MPAM_E2E_NAMESPACE`：测试业务 Pod 所在命名空间，默认 `mpam-e2e`
-- `MPAM_OPERATOR_NAMESPACE`：operator 命名空间，默认 `mpam-system`
+- `MPAM_OPERATOR_NAMESPACE`：operator 命名空间，默认 `qos-system`
 - `MPAM_OPERATOR_IMAGE`：operator 镜像，默认 `k8s-mpam-controller:0.1.0`
 - `MPAM_E2E_POD_IMAGE`：测试 Pod 镜像，默认 `busybox:1.36`
 - `MPAM_E2E_NODE_SELECTOR`：可选，格式 `key=value`，用于限制 DaemonSet 测试节点
