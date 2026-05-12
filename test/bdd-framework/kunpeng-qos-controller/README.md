@@ -39,7 +39,7 @@ k8s-mpam-controller/
 
 - `QOS_E2E_NAMESPACE`：测试业务 Pod 所在命名空间，默认 `qos-e2e`
 - `QOS_OPERATOR_NAMESPACE`：operator 命名空间，默认 `qos-system`
-- `QOS_OPERATOR_IMAGE`：operator 镜像，默认 `k8s-mpam-controller:0.1.0`
+- `QOS_OPERATOR_IMAGE`：operator 镜像，默认 `kunpeng-qos-controller:0.1.0`
 - `QOS_E2E_POD_IMAGE`：测试 Pod 镜像，默认 `busybox:1.36`
 - `QOS_E2E_NODE_SELECTOR`：可选，格式 `key=value`，用于限制 DaemonSet 测试节点
 - `QOS_E2E_TIMEOUT`：轮询超时秒数，默认 `180`

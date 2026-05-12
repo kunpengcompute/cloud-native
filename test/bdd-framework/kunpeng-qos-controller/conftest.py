@@ -37,7 +37,7 @@ def qos_test_config(test_config):
         {
             "namespace": os.getenv("QOS_E2E_NAMESPACE", "qos-e2e"),
             "operator_namespace": os.getenv("QOS_OPERATOR_NAMESPACE", "qos-system"),
-            "operator_image": os.getenv("QOS_OPERATOR_IMAGE", "k8s-mpam-controller:0.1.0"),
+            "operator_image": os.getenv("QOS_OPERATOR_IMAGE", "kunpeng-qos-controller:0.1.0"),
             "pod_image": os.getenv("QOS_E2E_POD_IMAGE", "busybox:1.36"),
             "node_selector": os.getenv("QOS_E2E_NODE_SELECTOR", ""),
             "reconcile_timeout_seconds": int(os.getenv("QOS_E2E_TIMEOUT", "180")),

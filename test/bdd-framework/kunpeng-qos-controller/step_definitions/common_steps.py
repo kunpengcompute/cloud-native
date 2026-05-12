@@ -28,7 +28,7 @@ test_context: Dict[str, object] = {
     "run_id": f"qos-e2e-{int(time.time())}",
     "namespace": "qos-e2e",
     "operator_namespace": "qos-system",
-    "operator_image": "k8s-mpam-controller:0.1.0",
+    "operator_image": "kunpeng-qos-controller:0.1.0",
     "pod_image": "busybox:1.36",
     "node_selector": "",
     "timeout": 30,

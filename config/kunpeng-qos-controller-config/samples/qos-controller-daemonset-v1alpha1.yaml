@@ -59,9 +59,9 @@ spec:
       containers:
       - name: qos-controller
         # Replace with your actual registry/image tag.
-        image: k8s-mpam-controller:0.1.0
+        image: kunpeng-qos-controller:0.1.0
         imagePullPolicy: IfNotPresent
-        command: ["/usr/bin/agent"]
+        command: ["/usr/bin/kunpeng-qos-controller"]
         securityContext:
           capabilities:
             add:

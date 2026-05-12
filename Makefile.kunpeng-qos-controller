@@ -1,7 +1,7 @@
-# K8S MPAM Controller Makefile
+# Kunpeng QoS Controller Makefile
 
 # Project configuration
-PROJECT_NAME := k8s-mpam-controller
+PROJECT_NAME := kunpeng-qos-controller
 VERSION ?= 0.1.0
 BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT := $(shell git rev-parse HEAD)
@@ -9,7 +9,7 @@ GIT_COMMIT := $(shell git rev-parse HEAD)
 # Build configuration
 GOPATH_BIN := $(shell go env GOPATH)/bin
 BUILD_DIR := bin
-DOCKER_IMAGE := k8s-mpam-controller:$(VERSION)
+DOCKER_IMAGE := kunpeng-qos-controller:$(VERSION)
 
 # Build flags
 CGO_CFLAGS := "-fstack-protector-strong -D_FORTIFY_SOURCE=2 -O2"
@@ -26,7 +26,7 @@ all: build
 
 .PHONY: help
 help: ## Display this help.
-	@echo "K8S MPAM Controller Build System"
+	@echo "Kunpeng QoS Controller Build System"
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
@@ -42,25 +42,25 @@ version: ## Show version information.
 .PHONY: deps
 deps: ## Download dependencies.
 	@echo "Downloading dependencies..."
-	go get -d -v ./cmd/k8s-mpam-controller ./pkg/k8s-mpam-controller/...
+	go get -d -v ./cmd/kunpeng-qos-controller ./pkg/kunpeng-qos-controller/...
 	@echo "Dependencies downloaded"
 
 .PHONY: fmt
 fmt: ## Format code.
 	@echo "Formatting code..."
-	go fmt ./cmd/k8s-mpam-controller ./pkg/k8s-mpam-controller/...
+	go fmt ./cmd/kunpeng-qos-controller ./pkg/kunpeng-qos-controller/...
 	@echo "Code formatted"
 
 .PHONY: vet
 vet: ## Run go vet.
 	@echo "Running go vet..."
-	go vet ./cmd/k8s-mpam-controller ./pkg/k8s-mpam-controller/...
+	go vet ./cmd/kunpeng-qos-controller ./pkg/kunpeng-qos-controller/...
 	@echo "Go vet completed"
 
 .PHONY: test
 test: ## Run tests.
 	@echo "Running tests..."
-	go test ./pkg/k8s-mpam-controller/... -v
+	go test ./pkg/kunpeng-qos-controller/... -v
 	@echo "Tests completed"
 
 .PHONY: tidy
@@ -72,24 +72,16 @@ tidy: ## Tidy go modules.
 ##@ Build
 
 .PHONY: build
-build: deps ## Build the project.
-	@echo "Building $(PROJECT_NAME)..."
-	@mkdir -p $(BUILD_DIR)
-	CGO_CFLAGS=$(CGO_CFLAGS) go install -buildmode=pie -ldflags $(LDFLAGS) ./cmd/k8s-mpam-controller
-	@echo "$(PROJECT_NAME) built successfully"
-	@echo "Binary installed to $(GOPATH_BIN)/k8s-mpam-controller"
-
-.PHONY: build-local
-build-local: deps ## Build binary to local bin directory.
+build: deps ## Build binary to local bin directory.
 	@echo "Building $(PROJECT_NAME) locally..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_CFLAGS=$(CGO_CFLAGS) go build -buildmode=pie -ldflags $(LDFLAGS) -o $(BUILD_DIR)/k8s-mpam-controller ./cmd/k8s-mpam-controller
-	@echo "$(PROJECT_NAME) built locally in $(BUILD_DIR)/k8s-mpam-controller"
+	CGO_CFLAGS=$(CGO_CFLAGS) go build -buildmode=pie -ldflags $(LDFLAGS) -o $(BUILD_DIR)/kunpeng-qos-controller ./cmd/kunpeng-qos-controller
+	@echo "$(PROJECT_NAME) built locally in $(BUILD_DIR)/kunpeng-qos-controller"
 
 .PHONY: clean
 clean: ## Clean build artifacts.
 	@echo "Cleaning $(PROJECT_NAME)..."
-	rm -f $(GOPATH_BIN)/k8s-mpam-controller
+	rm -f $(GOPATH_BIN)/kunpeng-qos-controller
 	rm -rf $(BUILD_DIR)
 	@echo "Clean completed"
 
@@ -98,7 +90,7 @@ clean: ## Clean build artifacts.
 .PHONY: docker-build
 docker-build: ## Build docker image.
 	@echo "Building docker image $(DOCKER_IMAGE)..."
-	sudo docker build --force-rm -f ./Dockerfile.mpam -t $(DOCKER_IMAGE) .
+	sudo docker build --force-rm -f ./Dockerfile.kunpeng-qos-controller -t $(DOCKER_IMAGE) .
 	@echo "Docker image $(DOCKER_IMAGE) built successfully"
 
 .PHONY: docker-push
@@ -123,22 +115,22 @@ docker-clean: ## Clean docker images.
 .PHONY: install
 install: build ## Install binary to system.
 	@echo "Installing $(PROJECT_NAME) to system..."
-	sudo cp $(GOPATH_BIN)/k8s-mpam-controller /usr/local/bin/
-	sudo chmod +x /usr/local/bin/k8s-mpam-controller
+	sudo cp $(BUILD_DIR)/kunpeng-qos-controller /usr/local/bin/
+	sudo chmod +x /usr/local/bin/kunpeng-qos-controller
 	@echo "Installation completed"
 
 .PHONY: uninstall
 uninstall: ## Uninstall binary from system.
 	@echo "Uninstalling $(PROJECT_NAME) from system..."
-	sudo rm -f /usr/local/bin/k8s-mpam-controller
+	sudo rm -f /usr/local/bin/kunpeng-qos-controller
 	@echo "Uninstallation completed"
 
 ##@ Development Tools
 
 .PHONY: run
-run: build-local ## Run the application locally.
+run: build ## Run the application locally.
 	@echo "Running $(PROJECT_NAME)..."
-	./$(BUILD_DIR)/k8s-mpam-controller
+	./$(BUILD_DIR)/kunpeng-qos-controller
 
 .PHONY: check
 check: fmt vet test ## Run all checks (format, vet, test).

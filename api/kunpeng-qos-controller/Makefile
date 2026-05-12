@@ -1,5 +1,5 @@
 CONTROLLER_GEN ?= controller-gen
-API_PATH ?= ./pkg/k8s-mpam-controller/api/v1alpha1
+API_PATH ?= ./api/kunpeng-qos-controller/v1alpha1
 CRD_OUT ?= ./config/kunpeng-qos-controller-config/crd/bases
 
 .PHONY: generate manifests all

@@ -9,13 +9,13 @@ Install `controller-gen` (from `sigs.k8s.io/controller-tools`).
 ## Generate deepcopy code
 
 ```bash
-make -f pkg/k8s-mpam-controller/api/Makefile generate
+make -f api/kunpeng-qos-controller/Makefile generate
 ```
 
 ## Generate CRD YAML
 
 ```bash
-make -f pkg/k8s-mpam-controller/api/Makefile manifests
+make -f api/kunpeng-qos-controller/Makefile manifests
 ```
 
 Generated CRDs are written to:

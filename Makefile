@@ -1,5 +1,5 @@
 # K8S Projects Makefile
-# This Makefile manages k8s-mpam-controller and kunpeng-tap projects
+# This Makefile manages kunpeng-qos-controller and kunpeng-tap projects
 
 # Project configuration
 VERSION ?= 0.1.0
@@ -15,7 +15,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 .PHONY: all
-all: mpam-build kunpeng-tap-build kae-device-plugin-build kunpeng-perf-monitor-build
+all: qos-build kunpeng-tap-build kae-device-plugin-build kunpeng-perf-monitor-build
 
 ##@ General
 
@@ -25,52 +25,48 @@ help: ## Display this help.
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-##@ K8S MPAM Controller
+##@ Kunpeng QoS Controller
 
-.PHONY: mpam-build
-mpam-build: ## Build k8s-mpam-controller project.
-	$(MAKE) -f Makefile.mpam build
+.PHONY: qos-build
+qos-build: ## Build kunpeng-qos-controller project.
+	$(MAKE) -f Makefile.kunpeng-qos-controller build
 
-.PHONY: mpam-build-local
-mpam-build-local: ## Build k8s-mpam-controller locally.
-	$(MAKE) -f Makefile.mpam build-local
+.PHONY: qos-clean
+qos-clean: ## Clean kunpeng-qos-controller build artifacts.
+	$(MAKE) -f Makefile.kunpeng-qos-controller clean
 
-.PHONY: mpam-clean
-mpam-clean: ## Clean k8s-mpam-controller build artifacts.
-	$(MAKE) -f Makefile.mpam clean
+.PHONY: qos-docker
+qos-docker: ## Build kunpeng-qos-controller docker image.
+	$(MAKE) -f Makefile.kunpeng-qos-controller docker-build
 
-.PHONY: mpam-docker
-mpam-docker: ## Build k8s-mpam-controller docker image.
-	$(MAKE) -f Makefile.mpam docker-build
+.PHONY: qos-docker-push
+qos-docker-push: ## Push kunpeng-qos-controller docker image.
+	$(MAKE) -f Makefile.kunpeng-qos-controller docker-push
 
-.PHONY: mpam-docker-push
-mpam-docker-push: ## Push k8s-mpam-controller docker image.
-	$(MAKE) -f Makefile.mpam docker-push
+.PHONY: qos-docker-run
+qos-docker-run: ## Run kunpeng-qos-controller docker container.
+	$(MAKE) -f Makefile.kunpeng-qos-controller docker-run
 
-.PHONY: mpam-docker-run
-mpam-docker-run: ## Run k8s-mpam-controller docker container.
-	$(MAKE) -f Makefile.mpam docker-run
+.PHONY: qos-install
+qos-install: ## Install kunpeng-qos-controller to system.
+	$(MAKE) -f Makefile.kunpeng-qos-controller install
 
-.PHONY: mpam-install
-mpam-install: ## Install k8s-mpam-controller to system.
-	$(MAKE) -f Makefile.mpam install
+.PHONY: qos-uninstall
+qos-uninstall: ## Uninstall kunpeng-qos-controller from system.
+	$(MAKE) -f Makefile.kunpeng-qos-controller uninstall
 
-.PHONY: mpam-uninstall
-mpam-uninstall: ## Uninstall k8s-mpam-controller from system.
-	$(MAKE) -f Makefile.mpam uninstall
-
-.PHONY: mpam-run
-mpam-run: ## Run k8s-mpam-controller locally.
-	$(MAKE) -f Makefile.mpam run
+.PHONY: qos-run
+qos-run: ## Run kunpeng-qos-controller locally.
+	$(MAKE) -f Makefile.kunpeng-qos-controller run
 
 
-.PHONY: mpam-test
-mpam-test: ## Test k8s-mpam-controller.
-	$(MAKE) -f Makefile.mpam test
+.PHONY: qos-test
+qos-test: ## Test kunpeng-qos-controller.
+	$(MAKE) -f Makefile.kunpeng-qos-controller test
 
-.PHONY: mpam-tidy
-mpam-tidy: ## Tidy k8s-mpam-controller go modules.
-	$(MAKE) -f Makefile.mpam tidy
+.PHONY: qos-tidy
+qos-tidy: ## Tidy kunpeng-qos-controller go modules.
+	$(MAKE) -f Makefile.kunpeng-qos-controller tidy
 
 ##@ Kunpeng TAP
 
@@ -200,19 +196,19 @@ kae-device-plugin-tidy: ## Tidy kae-device-plugin go modules.
 ##@ Combined Operations
 
 .PHONY: build
-build: mpam-build kunpeng-tap-build kae-device-plugin-build kunpeng-perf-monitor-build ## Build all projects.
+build: qos-build kunpeng-tap-build kae-device-plugin-build kunpeng-perf-monitor-build ## Build all projects.
 
 .PHONY: clean
-clean: mpam-clean kunpeng-tap-clean kae-device-plugin-clean kunpeng-perf-monitor-clean## Clean all projects.
+clean: qos-clean kunpeng-tap-clean kae-device-plugin-clean kunpeng-perf-monitor-clean## Clean all projects.
 
 .PHONY: docker
-docker: mpam-docker kunpeng-tap-docker-build kae-device-plugin-docker kunpeng-perf-monitor-docker ## Build all docker images.
+docker: qos-docker kunpeng-tap-docker-build kae-device-plugin-docker kunpeng-perf-monitor-docker ## Build all docker images.
 
 .PHONY: test
-test: mpam-test kunpeng-tap-test kae-device-plugin-test kunpeng-perf-monitor-test ## Run tests for all projects.
+test: qos-test kunpeng-tap-test kae-device-plugin-test kunpeng-perf-monitor-test ## Run tests for all projects.
 
 .PHONY: tidy
-tidy: mpam-tidy kunpeng-tap-tidy kae-device-plugin-tidy ## Tidy go modules for all projects.
+tidy: qos-tidy kunpeng-tap-tidy kae-device-plugin-tidy ## Tidy go modules for all projects.
 
 ##@ Kunpeng TAP RPM Packaging
 
