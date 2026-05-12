@@ -1,0 +1,16 @@
+apiVersion: qos.kunpeng.huawei.com/v1alpha1
+kind: QoSPolicy
+metadata:
+  name: e2e-invalid-policy
+spec:
+  mb:
+    hdl: 2   # invalid: must be 0 or 1
+    pri: 9   # invalid: must be in [0,7]
+    min: -1  # invalid: must be >= 0
+    max: 150 # invalid: must be <= 100
+  l3:
+    pri: 5   # invalid: must be in [0,3]
+    min: -1  # invalid: must be >= 0
+    max: 101 # invalid: must be <= 100
+    ways: 0  # invalid: must be >= 1
+
