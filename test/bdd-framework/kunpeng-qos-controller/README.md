@@ -1,4 +1,4 @@
-# k8s-mpam-controller (QoS) BDD E2E
+# kunpeng-qos-controller BDD E2E
 
 本目录是 QoS Operator 的 BDD E2E 套件，覆盖核心闭环：
 
@@ -14,7 +14,7 @@
 ## 目录结构
 
 ```text
-k8s-mpam-controller/
+kunpeng-qos-controller/
 ├── conftest.py
 ├── features/
 │   └── qos_controller.feature
