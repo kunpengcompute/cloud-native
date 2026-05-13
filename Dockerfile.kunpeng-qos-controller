@@ -1,0 +1,14 @@
+# Build kunpeng-qos-controller
+FROM golang:1.25.0 as builder
+
+WORKDIR /go/src/kunpeng-qos-controller
+COPY . /go/src/kunpeng-qos-controller
+
+# use "go get" instead of "go mod" to bypass client-go dependence issue
+# use build.sh to bypass error: "The command '/bin/sh -c go get -d -v ./...' returned a non-zero code: 1"
+RUN make kunpeng-qos-controller-build
+
+# Create kunpeng-qos-controller image
+FROM busybox:glibc
+
+COPY --from=builder /go/src/kunpeng-qos-controller/bin/kunpeng-qos-controller /usr/bin/kunpeng-qos-controller
