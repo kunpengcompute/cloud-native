@@ -261,10 +261,15 @@ def _parse_schemata(content: str) -> Dict[str, Dict[str, str]]:
 
 def _schemata_matches_expected(content: str, expected: Dict[str, str]) -> bool:
     parsed = _parse_schemata(content)
+    matched_any = False
     for key, exp_value in expected.items():
         assignments = parsed.get(key)
         if not assignments:
-            return False
+            # Different servers may not expose all schemata items
+            # (for example some models do not have L3MIN/L3MAX).
+            # Missing keys are treated as unsupported and skipped.
+            continue
+        matched_any = True
         for actual in assignments.values():
             if key == "L3":
                 # L3 mask is hex string in schemata. Compare by numeric value
@@ -283,7 +288,7 @@ def _schemata_matches_expected(content: str, expected: Dict[str, str]) -> bool:
                     return False
             except ValueError:
                 return False
-    return True
+    return matched_any
 
 
 def _invalid_policy_doc(name: str) -> dict:
