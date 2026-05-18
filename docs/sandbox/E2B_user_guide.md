@@ -466,10 +466,11 @@ bash build.sh --start
 cd /opt/e2b-infra
 bash build.sh --stop
 bash build.sh --uninstall
+bash build.sh --install
 bash build.sh --start
 ```
 
-命令说明：先停止并清理异常部署状态，再重新启动服务。
+命令说明：先停止并清理异常部署状态，再重新部署和启动服务。
 
 ### 无法访问Nomad页面
 

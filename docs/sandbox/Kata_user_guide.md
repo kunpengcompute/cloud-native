@@ -10,7 +10,7 @@ Kata Containers是一个开源的容器运行时项目，旨在将容器的轻�
 - Kata Containers使用Cloud-Hypervisor（CLH）作为虚拟机管理器，需要宿主机支持硬件虚拟化（KVM）。请确认宿主机内核已启用KVM模块（`ls /dev/kvm`）。
 - 单节点并发运行大量Kata沙箱（如1000+）时，对宿主机的内存、文件描述符、PID数量等系统资源消耗极大，需按本文档[千级沙箱并发调优](#千级沙箱并发调优)章节进行调整。
 - Nydus镜像加速依赖远程Registry服务的网络连通性，请确保集群节点可访问配置的镜像仓库地址。
-- Kata运行时中的Pod不支持HostNetwork、HostPID等共享宿主机命名空间的特性。
+- Kata运行时中的Pod默认使用独立网络命名空间，HostPID等共享宿主机命名空间特性可能受限或不支持；本文千级Kata容器启动部署实例为减少网络插件限制影响，使用hostNetwork仅用于并发启动验证。
 - 部分Kubernetes特性（如Privileged特权模式、某些Device Plugin）在Kata运行时中可能受限或不支持。
 
 ## 应用场景
@@ -554,4 +554,118 @@ Kata Containers每个Pod都是一个cloud-hypervisor进程，这对宿主机的�
 
     ```
     sysctl -p
+    ```
+
+### 千级Kata容器启动部署实例
+
+完成上述Kata运行时配置、RuntimeClass创建和系统参数调优后，可通过Deployment在单节点上批量启动Kata容器。以下示例在`master`节点上创建1000个Kata Pod，用于验证千级Kata沙箱并发启动能力。
+
+>![](public_sys-resources/icon-note.gif) **说明：** 
+>1. 示例中的`nodeName: master`、镜像地址、CPU和内存请求仅供参考，请根据实际节点名称、镜像仓库和宿主机资源规格调整。
+>2. 示例通过`hostNetwork: true`让Pod使用宿主机网络，减少CNI插件、Pod IP分配和ARP表规模对千级启动验证的影响。使用宿主机网络时Pod没有独立Pod网络，且监听端口会与宿主机端口共享，请勿在容器中启动固定监听端口相同的服务。
+>3. 如果节点存在Master或Control Plane污点，需要保留`tolerations`配置，否则Pod会因污点无法调度。
+>4. 千级Kata Pod会同时拉起大量`cloud-hypervisor`进程，建议先按100、300、600、1000逐步扩容，观察CPU、内存、PID、文件句柄和系统网络状态。
+
+1.  创建部署命名空间。
+
+    ```
+    kubectl create namespace kata-scale
+    ```
+
+2.  创建千级Kata容器Deployment配置文件kata-sandbox-1000.yaml。
+
+    ```
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: kata-sandbox-1000
+      namespace: kata-scale
+    spec:
+      # 建议首次部署时先设置为100，确认资源稳定后再逐步扩容到1000。
+      replicas: 100
+      selector:
+        matchLabels:
+          app: kata-sandbox-scale
+      template:
+        metadata:
+          labels:
+            app: kata-sandbox-scale
+        spec:
+          runtimeClassName: kata-runtime
+          nodeName: master
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          terminationGracePeriodSeconds: 0
+          tolerations:
+          - key: "node-role.kubernetes.io/control-plane"
+            operator: "Exists"
+            effect: "NoSchedule"
+          - key: "node-role.kubernetes.io/master"
+            operator: "Exists"
+            effect: "NoSchedule"
+          containers:
+          - name: sandbox-container
+            image: docker/sandbox-templates:claude-code
+            imagePullPolicy: IfNotPresent
+            command: ["/bin/bash"]
+            args: ["-c", "sleep infinity"]
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "256Mi"
+              limits:
+                cpu: "500m"
+                memory: "1Gi"
+    ```
+
+    如果需要验证Kata+Nydus镜像加速，可将`image`替换为前文转换后的Nydus镜像，例如：
+
+    ```
+    image: sealos.hub:5000/sandbox-templates:claude-code-nydus
+    ```
+
+3.  部署并分批扩容。
+
+    ```
+    kubectl apply -f kata-sandbox-1000.yaml
+    kubectl -n kata-scale rollout status deployment/kata-sandbox-1000
+
+    kubectl -n kata-scale scale deployment kata-sandbox-1000 --replicas=300
+    kubectl -n kata-scale rollout status deployment/kata-sandbox-1000
+
+    kubectl -n kata-scale scale deployment kata-sandbox-1000 --replicas=600
+    kubectl -n kata-scale rollout status deployment/kata-sandbox-1000
+
+    kubectl -n kata-scale scale deployment kata-sandbox-1000 --replicas=1000
+    kubectl -n kata-scale rollout status deployment/kata-sandbox-1000
+    ```
+
+4.  检查Pod运行状态。
+
+    ```
+    kubectl -n kata-scale get pods -o wide
+    kubectl -n kata-scale get pods --field-selector=status.phase=Running --no-headers | wc -l
+    ```
+
+    当Running状态Pod数量达到1000时，说明Kubernetes层面已完成千级Kata容器启动。
+
+5.  检查Kata虚拟机进程数量。
+
+    ```
+    ps -ef | grep cloud-hypervisor | grep -v grep | wc -l
+    ```
+
+    该数量应接近Running状态Pod数量。若数量明显偏少，请通过如下命令查看失败原因。
+
+    ```
+    kubectl -n kata-scale get events --sort-by=.lastTimestamp
+    kubectl -n kata-scale describe pod <pod-name>
+    journalctl -u kubelet -f
+    journalctl -u containerd -f
+    ```
+
+6.  验证完成后清理测试资源。
+
+    ```
+    kubectl delete namespace kata-scale
     ```
