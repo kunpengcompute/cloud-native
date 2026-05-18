@@ -45,7 +45,7 @@ make kunpeng-qos-controller-build
 
 输出路径：
 
-- `bin/kunpeng-qos-controller`
+ `bin/kunpeng-qos-controller`
 
 ## Docker 镜像编译
 
@@ -179,13 +179,13 @@ kubectl -n qos-system exec -it "${POD#pod/}" -- ls /sys/fs/resctrl/offline-small
 ## 常用清单路径
 
 - CRD：
-  - `config/kunpeng-qos-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml`
+   `config/kunpeng-qos-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml`
 - 部署示例：
-  - `config/kunpeng-qos-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml`
+   `config/kunpeng-qos-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml`
 - QoSPolicy 示例：
-  - `config/kunpeng-qos-controller-config/samples/qospolicy-examples-v1alpha1.yaml`
+   `config/kunpeng-qos-controller-config/samples/qospolicy-examples-v1alpha1.yaml`
 - Pod 示例：
-  - `config/kunpeng-qos-controller-config/samples/pod-examples-for-qospolicy-v1alpha1.yaml`
+   `config/kunpeng-qos-controller-config/samples/pod-examples-for-qospolicy-v1alpha1.yaml`
 
 # 维护特性
 
