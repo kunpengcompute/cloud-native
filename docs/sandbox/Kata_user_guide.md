@@ -160,7 +160,7 @@ Kata Containers是一个开源的容器运行时项目，旨在将容器的轻�
     systemctl restart containerd
     ```
 
-    >![](public_sys-resources/icon-note.gif) **说明：** 
+    >**说明：** 
     >建议修改之前备份/etc/containerd/config.toml文件，防止出现问题之后无法恢复。
 
 ## （可选）Nydus镜像加速
@@ -388,7 +388,7 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
     curl -u admin:passw0rd http://sealos.hub:5000/v2/_catalog
     ```
 
-    >![](public_sys-resources/icon-note.gif) **说明：** 
+    >**说明：** 
     >1. 可以是任意镜像，本文档的镜像仅用于验证Kata、Nydus是否能正常使用，仅供参考。
     >2. 如果使用sealos安装的Kubernetes集群，可以参考本文档将镜像推送至本地sealos仓库，请根据实际环境需求更改。
 
@@ -406,7 +406,7 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
     EOF
     ```
 
-    >![](public_sys-resources/icon-note.gif) **说明：** 
+    >**说明：** 
     >handler的名称必须对应Kata配置/etc/containerd/config.toml配置文件中\[plugins...runtimes.**kata**\]的后缀，本文档示例为:kata。
 
 2.  检查是否成功创建。
@@ -560,7 +560,7 @@ Kata Containers每个Pod都是一个cloud-hypervisor进程，这对宿主机的�
 
 完成上述Kata运行时配置、RuntimeClass创建和系统参数调优后，可通过Deployment在单节点上批量启动Kata容器。以下示例在`master`节点上创建1000个Kata Pod，用于验证千级Kata沙箱并发启动能力。
 
->![](public_sys-resources/icon-note.gif) **说明：** 
+>**说明：** 
 >1. 示例中的`nodeName: master`、镜像地址、CPU和内存请求仅供参考，请根据实际节点名称、镜像仓库和宿主机资源规格调整。
 >2. 示例通过`hostNetwork: true`让Pod使用宿主机网络，减少CNI插件、Pod IP分配和ARP表规模对千级启动验证的影响。使用宿主机网络时Pod没有独立Pod网络，且监听端口会与宿主机端口共享，请勿在容器中启动固定监听端口相同的服务。
 >3. 如果节点存在Master或Control Plane污点，需要保留`tolerations`配置，否则Pod会因污点无法调度。
