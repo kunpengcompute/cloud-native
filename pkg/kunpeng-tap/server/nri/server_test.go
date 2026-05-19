@@ -148,7 +148,7 @@ var _ = ginkgo.Describe("Plugin", func() {
 				"KEY1=value1",
 				"KEY2=value2",
 				"KEY_WITHOUT_VALUE",
-				"KEY_WITH_EQUALS=value=with=equals",
+				"KEY_WITH_EQUALS=value=with=equals", //pragma: allowlist secret
 				"",
 			}
 		})

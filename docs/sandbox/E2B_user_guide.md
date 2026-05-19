@@ -200,7 +200,7 @@ E2B 管理平台的核心能力包括：
     | --- | --- | --- |
     | `NUM_SERVERS` | `1` | 当前集群server节点数量。 |
     | `REGISTRY_URL` | `$SERVER_IP:2900/e2b-orchestration` | Harbor镜像仓库地址，默认端口为`2900`。 |
-    | `POSTGRES_CONNECTION_STRING` | `postgresql://postgres:local@$SERVER_IP:5432/mydatabase?sslmode=disable` | Postgres数据库连接地址。 |
+    | `POSTGRES_CONNECTION_STRING` | `postgresql://postgres:local@$SERVER_IP:5432/mydatabase?sslmode=disable` | Postgres数据库连接地址。 | //pragma: allowlist secret
     | `HARBOR_HOST` | `$SERVER_IP:2900` | Harbor访问地址。 |
 
 4. 保存并退出文件。
