@@ -192,7 +192,7 @@ func TestHandleUpdate(t *testing.T) {
 			name: "Add device manager",
 			update: updateInfo{
 				Added: map[string]map[string]DeviceInfo{
-					"ce48969398f05f33946d560708be108a": {
+					"ce48969398f05f33946d560708be108a": { //pragma: allowlist secret
 						"intel-fpga-fme.0": {
 							health: pluginapi.Healthy,
 							devices: []pluginapi.DeviceSpec{
@@ -231,11 +231,11 @@ func TestHandleUpdate(t *testing.T) {
 		{
 			name: "Update existing device manager",
 			servers: map[string]devicePluginServer{
-				"ce48969398f05f33946d560708be108a": &serverStub{},
+				"ce48969398f05f33946d560708be108a": &serverStub{}, //pragma: allowlist secret
 			},
 			update: updateInfo{
 				Updated: map[string]map[string]DeviceInfo{
-					"ce48969398f05f33946d560708be108a": {
+					"ce48969398f05f33946d560708be108a": { //pragma: allowlist secret
 						"intel-fpga-fme.1": {
 							health: pluginapi.Healthy,
 							devices: []pluginapi.DeviceSpec{
@@ -259,11 +259,11 @@ func TestHandleUpdate(t *testing.T) {
 		{
 			name: "Remove device manager",
 			servers: map[string]devicePluginServer{
-				"ce48969398f05f33946d560708be108a": &serverStub{},
+				"ce48969398f05f33946d560708be108a": &serverStub{}, //pragma: allowlist secret
 			},
 			update: updateInfo{
 				Removed: map[string]map[string]DeviceInfo{
-					"ce48969398f05f33946d560708be108a": {},
+					"ce48969398f05f33946d560708be108a": {}, //pragma: allowlist secret
 				},
 			},
 			expectedServers: 0,
