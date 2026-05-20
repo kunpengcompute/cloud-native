@@ -421,44 +421,29 @@ type PMUCollectorInterface interface {
 
 ### 7.1 Collector 注册与启动流程
 
-```plantuml
-@startuml
-title Collector 注册与启动流程
+```mermaid
+flowchart TD
+    Start([开始]) --> Register["各 Collector init 调用 RegisterCollector<br/>完成 mpam / psi / pmu 注册"]
+    Register --> Parse["kingpin.Parse 解析命令行参数<br/>显式指定 collector 时记入 forcedCollectors"]
+    Parse --> Handler["main -> newHandler -> innerHandler"]
+    Handler --> NewNode["NewNodeCollector(logger, filters)"]
+    NewNode --> Iterate["遍历 collectorState<br/>跳过未启用项"]
 
-start
+    Iterate --> NewMPAM["NewMPAMCollector<br/>检查 /sys/fs/resctrl 是否存在"]
+    NewMPAM --> ResctrlMissing{"resctrl 路径不存在?"}
+    ResctrlMissing -->|yes| SkipMPAM["mpamCollector 初始化失败<br/>跳过"]
+    ResctrlMissing -->|no| NewPSI
+    SkipMPAM --> NewPSI["NewPSICollector<br/>df -T 判断 cgroup 版本<br/>确定 cgroupSearchPath"]
 
-:各 Collector init() 调用 RegisterCollector()
-完成 mpam / psi / pmu 注册;
+    NewPSI --> CgroupInvalid{"cgroup 路径异常或版本未知?"}
+    CgroupInvalid -->|yes| SkipPSI["psiCollector 初始化失败<br/>跳过"]
+    CgroupInvalid -->|no| NewPMU
+    SkipPSI --> NewPMU["NewPMUCollector<br/>构建 HHA 指标 Desc"]
 
-:kingpin.Parse() 解析命令行参数
-collector.mpam / psi / pmu 显式指定时记入 forcedCollectors;
-
-:main() -> newHandler() -> innerHandler();
-:NewNodeCollector(logger, filters);
-:遍历 collectorState，跳过未启用项;
-
-:NewMPAMCollector()
-检查 /sys/fs/resctrl 是否存在;
-if (resctrl 路径不存在?) then (yes)
-  :mpamCollector 初始化失败，跳过;
-endif
-
-:NewPSICollector()
-df -T 判断 cgroup 版本
-确定 cgroupSearchPath;
-if (cgroup 路径异常或版本未知?) then (yes)
-  :psiCollector 初始化失败，跳过;
-endif
-
-:NewPMUCollector()
-构建 HHA 指标 Desc;
-
-:NodeCollector 持有全部 Collector 映射;
-:注册到 prometheus.Registry;
-:HTTP server 启动，监听 :9100;
-
-stop
-@enduml
+    NewPMU --> Mapping["NodeCollector 持有全部 Collector 映射"]
+    Mapping --> Registry["注册到 prometheus.Registry"]
+    Registry --> Server["HTTP server 启动<br/>监听 :9100"]
+    Server --> Stop([结束])
 ```
 
 ### 7.2 Prometheus Scrape 时序图
@@ -517,157 +502,102 @@ sequenceDiagram
 
 ### 7.3 MPAM 采集流程
 
-```plantuml
-@startuml
-title MPAM 采集流程
+```mermaid
+flowchart TD
+    Start([开始]) --> Scan["getAllTargetDirs(/sys/fs/resctrl, mon_groups)<br/>扫描所有 MPAM 控制/监控组"]
+    Scan --> Empty{"groups 为空?"}
+    Empty -->|yes| NoData["返回 ErrNoData"]
+    NoData --> Stop([结束])
+    Empty -->|no| Loop["遍历每个 MPAM group"]
 
-start
+    Loop --> Labels["读取 cpus_list 和 mode<br/>构建 mpamMetricsCommonLabels"]
+    Labels --> LabelError{"标签读取失败?"}
+    LabelError -->|yes| Skip["记录 Error<br/>跳过该 group"]
+    Skip --> Stop
 
-:getAllTargetDirs("/sys/fs/resctrl", "mon_groups")
-扫描所有 MPAM 控制/监控组;
-
-if (groups 为空?) then (yes)
-  :返回 ErrNoData;
-  stop
-endif
-
-:遍历每个 MPAM group;
-
-:读取 cpus_list 和 mode
-构建 mpamMetricsCommonLabels;
-
-if (标签读取失败?) then (yes)
-  :记录 Error，跳过该 group;
-else (no)
-  :updateMPAMResUsageMetrics
-  listResInfoSubDirs(mon_data)
-  获取 mon_L3_XXX / mon_MB_XXX 目录列表;
-
-  :读取 mon_L3_XXX/llc_occupancy
-  写入 l3_cache_usage 指标;
-
-  :读取 mon_MB_XXX/mbm_total_bytes
-  写入 mem_usage 指标;
-
-  :updateMPAMResConfigMetrics
-  getMPAMConfigData(schemata, "L3", "MB")
-  逐行解析 L3:id=val 和 MB:id=val;
-
-  :L3 配置数据写入 l3_cache_config 指标;
-  :MB 配置数据写入 mem_config 指标;
-endif
-
-stop
-@enduml
+    LabelError -->|no| Usage["updateMPAMResUsageMetrics<br/>listResInfoSubDirs(mon_data)<br/>获取 mon_L3_XXX / mon_MB_XXX 目录列表"]
+    Usage --> L3Usage["读取 mon_L3_XXX/llc_occupancy<br/>写入 l3_cache_usage 指标"]
+    L3Usage --> MemUsage["读取 mon_MB_XXX/mbm_total_bytes<br/>写入 mem_usage 指标"]
+    MemUsage --> Config["updateMPAMResConfigMetrics<br/>getMPAMConfigData(schemata, L3, MB)<br/>逐行解析 L3:id=val 和 MB:id=val"]
+    Config --> L3Config["L3 配置数据写入 l3_cache_config 指标"]
+    L3Config --> MemConfig["MB 配置数据写入 mem_config 指标"]
+    MemConfig --> Stop
 ```
 
 ### 7.4 PSI 采集流程
 
-```plantuml
-@startuml
-title PSI 采集流程
+```mermaid
+flowchart TD
+    Start([开始]) --> Check["checkCgroupVersion<br/>执行 df -T cgroupMountPath"]
+    Check --> IsV2{"输出含 cgroup2?"}
+    IsV2 -->|yes| V2["cgroupVersion = v2<br/>baseSearchPath = /sys/fs/cgroup"]
+    IsV2 -->|no| IsV1{"输出含 tmpfs?"}
+    IsV1 -->|yes| V1["cgroupVersion = v1<br/>baseSearchPath = /sys/fs/cgroup/cpu,cpuacct"]
+    IsV1 -->|未知| VersionError["返回错误"]
+    VersionError --> Stop([结束])
 
-start
-:checkCgroupVersion\n执行 df -T cgroupMountPath;
-if (输出含 cgroup2?) then (yes)
-  :cgroupVersion = v2\nbaseSearchPath = /sys/fs/cgroup;
-else if (输出含 tmpfs?) then (yes)
-  :cgroupVersion = v1\nbaseSearchPath = /sys/fs/cgroup/cpu,cpuacct;
-else (未知)
-  :返回错误;
-  stop
-endif
+    V2 --> FinalPath["getFinalPath(baseSearchPath, kubepods 或 kubepods.slice)<br/>得到 cgroupSearchPath"]
+    V1 --> FinalPath
+    FinalPath --> Scan["getAllTargetDirs<br/>以 cpu.pressure 为特征文件扫描 cgroupSearchPath<br/>得到 cgroupName -> relPath 映射"]
+    Scan --> Empty{"PSI cgroups 为空?"}
+    Empty -->|yes| NoData["返回 ErrNoData"]
+    NoData --> Stop
+    Empty -->|no| Loop["遍历每个 PSI cgroup"]
 
-:getFinalPath(baseSearchPath, kubepods 或 kubepods.slice)\n得到 cgroupSearchPath;
-
-:getAllTargetDirs\n以 cpu.pressure 为特征文件扫描 cgroupSearchPath\n得到 cgroupName -> relPath 映射;
-if (PSI cgroups 为空?) then (yes)
-  :返回 ErrNoData;
-  stop
-endif
-
-:遍历每个 PSI cgroup;
-
-:读取 cpu.pressure\n解析 some/full 行\n写入 psi_metrics{resource=cpu.pressure};
-
-:读取 io.pressure\n解析 some/full 行\n写入 psi_metrics{resource=io.pressure};
-
-:读取 memory.pressure\n解析 some/full 行\n写入 psi_metrics{resource=memory.pressure};
-
-:尝试读取可选文件 irq.pressure;
-if (读取失败?) then (yes)
-  :记录 Error 日志，继续;
-  note right: irq.pressure 并非所有内核版本都支持
-else (no)
-  :解析 full 行\n写入 psi_metrics{resource=irq.pressure};
-endif
-
-stop
-@enduml
+    Loop --> Cpu["读取 cpu.pressure<br/>解析 some/full 行<br/>写入 psi_metrics resource=cpu.pressure"]
+    Cpu --> Io["读取 io.pressure<br/>解析 some/full 行<br/>写入 psi_metrics resource=io.pressure"]
+    Io --> Memory["读取 memory.pressure<br/>解析 some/full 行<br/>写入 psi_metrics resource=memory.pressure"]
+    Memory --> Irq["尝试读取可选文件 irq.pressure"]
+    Irq --> IrqFailed{"读取失败?"}
+    IrqFailed -->|yes| Log["记录 Error 日志，继续<br/>irq.pressure 并非所有内核版本都支持"]
+    IrqFailed -->|no| IrqMetric["解析 full 行<br/>写入 psi_metrics resource=irq.pressure"]
+    Log --> Stop
+    IrqMetric --> Stop
 ```
 
 ### 7.5 PMU 采集流程
 
-```plantuml
-@startuml
-title PMU 采集流程
+```mermaid
+flowchart TD
+    Start([开始]) --> Singleton["GetRealPMUCollector<br/>获取单例 RealPMUCollector（sync.Once）"]
+    Singleton --> Attrs["构建 deviceAttrs<br/>包含 PMU_HHA_CROSS_NUMA 和 PMU_HHA_CROSS_SOCKET"]
+    Attrs --> Open["PmuDeviceOpen(deviceAttrs) 得到 fd"]
+    Open --> OpenFailed{"fd == -1?"}
+    OpenFailed -->|yes| OpenError["返回错误"]
+    OpenError --> Stop([结束])
+    OpenFailed -->|no| DeferClose["defer PmuClose(fd)<br/>保证资源释放"]
 
-start
-:GetRealPMUCollector\n获取单例 RealPMUCollector（sync.Once）;
+    DeferClose --> Enable["PmuEnable(fd)"]
+    Enable --> EnableFailed{"失败?"}
+    EnableFailed -->|yes| EnableError["返回错误"]
+    EnableError --> Stop
+    EnableFailed -->|no| Sleep["time.Sleep<br/>等待 1s 采样窗口"]
 
-:构建 deviceAttrs\n包含 PMU_HHA_CROSS_NUMA 和 PMU_HHA_CROSS_SOCKET;
+    Sleep --> Disable["PmuDisable(fd)"]
+    Disable --> DisableFailed{"失败?"}
+    DisableFailed -->|yes| DisableError["返回错误"]
+    DisableError --> Stop
+    DisableFailed -->|no| Read["PmuRead(fd) 得到 PmuDataVo"]
 
-:PmuDeviceOpen(deviceAttrs) 得到 fd;
-if (fd == -1?) then (yes)
-  :返回错误;
-  stop
-endif
+    Read --> DataEmpty{"数据为空?"}
+    DataEmpty -->|yes| DataError["返回错误"]
+    DataError --> Stop
+    DataEmpty -->|no| DeferData["defer PmuDataFree(dataVo)"]
 
-note right: defer PmuClose(fd) 保证资源释放
+    DeferData --> DevMetric["PmuGetDevMetric(dataVo, deviceAttrs)<br/>得到 PmuDeviceDataVo"]
+    DevMetric --> DevFailed{"失败?"}
+    DevFailed -->|yes| DevError["返回错误"]
+    DevError --> Stop
+    DevFailed -->|no| DeferDev["defer DevDataFree(deviceDataVo)"]
 
-:PmuEnable(fd);
-if (失败?) then (yes)
-  :返回错误;
-  stop
-endif
-
-:time.Sleep 等待 1s 采样窗口;
-
-:PmuDisable(fd);
-if (失败?) then (yes)
-  :返回错误;
-  stop
-endif
-
-:PmuRead(fd) 得到 PmuDataVo;
-if (数据为空?) then (yes)
-  :返回错误;
-  stop
-endif
-
-note right: defer PmuDataFree(dataVo)
-
-:PmuGetDevMetric(dataVo, deviceAttrs) 得到 PmuDeviceDataVo;
-if (失败?) then (yes)
-  :返回错误;
-  stop
-endif
-
-note right: defer DevDataFree(deviceDataVo)
-
-:遍历 GoDeviceData;
-if (Metric == PMU_HHA_CROSS_NUMA?) then (yes)
-  :写入 hhaCrossNumaOpRatio\n标签 numaID=v.NumaId;
-else (no)
-endif
-
-if (Metric == PMU_HHA_CROSS_SOCKET?) then (yes)
-  :写入 hhaCrossSocketOpRatio\n标签 numaID=v.NumaId;
-else (no)
-endif
-
-stop
-@enduml
+    DeferDev --> Loop["遍历 GoDeviceData"]
+    Loop --> IsNuma{"Metric == PMU_HHA_CROSS_NUMA?"}
+    IsNuma -->|yes| WriteNuma["写入 hhaCrossNumaOpRatio<br/>标签 numaID=v.NumaId"]
+    IsNuma -->|no| IsSocket
+    WriteNuma --> IsSocket{"Metric == PMU_HHA_CROSS_SOCKET?"}
+    IsSocket -->|yes| WriteSocket["写入 hhaCrossSocketOpRatio<br/>标签 numaID=v.NumaId"]
+    IsSocket -->|no| Stop
+    WriteSocket --> Stop
 ```
 
 ## 8. 配置说明
