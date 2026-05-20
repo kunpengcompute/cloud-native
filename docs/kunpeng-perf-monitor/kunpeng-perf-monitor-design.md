@@ -180,159 +180,156 @@ HTTP 请求处理器，包装 Prometheus 指标端点。
 #cgo static  LDFLAGS: -L ../static_lib -lkperf -lsym -lelf++ -ldwarf++ -lstdc++ -lnuma
 ```
 
-## 4. UML 类图
+## 4. 类图
 
 ### 4.1 完整类图
 
-```plantuml
-@startuml
-title kunpeng-perf-monitor 完整类图
-skinparam classAttributeIconSize 0
+```mermaid
+classDiagram
+    class PrometheusCollector {
+        <<interface>>
+        +Describe(ch)
+        +Collect(ch)
+    }
 
-interface PrometheusCollector <<prometheus.Collector>> {
-    +Describe(ch)
-    +Collect(ch)
-}
+    class Collector {
+        <<interface>>
+        +Update(ch) error
+    }
 
-interface Collector {
-    +Update(ch) : error
-}
+    class PMUCollectorInterface {
+        <<interface>>
+        +PmuDeviceOpen(attrs) int,error
+        +PmuClose(fd)
+        +PmuEnable(fd) error
+        +PmuDisable(fd) error
+        +PmuRead(fd) PmuDataVo,error
+        +PmuDataFree(dataVo)
+        +PmuGetDevMetric(dataVo, attrs) PmuDeviceDataVo,error
+        +DevDataFree(deviceData)
+    }
 
-interface PMUCollectorInterface {
-    +PmuDeviceOpen(attrs) : (int, error)
-    +PmuClose(fd)
-    +PmuEnable(fd) : error
-    +PmuDisable(fd) : error
-    +PmuRead(fd) : (PmuDataVo, error)
-    +PmuDataFree(dataVo)
-    +PmuGetDevMetric(dataVo, attrs) : (PmuDeviceDataVo, error)
-    +DevDataFree(deviceData)
-}
+    class handler {
+        -unfilteredHandler http.Handler
+        -enabledCollectors []string
+        -exporterMetricsRegistry Registry
+        -includeExporterMetrics bool
+        -maxRequests int
+        -logger Logger
+        +ServeHTTP(w, r)
+        -innerHandler(filters) http.Handler
+    }
 
-class handler {
-    - unfilteredHandler : http.Handler
-    - enabledCollectors : []string
-    - exporterMetricsRegistry : Registry
-    - includeExporterMetrics : bool
-    - maxRequests : int
-    - logger : Logger
-    + ServeHTTP(w, r)
-    - innerHandler(filters) : http.Handler
-}
+    class NodeCollector {
+        +Collectors map
+        -logger Logger
+        +Describe(ch)
+        +Collect(ch)
+    }
 
-class NodeCollector {
-    + Collectors : map
-    - logger : Logger
-    + Describe(ch)
-    + Collect(ch)
-}
+    class mpamCollector {
+        -cacheUsage Desc
+        -cacheConfig Desc
+        -memUsage Desc
+        -memConfig Desc
+        -logger Logger
+        +Update(ch) error
+        -getMPAMGroups() map
+        -getLabels() Labels
+        -updateMPAMResUsageMetrics()
+        -updateMPAMResConfigMetrics()
+    }
 
-class mpamCollector {
-    - cacheUsage : Desc
-    - cacheConfig : Desc
-    - memUsage : Desc
-    - memConfig : Desc
-    - logger : Logger
-    + Update(ch) : error
-    - getMPAMGroups() : map
-    - getLabels() : Labels
-    - updateMPAMResUsageMetrics()
-    - updateMPAMResConfigMetrics()
-}
+    class psiCollector {
+        -cgroupSearchPath string
+        -pressureMetric Desc
+        -logger Logger
+        +Update(ch) error
+        -getPSICgroups() map
+        -getPSIData(path) ResourceData
+        -getPSIMetric()
+        -updatePSIMetrics()
+    }
 
-class psiCollector {
-    - cgroupSearchPath : string
-    - pressureMetric : Desc
-    - logger : Logger
-    + Update(ch) : error
-    - getPSICgroups() : map
-    - getPSIData(path) : ResourceData
-    - getPSIMetric()
-    - updatePSIMetrics()
-}
+    class pmuCollector {
+        -hhaCrossNumaOpRatio Desc
+        -hhaCrossSocketOpRatio Desc
+        -logger Logger
+        +Update(ch) error
+        -updateHHACrossNumaAndSocketOpRatio()
+    }
 
-class pmuCollector {
-    - hhaCrossNumaOpRatio : Desc
-    - hhaCrossSocketOpRatio : Desc
-    - logger : Logger
-    + Update(ch) : error
-    - updateHHACrossNumaAndSocketOpRatio()
-}
+    class RealPMUCollector {
+        +PmuDeviceOpen(attrs) int,error
+        +PmuClose(fd)
+        +PmuEnable(fd) error
+        +PmuDisable(fd) error
+        +PmuRead(fd) PmuDataVo,error
+        +PmuDataFree(dataVo)
+        +PmuGetDevMetric(dataVo, attrs) PmuDeviceDataVo,error
+        +DevDataFree(deviceData)
+    }
 
-class RealPMUCollector {
-    + PmuDeviceOpen(attrs) : (int, error)
-    + PmuClose(fd)
-    + PmuEnable(fd) : error
-    + PmuDisable(fd) : error
-    + PmuRead(fd) : (PmuDataVo, error)
-    + PmuDataFree(dataVo)
-    + PmuGetDevMetric(dataVo, attrs) : (PmuDeviceDataVo, error)
-    + DevDataFree(deviceData)
-}
+    class kperf {
+        +PmuDeviceOpen(attr) int,error
+        +PmuEnable(fd) error
+        +PmuDisable(fd) error
+        +PmuRead(fd) PmuDataVo,error
+        +PmuGetDevMetric(dataVo, attrs) PmuDeviceDataVo,error
+        +PmuClose(fd)
+        +DevDataFree(devVo)
+    }
 
-class "kperf (libkperf CGo)" as kperf {
-    + PmuDeviceOpen(attr) : (int, error)
-    + PmuEnable(fd) : error
-    + PmuDisable(fd) : error
-    + PmuRead(fd) : (PmuDataVo, error)
-    + PmuGetDevMetric(dataVo, attrs) : (PmuDeviceDataVo, error)
-    + PmuClose(fd)
-    + DevDataFree(devVo)
-}
-
-handler --> NodeCollector : creates
-PrometheusCollector <|.. NodeCollector
-NodeCollector o-- Collector : manages
-Collector <|.. mpamCollector
-Collector <|.. psiCollector
-Collector <|.. pmuCollector
-pmuCollector --> PMUCollectorInterface : uses
-PMUCollectorInterface <|.. RealPMUCollector
-RealPMUCollector --> kperf : delegates
-@enduml
+    handler --> NodeCollector : creates
+    PrometheusCollector <|.. NodeCollector
+    NodeCollector o-- Collector : manages
+    Collector <|.. mpamCollector
+    Collector <|.. psiCollector
+    Collector <|.. pmuCollector
+    pmuCollector --> PMUCollectorInterface : uses
+    PMUCollectorInterface <|.. RealPMUCollector
+    RealPMUCollector --> kperf : delegates to libkperf CGo
 ```
 
 ### 4.2 Collector 注册机制类图
 
-```plantuml
-@startuml
-title Collector 注册机制
-skinparam classAttributeIconSize 0
+```mermaid
+classDiagram
+    class Global {
+        +factories map
+        +collectorState map
+        +forcedCollectors map
+        +initiatedCollectors map
+        +RegisterCollector(name, isDefault, factory)
+        +DisableDefaultCollectors()
+        +NewNodeCollector(logger, filters) NodeCollector
+    }
 
-class "collector 包全局状态" as Global {
-    + factories : map
-    + collectorState : map
-    + forcedCollectors : map
-    + initiatedCollectors : map
-    + RegisterCollector(name, isDefault, factory)
-    + DisableDefaultCollectors()
-    + NewNodeCollector(logger, filters) : NodeCollector
-}
+    class mpamCollector {
+        +init()
+    }
 
-class mpamCollector {
-    + init()
-    note: RegisterCollector("mpam", true, ...)
-}
+    class psiCollector {
+        +init()
+    }
 
-class psiCollector {
-    + init()
-    note: RegisterCollector("psi", true, ...)
-}
+    class pmuCollector {
+        +init()
+    }
 
-class pmuCollector {
-    + init()
-    note: RegisterCollector("pmu", true, ...)
-}
+    class NodeCollector {
+        +Collectors map
+    }
 
-class NodeCollector {
-    + Collectors : map
-}
+    note for Global "collector 包全局状态"
+    note for mpamCollector "RegisterCollector(mpam, true, ...)"
+    note for psiCollector "RegisterCollector(psi, true, ...)"
+    note for pmuCollector "RegisterCollector(pmu, true, ...)"
 
-mpamCollector ..> Global : init() 注册 mpam
-psiCollector  ..> Global : init() 注册 psi
-pmuCollector  ..> Global : init() 注册 pmu
-Global --> NodeCollector : NewNodeCollector() 实例化
-@enduml
+    mpamCollector ..> Global : init() 注册 mpam
+    psiCollector ..> Global : init() 注册 psi
+    pmuCollector ..> Global : init() 注册 pmu
+    Global --> NodeCollector : NewNodeCollector() 实例化
 ```
 
 ## 5. 关键数据结构
@@ -466,56 +463,56 @@ stop
 
 ### 7.2 Prometheus Scrape 时序图
 
-```plantuml
-@startuml
-title Prometheus Scrape 时序图
+```mermaid
+sequenceDiagram
+    title Prometheus Scrape 时序图
+    participant Prometheus
+    participant handler
+    participant NodeCollector
+    participant mpamCollector
+    participant psiCollector
+    participant pmuCollector
+    participant libkperf as libkperf (C)
 
-participant Prometheus
-participant handler
-participant NodeCollector
-participant mpamCollector
-participant psiCollector
-participant pmuCollector
-participant libkperf as "libkperf (C)"
+    Prometheus->>handler: GET /metrics
+    handler->>handler: 检查 collect[] / exclude[] 参数
 
-Prometheus -> handler : GET /metrics
-handler -> handler : 检查 collect[] / exclude[] 参数
+    alt 有过滤参数
+        handler->>handler: innerHandler(filters) 构建临时 handler
+    else 无过滤参数
+        handler->>handler: 使用预构建 unfilteredHandler
+    end
 
-alt 有过滤参数
-  handler -> handler : innerHandler(filters) 构建临时 handler
-else 无过滤参数
-  handler -> handler : 使用预构建 unfilteredHandler
-end
+    handler->>NodeCollector: Collect(ch)
+    Note over NodeCollector: 以下三路并发执行（goroutine per Collector）
 
-handler -> NodeCollector : Collect(ch)
-note over NodeCollector : 以下三路并发执行（goroutine per Collector）
+    par MPAM 采集
+        NodeCollector->>mpamCollector: Update(ch)
+        mpamCollector->>mpamCollector: getMPAMGroups() 遍历 /sys/fs/resctrl
+        mpamCollector->>mpamCollector: 读取 llc_occupancy / mbm_total_bytes / schemata
+        mpamCollector-->>NodeCollector: 写入 l3_cache_usage / mem_usage / config 指标
+    and PSI 采集
+        NodeCollector->>psiCollector: Update(ch)
+        psiCollector->>psiCollector: getPSICgroups() 遍历 kubepods cgroup
+        psiCollector->>psiCollector: 读取 cpu / io / memory / irq .pressure 文件
+        psiCollector-->>NodeCollector: 写入 psi_metrics 指标
+    and PMU 采集
+        NodeCollector->>pmuCollector: Update(ch)
+        pmuCollector->>libkperf: PmuDeviceOpen(HHA_CROSS_NUMA, HHA_CROSS_SOCKET)
+        libkperf-->>pmuCollector: fd
+        pmuCollector->>libkperf: PmuEnable(fd)
+        pmuCollector->>pmuCollector: time.Sleep(1s)
+        pmuCollector->>libkperf: PmuDisable(fd)
+        pmuCollector->>libkperf: PmuRead(fd)
+        libkperf-->>pmuCollector: PmuDataVo
+        pmuCollector->>libkperf: PmuGetDevMetric(dataVo, attrs)
+        libkperf-->>pmuCollector: PmuDeviceDataVo
+        pmuCollector-->>NodeCollector: 写入 HHA cross numa / socket 指标
+        pmuCollector->>libkperf: DevDataFree / PmuClose(fd)
+    end
 
-NodeCollector -> mpamCollector : Update(ch)
-mpamCollector -> mpamCollector : getMPAMGroups() 遍历 /sys/fs/resctrl
-mpamCollector -> mpamCollector : 读取 llc_occupancy / mbm_total_bytes / schemata
-mpamCollector --> NodeCollector : 写入 l3_cache_usage / mem_usage / config 指标
-
-NodeCollector -> psiCollector : Update(ch)
-psiCollector -> psiCollector : getPSICgroups() 遍历 kubepods cgroup
-psiCollector -> psiCollector : 读取 cpu / io / memory / irq .pressure 文件
-psiCollector --> NodeCollector : 写入 psi_metrics 指标
-
-NodeCollector -> pmuCollector : Update(ch)
-pmuCollector -> libkperf : PmuDeviceOpen(HHA_CROSS_NUMA, HHA_CROSS_SOCKET)
-libkperf --> pmuCollector : fd
-pmuCollector -> libkperf : PmuEnable(fd)
-pmuCollector -> pmuCollector : time.Sleep(1s)
-pmuCollector -> libkperf : PmuDisable(fd)
-pmuCollector -> libkperf : PmuRead(fd)
-libkperf --> pmuCollector : PmuDataVo
-pmuCollector -> libkperf : PmuGetDevMetric(dataVo, attrs)
-libkperf --> pmuCollector : PmuDeviceDataVo
-pmuCollector --> NodeCollector : 写入 HHA cross numa / socket 指标
-pmuCollector -> libkperf : DevDataFree / PmuClose(fd)
-
-NodeCollector --> handler : 写入 scrape_duration / scrape_success
-handler --> Prometheus : text/plain metrics
-@enduml
+    NodeCollector-->>handler: 写入 scrape_duration / scrape_success
+    handler-->>Prometheus: text/plain metrics
 ```
 
 ### 7.3 MPAM 采集流程
