@@ -29,7 +29,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
@@ -59,7 +58,7 @@ func run() error {
 	applyInterval := flag.Duration("dynamic-apply-interval", 30*time.Second, "interval for pulling interference and applying tuning decisions")
 	taskTimeout := flag.Duration("dynamic-task-timeout", 10*time.Second, "timeout for one dynamic-control task execution")
 	flag.Parse()
-	ctrl.SetLogger(klogr.New())
+	ctrl.SetLogger(klog.NewKlogr())
 
 	if *publishInterval <= 0 {
 		return fmt.Errorf("invalid --dynamic-publish-interval: must be > 0")

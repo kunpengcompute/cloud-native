@@ -313,10 +313,10 @@ func (s *supply) Release(g Grant) {
 
 	// Release memory resources
 	if memGrant, ok := g.(*grant); ok {
-		s.grantedMemory -= memGrant.allocatedMemory
-		// Ensure grantedMemory doesn't go below 0
-		if s.grantedMemory < 0 {
+		if s.grantedMemory < memGrant.allocatedMemory {
 			s.grantedMemory = 0
+		} else {
+			s.grantedMemory -= memGrant.allocatedMemory
 		}
 	}
 }

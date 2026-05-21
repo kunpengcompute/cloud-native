@@ -274,11 +274,12 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 				// But if CPU capacity is equal, should consider GPU affinity (NUMA 1)
 				if len(numaNodes) == 1 {
 					allocatedNUMA := numaNodes[0]
-					if allocatedNUMA == 0 {
+					switch allocatedNUMA {
+					case 0:
 						ginkgo.GinkgoWriter.Printf("✓ CPU-first strategy: Allocated to NUMA 0 (prioritizing CPU capacity)\n")
-					} else if allocatedNUMA == 1 {
+					case 1:
 						ginkgo.GinkgoWriter.Printf("✓ CPU-first strategy: Allocated to NUMA 1 (GPU affinity as secondary factor)\n")
-					} else {
+					default:
 						ginkgo.GinkgoWriter.Printf("! Unexpected allocation to NUMA %d\n", allocatedNUMA)
 					}
 
@@ -345,9 +346,10 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 				// Verify GPU 0 container allocation
 				if len(gpu0Numas) == 1 {
 					allocatedNUMA := gpu0Numas[0]
-					if allocatedNUMA == 0 {
+					switch allocatedNUMA {
+					case 0:
 						ginkgo.GinkgoWriter.Printf("✓ GPU 0 container allocated to NUMA 0 (CPU capacity priority)\n")
-					} else if allocatedNUMA == 1 {
+					case 1:
 						ginkgo.GinkgoWriter.Printf("✓ GPU 0 container allocated to NUMA 1 (GPU affinity as secondary factor)\n")
 					}
 					gomega.Expect(allocatedNUMA).To(gomega.Or(gomega.Equal(0), gomega.Equal(1)),
@@ -357,9 +359,10 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 				// Verify GPU 1 container allocation
 				if len(gpu1Numas) == 1 {
 					allocatedNUMA := gpu1Numas[0]
-					if allocatedNUMA == 0 {
+					switch allocatedNUMA {
+					case 0:
 						ginkgo.GinkgoWriter.Printf("✓ GPU 1 container allocated to NUMA 0 (CPU capacity priority)\n")
-					} else if allocatedNUMA == 3 {
+					case 3:
 						ginkgo.GinkgoWriter.Printf("✓ GPU 1 container allocated to NUMA 3 (GPU affinity as secondary factor)\n")
 					}
 					gomega.Expect(allocatedNUMA).To(gomega.Or(gomega.Equal(0), gomega.Equal(3)),
@@ -428,9 +431,10 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 				// Verify ML training container (GPU 0)
 				if len(mlNumas) == 1 {
 					allocatedNUMA := mlNumas[0]
-					if allocatedNUMA == 0 {
+					switch allocatedNUMA {
+					case 0:
 						ginkgo.GinkgoWriter.Printf("✓ ML training container allocated to NUMA 0 (CPU capacity priority)\n")
-					} else if allocatedNUMA == 1 {
+					case 1:
 						ginkgo.GinkgoWriter.Printf("✓ ML training container allocated to NUMA 1 (GPU affinity)\n")
 					}
 					gomega.Expect(allocatedNUMA).To(gomega.Or(gomega.Equal(0), gomega.Equal(1)),
@@ -440,9 +444,10 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 				// Verify inference service container (GPU 1)
 				if len(inferenceNumas) == 1 {
 					allocatedNUMA := inferenceNumas[0]
-					if allocatedNUMA == 0 {
+					switch allocatedNUMA {
+					case 0:
 						ginkgo.GinkgoWriter.Printf("✓ Inference service container allocated to NUMA 0 (CPU capacity priority)\n")
-					} else if allocatedNUMA == 3 {
+					case 3:
 						ginkgo.GinkgoWriter.Printf("✓ Inference service container allocated to NUMA 3 (GPU affinity)\n")
 					}
 					gomega.Expect(allocatedNUMA).To(gomega.Or(gomega.Equal(0), gomega.Equal(3)),
@@ -452,9 +457,10 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 				// Verify data processing container (GPU 0, competing with ML training)
 				if len(dataNumas) == 1 {
 					allocatedNUMA := dataNumas[0]
-					if allocatedNUMA == 0 {
+					switch allocatedNUMA {
+					case 0:
 						ginkgo.GinkgoWriter.Printf("✓ Data processing container allocated to NUMA 0 (CPU capacity priority)\n")
-					} else if allocatedNUMA == 1 {
+					case 1:
 						ginkgo.GinkgoWriter.Printf("✓ Data processing container allocated to NUMA 1 (GPU affinity)\n")
 					}
 					gomega.Expect(allocatedNUMA).To(gomega.Or(gomega.Equal(0), gomega.Equal(1)),
@@ -690,11 +696,12 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 				// Due to resource competition, it may be allocated to NUMA 0 (fallback) or NUMA 1 (GPU affinity)
 				if len(secondNumas) == 1 {
 					allocatedNUMA := secondNumas[0]
-					if allocatedNUMA == 1 {
+					switch allocatedNUMA {
+					case 1:
 						ginkgo.GinkgoWriter.Printf("✓ Second training container allocated to NUMA 1 (optimal GPU affinity)\n")
-					} else if allocatedNUMA == 0 {
+					case 0:
 						ginkgo.GinkgoWriter.Printf("✓ Second training container allocated to NUMA 0 (resource competition fallback)\n")
-					} else {
+					default:
 						ginkgo.GinkgoWriter.Printf("! Second training container allocated to unexpected NUMA %d\n", allocatedNUMA)
 					}
 					// With resource competition, both NUMA 0 and NUMA 1 are acceptable
@@ -721,11 +728,12 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 				// Due to resource competition, it may be allocated to NUMA 0 (fallback) or NUMA 3 (GPU affinity)
 				if len(batchNumas) == 1 {
 					allocatedNUMA := batchNumas[0]
-					if allocatedNUMA == 3 {
+					switch allocatedNUMA {
+					case 3:
 						ginkgo.GinkgoWriter.Printf("✓ Batch processing container allocated to NUMA 3 (optimal GPU affinity)\n")
-					} else if allocatedNUMA == 0 || allocatedNUMA == 2 {
+					case 0, 2:
 						ginkgo.GinkgoWriter.Printf("✓ Batch processing container allocated to NUMA %d (resource competition fallback)\n", allocatedNUMA)
-					} else {
+					default:
 						ginkgo.GinkgoWriter.Printf("! Batch processing container allocated to unexpected NUMA %d\n", allocatedNUMA)
 					}
 					// With resource competition, NUMA 0, 2, or 3 are acceptable
@@ -830,11 +838,12 @@ var _ = ginkgo.Describe("Resource Priority Functional Tests", func() {
 					allocatedNUMA := smallNumas[0]
 					ginkgo.GinkgoWriter.Printf("✓ Small GPU 0 container allocated to NUMA %d\n", allocatedNUMA)
 
-					if allocatedNUMA == 1 {
+					switch allocatedNUMA {
+					case 1:
 						ginkgo.GinkgoWriter.Printf("  → Still allocated to NUMA 1 (optimal GPU affinity)\n")
-					} else if allocatedNUMA == 0 {
+					case 0:
 						ginkgo.GinkgoWriter.Printf("  → Spilled to NUMA 0 (same socket as NUMA 1)\n")
-					} else {
+					default:
 						ginkgo.GinkgoWriter.Printf("  → Allocated to NUMA %d (resource pressure fallback)\n", allocatedNUMA)
 					}
 

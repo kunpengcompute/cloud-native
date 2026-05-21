@@ -734,7 +734,6 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 				ginkgo.Context("Case 3: Pre-deployed containers + Small container", func() {
 					ginkgo.It("should allocate 4 containers to different NUMA nodes, then small container to single NUMA", func() {
 						// Step 1: Deploy 4 containers with 12/18 CPU each
-						var allocations []*policy.Allocation
 						var cpuSets []string
 
 						for i := 1; i <= 4; i++ {
@@ -753,7 +752,6 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 							gomega.Expect(allocation).NotTo(gomega.BeNil())
 							gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
-							allocations = append(allocations, allocation)
 							cpuSets = append(cpuSets, allocation.Resources.CpusetCpus)
 						}
 
@@ -794,7 +792,6 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 				ginkgo.Context("Case 4: Pre-deployed containers + Medium container", func() {
 					ginkgo.It("should allocate 4 containers to different NUMA nodes, then medium container to single Socket", func() {
 						// Step 1: Deploy 4 containers with 12/18 CPU each (same as Case 3)
-						var allocations []*policy.Allocation
 						var cpuSets []string
 
 						for i := 1; i <= 4; i++ {
@@ -813,7 +810,6 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 							gomega.Expect(allocation).NotTo(gomega.BeNil())
 							gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
-							allocations = append(allocations, allocation)
 							cpuSets = append(cpuSets, allocation.Resources.CpusetCpus)
 						}
 
@@ -854,7 +850,6 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 				ginkgo.Context("Case 5: Pre-deployed containers + Boundary case medium container", func() {
 					ginkgo.It("should allocate 4 containers to different NUMA nodes, then boundary medium container to single NUMA", func() {
 						// Step 1: Deploy 4 containers with 12/18 CPU each
-						var allocations []*policy.Allocation
 						var cpuSets []string
 
 						for i := 1; i <= 4; i++ {
@@ -873,7 +868,6 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 							gomega.Expect(allocation).NotTo(gomega.BeNil())
 							gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
-							allocations = append(allocations, allocation)
 							cpuSets = append(cpuSets, allocation.Resources.CpusetCpus)
 						}
 
@@ -915,7 +909,6 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 				ginkgo.Context("Case 6: Pre-deployed containers + Large system container", func() {
 					ginkgo.It("should allocate 4 containers to different NUMA nodes, then large container to entire system", func() {
 						// Step 1: Deploy 4 containers with 12/18 CPU each (same as previous cases)
-						var allocations []*policy.Allocation
 						var cpuSets []string
 
 						for i := 1; i <= 4; i++ {
@@ -934,7 +927,6 @@ var _ = ginkgo.Describe("TopologyAware Policy", func() {
 							gomega.Expect(allocation).NotTo(gomega.BeNil())
 							gomega.Expect(allocation.Resources.CpusetCpus).NotTo(gomega.BeEmpty())
 
-							allocations = append(allocations, allocation)
 							cpuSets = append(cpuSets, allocation.Resources.CpusetCpus)
 						}
 

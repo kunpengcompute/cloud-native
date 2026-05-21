@@ -404,17 +404,17 @@ func (cch *cache) InsertPod(id string, msg interface{}, status *PodStatus) (Pod,
 	cch.Lock()
 	defer cch.Unlock()
 
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case *criv1.RunPodSandboxRequest:
-		err = p.fromRunRequest(msg.(*criv1.RunPodSandboxRequest))
+		err = p.fromRunRequest(msg)
 	case *criv1.PodSandbox:
-		err = p.fromListResponse(msg.(*criv1.PodSandbox), status)
+		err = p.fromListResponse(msg, status)
 	case *v1alpha1.PodSandboxHookRequest:
-		klog.V(5).InfoS("inserting pod", "id", id, "name", msg.(*v1alpha1.PodSandboxHookRequest).PodMeta.Name)
-		err = p.fromDockerRunRequest(msg.(*v1alpha1.PodSandboxHookRequest))
+		klog.V(5).InfoS("inserting pod", "id", id, "name", msg.PodMeta.Name)
+		err = p.fromDockerRunRequest(msg)
 	case *api.PodSandbox:
-		klog.InfoS("inserting pod from NRI", "id", id, "name", msg.(*api.PodSandbox).Name)
-		err = p.fromNriPodSandbox(msg.(*api.PodSandbox), status)
+		klog.InfoS("inserting pod from NRI", "id", id, "name", msg.Name)
+		err = p.fromNriPodSandbox(msg, status)
 	default:
 		err = fmt.Errorf("cannot create pod from message %T", msg)
 	}
@@ -465,17 +465,17 @@ func (cch *cache) InsertContainer(containerId string, msg interface{}) (Containe
 		cache: cch,
 	}
 
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case *criv1.CreateContainerRequest:
-		err = c.fromCreateRequest(msg.(*criv1.CreateContainerRequest))
+		err = c.fromCreateRequest(msg)
 	case *criv1.Container:
-		err = c.fromListResponse(msg.(*criv1.Container))
+		err = c.fromListResponse(msg)
 	case *v1alpha1.ContainerResourceHookRequest:
-		klog.InfoS("Inserting container", "id", containerId, "name", msg.(*v1alpha1.ContainerResourceHookRequest).ContainerMeta.Name)
-		err = c.fromDockerRunRequest(msg.(*v1alpha1.ContainerResourceHookRequest))
+		klog.InfoS("Inserting container", "id", containerId, "name", msg.ContainerMeta.Name)
+		err = c.fromDockerRunRequest(msg)
 	case *api.Container:
-		klog.InfoS("Inserting container from NRI", "id", containerId, "name", msg.(*api.Container).Name)
-		err = c.fromNriContainer(msg.(*api.Container))
+		klog.InfoS("Inserting container from NRI", "id", containerId, "name", msg.Name)
+		err = c.fromNriContainer(msg)
 	default:
 		// Fallback for unknown types
 		klog.InfoS("Inserting container from unknown type", "id", containerId, "type", fmt.Sprintf("%T", msg))

@@ -23,7 +23,6 @@ import (
 	koor "kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-tap/policy-manager/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 )
 
 // 计算Pod QOSclass
@@ -32,11 +31,11 @@ func ParseCgroupForQOSClass(cgroupPath string) corev1.PodQOSClass {
 	var qos corev1.PodQOSClass
 	switch {
 	case strings.Contains(dir, "besteffort"):
-		qos = v1.PodQOSBestEffort
+		qos = corev1.PodQOSBestEffort
 	case strings.Contains(dir, "burstable"):
-		qos = v1.PodQOSBurstable
+		qos = corev1.PodQOSBurstable
 	default:
-		qos = v1.PodQOSGuaranteed
+		qos = corev1.PodQOSGuaranteed
 	}
 
 	if dir == "" {
@@ -55,9 +54,9 @@ func cgroupParentToQOS(dir string) corev1.PodQOSClass {
 	switch {
 	case len(split) < 2:
 		qos = corev1.PodQOSClass("")
-	case strings.Index(split[1], strings.ToLower(string(corev1.PodQOSBurstable))) != -1:
+	case strings.Contains(split[1], strings.ToLower(string(corev1.PodQOSBurstable))):
 		qos = corev1.PodQOSBurstable
-	case strings.Index(split[1], strings.ToLower(string(corev1.PodQOSBestEffort))) != -1:
+	case strings.Contains(split[1], strings.ToLower(string(corev1.PodQOSBestEffort))):
 		qos = corev1.PodQOSBestEffort
 	default:
 		qos = corev1.PodQOSGuaranteed
@@ -73,5 +72,4 @@ func mergeAllocations(allocs []*Allocation, resp *koor.ContainerResourceHookResp
 		}
 		alloc.Merge(resp)
 	}
-	return
 }

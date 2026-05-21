@@ -10,7 +10,7 @@
  * See the Mulan PSL v2 for more details.
  * Author: Mr.Li
  * Create: 2025-03-28
- * Description: libkperf go language interface 
+ * Description: libkperf go language interface
  ******************************************************************************/
 
 package kperf
@@ -138,7 +138,7 @@ void IPmuGetMetricDataExt(struct PmuDeviceData* deviceData, struct MetricDataExt
 		case PMU_METRIC_CLUSTER:
 			metricData->clusterId = deviceData->clusterId;
 			break;
-		case PMU_METRIC_CHANNEL:			
+		case PMU_METRIC_CHANNEL:
 			metricData->channelId = deviceData->channelId;
 			metricData->ddrNumaId = deviceData->ddrNumaId;
 			metricData->socketId = deviceData->socketId;
@@ -176,97 +176,99 @@ size_t GetPmuTraceAttrSize() {
 
 */
 import "C"
-import "errors"
-import "unsafe"
-import "reflect"
-import "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-perf-monitor/libkperf/sym"
+import (
+	"errors"
+	"unsafe"
+
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-perf-monitor/libkperf/sym"
+)
 
 // pmu task type, for PmuOpen collectType
 var (
-	COUNT C.enum_PmuTaskType = C.COUNTING
+	COUNT  C.enum_PmuTaskType = C.COUNTING
 	SAMPLE C.enum_PmuTaskType = C.SAMPLING
-	SPE C.enum_PmuTaskType = C.SPE_SAMPLING
+	SPE    C.enum_PmuTaskType = C.SPE_SAMPLING
 )
 
 // pmu event type, for PmuEventList interface
 var (
-	CORE_EVENT C.enum_PmuEventType = C.CORE_EVENT
+	CORE_EVENT   C.enum_PmuEventType = C.CORE_EVENT
 	UNCORE_EVENT C.enum_PmuEventType = C.UNCORE_EVENT
-	TRACE_EVENT C.enum_PmuEventType = C.TRACE_EVENT
-	ALL_EVENT C.enum_PmuEventType = C.ALL_EVENT
+	TRACE_EVENT  C.enum_PmuEventType = C.TRACE_EVENT
+	ALL_EVENT    C.enum_PmuEventType = C.ALL_EVENT
 )
 
 // symbol mode, for pmuAttr.SymbolMode
 var (
-	ELF C.enum_SymbolMode = C.RESOLVE_ELF
+	ELF       C.enum_SymbolMode = C.RESOLVE_ELF
 	ELF_DWARF C.enum_SymbolMode = C.RESOLVE_ELF_DWARF
 )
 
 // spe filter, for pmuAttr.DataFilter
 var (
-	TS_ENABLE C.enum_SpeFilter = C.TS_ENABLE
-	PA_ENABLE C.enum_SpeFilter = C.PA_ENABLE
-	PCT_ENABLE C.enum_SpeFilter = C.PCT_ENABLE
-	JITTER C.enum_SpeFilter = C.JITTER
+	TS_ENABLE     C.enum_SpeFilter = C.TS_ENABLE
+	PA_ENABLE     C.enum_SpeFilter = C.PA_ENABLE
+	PCT_ENABLE    C.enum_SpeFilter = C.PCT_ENABLE
+	JITTER        C.enum_SpeFilter = C.JITTER
 	BRANCH_FILTER C.enum_SpeFilter = C.BRANCH_FILTER
-	LOAD_FILTER C.enum_SpeFilter = C.LOAD_FILTER
-	STORE_FILTER C.enum_SpeFilter = C.STORE_FILTER
-	SPE_DATA_ALL C.enum_SpeFilter = C.SPE_DATA_ALL
+	LOAD_FILTER   C.enum_SpeFilter = C.LOAD_FILTER
+	STORE_FILTER  C.enum_SpeFilter = C.STORE_FILTER
+	SPE_DATA_ALL  C.enum_SpeFilter = C.SPE_DATA_ALL
 )
 
 // spe event filter, for pmuAttr.EvFilter
 var (
-	SPE_EVENT_NONE C.enum_SpeEventFilter = C.SPE_EVENT_NONE
-	SPE_EVENT_RETIRED C.enum_SpeEventFilter = C.SPE_EVENT_RETIRED
-	SPE_EVENT_L1DMISS C.enum_SpeEventFilter = C.SPE_EVENT_L1DMISS
-	SPE_EVENT_TLB_WALK C.enum_SpeEventFilter = C.SPE_EVENT_TLB_WALK
+	SPE_EVENT_NONE         C.enum_SpeEventFilter = C.SPE_EVENT_NONE
+	SPE_EVENT_RETIRED      C.enum_SpeEventFilter = C.SPE_EVENT_RETIRED
+	SPE_EVENT_L1DMISS      C.enum_SpeEventFilter = C.SPE_EVENT_L1DMISS
+	SPE_EVENT_TLB_WALK     C.enum_SpeEventFilter = C.SPE_EVENT_TLB_WALK
 	SPE_EVENT_MISPREDICTED C.enum_SpeEventFilter = C.SPE_EVENT_MISPREDICTED
 )
 
 // spe data source hit, used for determining data source type
 var (
-    HIP_PEER_CPU           uint16	= 0
-    HIP_PEER_CPU_HITM      uint16	= 1
-    HIP_L3                 uint16	= 2
-    HIP_L3_HITM            uint16   = 3
-    HIP_PEER_CLUSTER  	   uint16   = 4
-    HIP_PEER_CLUSTER_HITM  uint16 	= 5
-    HIP_REMOTE_SOCKET      uint16 	= 6
-    HIP_REMOTE_SOCKET_HITM uint16 	= 7
-    HIP_LOCAL_MEM          uint16 	= 8
-    HIP_REMOTE_MEM         uint16 	= 9
-    HIP_NC_DEV             uint16 	= 13
-    HIP_L2                 uint16 	= 16
-    HIP_L2_HITM            uint16 	= 17
-    HIP_L1                 uint16 	= 18
+	HIP_PEER_CPU           uint16 = 0
+	HIP_PEER_CPU_HITM      uint16 = 1
+	HIP_L3                 uint16 = 2
+	HIP_L3_HITM            uint16 = 3
+	HIP_PEER_CLUSTER       uint16 = 4
+	HIP_PEER_CLUSTER_HITM  uint16 = 5
+	HIP_REMOTE_SOCKET      uint16 = 6
+	HIP_REMOTE_SOCKET_HITM uint16 = 7
+	HIP_LOCAL_MEM          uint16 = 8
+	HIP_REMOTE_MEM         uint16 = 9
+	HIP_NC_DEV             uint16 = 13
+	HIP_L2                 uint16 = 16
+	HIP_L2_HITM            uint16 = 17
+	HIP_L1                 uint16 = 18
 )
 
 // branch sample type, for pmuAttr.BranchSampleFilter
 var (
 	/**
-     * The first part of the value is the privilege level,which is a combination of 
-     * one of the values listed below. If the user does not set privilege level explicitly,
-     * the kernel will use the event's privilege level.Event and branch privilege levels do
-     * not have to match.
-     */
-	 KPERF_SAMPLE_BRANCH_USER       uint64   = 1 << 0
-	 KPERF_SAMPLE_BRANCH_KERNEL     uint64   = 1 << 1
-	 KPERF_SAMPLE_BRANCH_HV         uint64   = 1 << 2
-	 // In addition to privilege value , at least one or more of the following bits must be set.
-	 KPERF_SAMPLE_BRANCH_ANY        uint64   = 1 << 3
-	 KPERF_SAMPLE_BRANCH_ANY_CALL   uint64   = 1 << 4
-	 KPERF_SAMPLE_BRANCH_ANY_RETURN uint64   = 1 << 5
-	 KPERF_SAMPLE_BRANCH_IND_CALL   uint64   = 1 << 6
-	 KPERF_SAMPLE_BRANCH_ABORT_TX   uint64   = 1 << 7
-	 KPERF_SAMPLE_BRANCH_IN_TX      uint64   = 1 << 8
-	 KPERF_SAMPLE_BRANCH_NO_TX      uint64   = 1 << 9
-	 KPERF_SAMPLE_BRANCH_COND       uint64   = 1 << 10
-	 KPERF_SAMPLE_BRANCH_CALL_STACK uint64   = 1 << 11
-	 KPERF_SAMPLE_BRANCH_IND_JUMP   uint64   = 1 << 12
-	 KPERF_SAMPLE_BRANCH_CALL       uint64   = 1 << 13
-	 KPERF_SAMPLE_BRANCH_NO_FLAGES  uint64   = 1 << 14
-	 KPERF_SAMPLE_BRANCH_NO_CYCLES  uint64   = 1 << 15
-	 KPERF_SAMPLE_BRANCH_TYPE_SAVE  uint64   = 1 << 16
+	 * The first part of the value is the privilege level,which is a combination of
+	 * one of the values listed below. If the user does not set privilege level explicitly,
+	 * the kernel will use the event's privilege level.Event and branch privilege levels do
+	 * not have to match.
+	 */
+	KPERF_SAMPLE_BRANCH_USER   uint64 = 1 << 0
+	KPERF_SAMPLE_BRANCH_KERNEL uint64 = 1 << 1
+	KPERF_SAMPLE_BRANCH_HV     uint64 = 1 << 2
+	// In addition to privilege value , at least one or more of the following bits must be set.
+	KPERF_SAMPLE_BRANCH_ANY        uint64 = 1 << 3
+	KPERF_SAMPLE_BRANCH_ANY_CALL   uint64 = 1 << 4
+	KPERF_SAMPLE_BRANCH_ANY_RETURN uint64 = 1 << 5
+	KPERF_SAMPLE_BRANCH_IND_CALL   uint64 = 1 << 6
+	KPERF_SAMPLE_BRANCH_ABORT_TX   uint64 = 1 << 7
+	KPERF_SAMPLE_BRANCH_IN_TX      uint64 = 1 << 8
+	KPERF_SAMPLE_BRANCH_NO_TX      uint64 = 1 << 9
+	KPERF_SAMPLE_BRANCH_COND       uint64 = 1 << 10
+	KPERF_SAMPLE_BRANCH_CALL_STACK uint64 = 1 << 11
+	KPERF_SAMPLE_BRANCH_IND_JUMP   uint64 = 1 << 12
+	KPERF_SAMPLE_BRANCH_CALL       uint64 = 1 << 13
+	KPERF_SAMPLE_BRANCH_NO_FLAGES  uint64 = 1 << 14
+	KPERF_SAMPLE_BRANCH_NO_CYCLES  uint64 = 1 << 15
+	KPERF_SAMPLE_BRANCH_TYPE_SAVE  uint64 = 1 << 16
 )
 
 // trace type, for pmuTraceOpen
@@ -276,60 +278,60 @@ var (
 
 // PmuDeviceMetric
 var (
-    // Perchannel metric.
-    // Collect ddr read bandwidth for each channel.
-    // Unit: Bytes/s
-    PMU_DDR_READ_BW C.enum_PmuDeviceMetric = C.PMU_DDR_READ_BW
-    // Perchannel metric.
-    // Collect ddr write bandwidth for each channel.
-    // Unit: Bytes/s
-    PMU_DDR_WRITE_BW C.enum_PmuDeviceMetric = C.PMU_DDR_WRITE_BW
-    // Percore metric.
-    // Collect L3 access bytes for each cpu core.
-    // Unit: Bytes
-    PMU_L3_TRAFFIC C.enum_PmuDeviceMetric = C.PMU_L3_TRAFFIC
-    // Percore metric.
-    // Collect L3 miss count for each cpu core.
-    // Unit: count
-    PMU_L3_MISS C.enum_PmuDeviceMetric = C.PMU_L3_MISS
-    // Percore metric.
-    // Collect L3 total reference count, including miss and hit count.
-    // Unit: count
-    PMU_L3_REF C.enum_PmuDeviceMetric = C.PMU_L3_REF
-    // Percluster metric.
-    // Collect L3 total latency for each cluster node.
-    // Unit: cycles
-    PMU_L3_LAT C.enum_PmuDeviceMetric = C.PMU_L3_LAT
-    // Collect pcie rx bandwidth.
-    // Perpcie metric.
-    // Collect pcie rx bandwidth for pcie device.
-    // Unit: Bytes/us
-    PMU_PCIE_RX_MRD_BW C.enum_PmuDeviceMetric = C.PMU_PCIE_RX_MRD_BW
-    PMU_PCIE_RX_MWR_BW C.enum_PmuDeviceMetric = C.PMU_PCIE_RX_MWR_BW
-    // Perpcie metric.
-    // Collect pcie tx bandwidth for pcie device.
-    // Unit: Bytes/us
-    PMU_PCIE_TX_MRD_BW C.enum_PmuDeviceMetric = C.PMU_PCIE_TX_MRD_BW
-    PMU_PCIE_TX_MWR_BW C.enum_PmuDeviceMetric = C.PMU_PCIE_TX_MWR_BW
+	// Perchannel metric.
+	// Collect ddr read bandwidth for each channel.
+	// Unit: Bytes/s
+	PMU_DDR_READ_BW C.enum_PmuDeviceMetric = C.PMU_DDR_READ_BW
+	// Perchannel metric.
+	// Collect ddr write bandwidth for each channel.
+	// Unit: Bytes/s
+	PMU_DDR_WRITE_BW C.enum_PmuDeviceMetric = C.PMU_DDR_WRITE_BW
+	// Percore metric.
+	// Collect L3 access bytes for each cpu core.
+	// Unit: Bytes
+	PMU_L3_TRAFFIC C.enum_PmuDeviceMetric = C.PMU_L3_TRAFFIC
+	// Percore metric.
+	// Collect L3 miss count for each cpu core.
+	// Unit: count
+	PMU_L3_MISS C.enum_PmuDeviceMetric = C.PMU_L3_MISS
+	// Percore metric.
+	// Collect L3 total reference count, including miss and hit count.
+	// Unit: count
+	PMU_L3_REF C.enum_PmuDeviceMetric = C.PMU_L3_REF
+	// Percluster metric.
+	// Collect L3 total latency for each cluster node.
+	// Unit: cycles
+	PMU_L3_LAT C.enum_PmuDeviceMetric = C.PMU_L3_LAT
+	// Collect pcie rx bandwidth.
 	// Perpcie metric.
-    // Collect pcie rx latency for pcie device.
-    // Unit: ns
-    PMU_PCIE_RX_MRD_LAT C.enum_PmuDeviceMetric = C.PMU_PCIE_RX_MRD_LAT
-    PMU_PCIE_RX_MWR_LAT C.enum_PmuDeviceMetric = C.PMU_PCIE_RX_MWR_LAT
-    // Perpcie metric.
-    // Collect pcie tx latency for pcie device.
-    // Unit: ns
-    PMU_PCIE_TX_MRD_LAT C.enum_PmuDeviceMetric = C.PMU_PCIE_TX_MRD_LAT
-    // Perpcie metric.
-    // Collect smmu address transaction.
-    // Unit: count
-    PMU_SMMU_TRAN C.enum_PmuDeviceMetric = C.PMU_SMMU_TRAN
-    // Pernuma metric.
-    // Collect rate of cross-numa operations received by HHA.
-    PMU_HHA_CROSS_NUMA C.enum_PmuDeviceMetric = C.PMU_HHA_CROSS_NUMA
-    // Pernuma metric.
-    // Collect rate of cross-socket operations received by HHA.
-    PMU_HHA_CROSS_SOCKET C.enum_PmuDeviceMetric = C.PMU_HHA_CROSS_SOCKET
+	// Collect pcie rx bandwidth for pcie device.
+	// Unit: Bytes/us
+	PMU_PCIE_RX_MRD_BW C.enum_PmuDeviceMetric = C.PMU_PCIE_RX_MRD_BW
+	PMU_PCIE_RX_MWR_BW C.enum_PmuDeviceMetric = C.PMU_PCIE_RX_MWR_BW
+	// Perpcie metric.
+	// Collect pcie tx bandwidth for pcie device.
+	// Unit: Bytes/us
+	PMU_PCIE_TX_MRD_BW C.enum_PmuDeviceMetric = C.PMU_PCIE_TX_MRD_BW
+	PMU_PCIE_TX_MWR_BW C.enum_PmuDeviceMetric = C.PMU_PCIE_TX_MWR_BW
+	// Perpcie metric.
+	// Collect pcie rx latency for pcie device.
+	// Unit: ns
+	PMU_PCIE_RX_MRD_LAT C.enum_PmuDeviceMetric = C.PMU_PCIE_RX_MRD_LAT
+	PMU_PCIE_RX_MWR_LAT C.enum_PmuDeviceMetric = C.PMU_PCIE_RX_MWR_LAT
+	// Perpcie metric.
+	// Collect pcie tx latency for pcie device.
+	// Unit: ns
+	PMU_PCIE_TX_MRD_LAT C.enum_PmuDeviceMetric = C.PMU_PCIE_TX_MRD_LAT
+	// Perpcie metric.
+	// Collect smmu address transaction.
+	// Unit: count
+	PMU_SMMU_TRAN C.enum_PmuDeviceMetric = C.PMU_SMMU_TRAN
+	// Pernuma metric.
+	// Collect rate of cross-numa operations received by HHA.
+	PMU_HHA_CROSS_NUMA C.enum_PmuDeviceMetric = C.PMU_HHA_CROSS_NUMA
+	// Pernuma metric.
+	// Collect rate of cross-socket operations received by HHA.
+	PMU_HHA_CROSS_SOCKET C.enum_PmuDeviceMetric = C.PMU_HHA_CROSS_SOCKET
 )
 
 // PmuBdfType
@@ -341,157 +343,157 @@ var (
 // PmuMetricMode
 var (
 	PMU_METRIC_INVALID C.enum_PmuMetricMode = C.PMU_METRIC_INVALID
-    PMU_METRIC_CORE C.enum_PmuMetricMode = C.PMU_METRIC_CORE
-    PMU_METRIC_NUMA C.enum_PmuMetricMode = C.PMU_METRIC_NUMA
+	PMU_METRIC_CORE    C.enum_PmuMetricMode = C.PMU_METRIC_CORE
+	PMU_METRIC_NUMA    C.enum_PmuMetricMode = C.PMU_METRIC_NUMA
 	PMU_METRIC_CLUSTER C.enum_PmuMetricMode = C.PMU_METRIC_CLUSTER
-    PMU_METRIC_BDF C.enum_PmuMetricMode  = C.PMU_METRIC_BDF
-	PMU_METRIC_CHANNEL C.enum_PmuMetricMode  = C.PMU_METRIC_CHANNEL
+	PMU_METRIC_BDF     C.enum_PmuMetricMode = C.PMU_METRIC_BDF
+	PMU_METRIC_CHANNEL C.enum_PmuMetricMode = C.PMU_METRIC_CHANNEL
 )
-	
+
 var fdModeMap map[int]C.enum_PmuTaskType = make(map[int]C.enum_PmuTaskType)
 
 type PmuAttr struct {
-	EvtList []string                   // evt list
-	PidList []int                      // process id list
-	CpuList []int                      // cpu id list
-	EvtAttr []int                      // group id list
-	SampleRate uint32                  // sample rate, if useFreq=true, set the freq=SampleRate
-	UseFreq bool                       // Use sample frequency or not, if set to true, used frequency, otherwise, used period
-	ExcludeUser bool                   // Don't count user
-	ExcludeKernel bool                 // Don't count kernel
-	SymbolMode C.enum_SymbolMode       // This indicates how to analyze symbols of samples.Refer to comments of SymbolMode
-	CallStack bool                     // This indicates whether to collect whole callchains or only top frame
-	DataFilter C.enum_SpeFilter        // Spe Data Filter.Refer to comments of SpeFilter 
-	EvFilter C.enum_SpeEventFilter     // Spe Event filter.Refer to comments of SpeEventFilter
-	MinLatency uint64                  // Collect only samples with latency or higher
-	IncludeNewFork bool                // enable it you can get the new child thread count, only in counting mode
-	BranchSampleFilter uint64          // if the filter mode is set, branch_sample_stack data is collected in sampling mode
-	BlockedSample bool                 // This indicates whether the blocked sample mode is enabled. In this mode, both on Cpu and off Cpu data is collected
-	CgroupNameList []string            // cgroup name list, if not user cgroup function, this field will be nullptr.if use cgroup function,use the cgroup name in the cgroupList to apply all event in the Event list
-	EnableUserAccess bool              // enable user access counting for current process
-	EnableBpf bool                     // enable bpf mode for counting
+	EvtList            []string              // evt list
+	PidList            []int                 // process id list
+	CpuList            []int                 // cpu id list
+	EvtAttr            []int                 // group id list
+	SampleRate         uint32                // sample rate, if useFreq=true, set the freq=SampleRate
+	UseFreq            bool                  // Use sample frequency or not, if set to true, used frequency, otherwise, used period
+	ExcludeUser        bool                  // Don't count user
+	ExcludeKernel      bool                  // Don't count kernel
+	SymbolMode         C.enum_SymbolMode     // This indicates how to analyze symbols of samples.Refer to comments of SymbolMode
+	CallStack          bool                  // This indicates whether to collect whole callchains or only top frame
+	DataFilter         C.enum_SpeFilter      // Spe Data Filter.Refer to comments of SpeFilter
+	EvFilter           C.enum_SpeEventFilter // Spe Event filter.Refer to comments of SpeEventFilter
+	MinLatency         uint64                // Collect only samples with latency or higher
+	IncludeNewFork     bool                  // enable it you can get the new child thread count, only in counting mode
+	BranchSampleFilter uint64                // if the filter mode is set, branch_sample_stack data is collected in sampling mode
+	BlockedSample      bool                  // This indicates whether the blocked sample mode is enabled. In this mode, both on Cpu and off Cpu data is collected
+	CgroupNameList     []string              // cgroup name list, if not user cgroup function, this field will be nullptr.if use cgroup function,use the cgroup name in the cgroupList to apply all event in the Event list
+	EnableUserAccess   bool                  // enable user access counting for current process
+	EnableBpf          bool                  // enable bpf mode for counting
 }
 
 type CpuTopology struct {
-	CoreId int         // cpu core id
-	NumaId int		   // numa id
-	SocketId int       // socket id
+	CoreId   int // cpu core id
+	NumaId   int // numa id
+	SocketId int // socket id
 }
 
 type SpeDataExt struct {
-	Pa uint64          // physical address
-	Va uint64		   // virtual address
-	Event uint64       // event id, which is a bit map of mixed events, events bits 
-	Lat uint16         // latency, Number of cycles between the time when an operation is dispatched and the time when the operation is executed
-	Source uint16      // data source, used to record the source of data accessed by a load operation.
+	Pa     uint64 // physical address
+	Va     uint64 // virtual address
+	Event  uint64 // event id, which is a bit map of mixed events, events bits
+	Lat    uint16 // latency, Number of cycles between the time when an operation is dispatched and the time when the operation is executed
+	Source uint16 // data source, used to record the source of data accessed by a load operation.
 }
 
 type BranchSampleRecord struct {
-	FromAddr uint64    // from addr
-	ToAddr uint64      // to addr
-	Cycles uint64      // cycles
-	MisPred uint8     // mispred
-	Predicted uint8   // predicted
+	FromAddr  uint64 // from addr
+	ToAddr    uint64 // to addr
+	Cycles    uint64 // cycles
+	MisPred   uint8  // mispred
+	Predicted uint8  // predicted
 }
 
 type PmuData struct {
-	Evt string 						   // event name
-	Ts uint64						   // time stamp. uint: ns
-	Pid int				               // process id
-	Tid int							   // thread id
-	Cpu int						       // cpu id
-	GroupId int						   // id for group event
-	Comm string						   // process command 
-	Period uint64                      // sample period
-	Count uint64					   // event count. Only available for counting
-	CountPercent float64               // event count Percent. when count = 0, countPercent = -1; Only available for counting
-	CpuTopo CpuTopology 			   // cpu topology
-	Symbols []sym.Symbol			   // symbol list
- 	BranchRecords []BranchSampleRecord // branch record list
-	SpeExt SpeDataExt                  // SPE data
-	CgroupName string                  // trace data from which cgroup
+	Evt           string               // event name
+	Ts            uint64               // time stamp. uint: ns
+	Pid           int                  // process id
+	Tid           int                  // thread id
+	Cpu           int                  // cpu id
+	GroupId       int                  // id for group event
+	Comm          string               // process command
+	Period        uint64               // sample period
+	Count         uint64               // event count. Only available for counting
+	CountPercent  float64              // event count Percent. when count = 0, countPercent = -1; Only available for counting
+	CpuTopo       CpuTopology          // cpu topology
+	Symbols       []sym.Symbol         // symbol list
+	BranchRecords []BranchSampleRecord // branch record list
+	SpeExt        SpeDataExt           // SPE data
+	CgroupName    string               // trace data from which cgroup
 
-	cPmuData C.struct_PmuData          // C.struct_PmuData
+	cPmuData C.struct_PmuData // C.struct_PmuData
 }
 
 type PmuDataVo struct {
-	GoData []PmuData            // PmuData list
-	cData *C.struct_PmuData	    // Pointer to PmuData in interface C
-	fd int		                // fd
+	GoData []PmuData         // PmuData list
+	cData  *C.struct_PmuData // Pointer to PmuData in interface C
+	fd     int               // fd
 }
 
 type SampleRawField struct {
-	FieldName string   // the field name of this field
-	FieldStr string    // the field line
-	Offset uint32	   // the data offset
-	Size uint32		   // the field size	
-	IsSigned uint32    // is signed or is unsigned
+	FieldName string // the field name of this field
+	FieldStr  string // the field line
+	Offset    uint32 // the data offset
+	Size      uint32 // the field size
+	IsSigned  uint32 // is signed or is unsigned
 }
 
 type PmuTraceAttr struct {
-	Funcs []string 	// system call function list, if funcs is empty, it will collect all the system call function elapsed time
-	PidList []int   // pid list 
-	CpuList []int   // cpu id list
+	Funcs   []string // system call function list, if funcs is empty, it will collect all the system call function elapsed time
+	PidList []int    // pid list
+	CpuList []int    // cpu id list
 }
 
 // PmuTraceData info
 type PmuTraceData struct {
-	FuncName string        // function name
-	StartTs  int64         // start timestamp. uint: us
-	ElapsedTime float64    // elapsed time
-	Pid int				   // process id
-	Tid int                // thread id
-	Cpu int			   	   // cpu id
-	Comm string			   // process command
+	FuncName    string  // function name
+	StartTs     int64   // start timestamp. uint: us
+	ElapsedTime float64 // elapsed time
+	Pid         int     // process id
+	Tid         int     // thread id
+	Cpu         int     // cpu id
+	Comm        string  // process command
 }
 
 // PmuTraceDataVo read from PmuTraceRead
 type PmuTraceDataVo struct {
-	GoTraceData []PmuTraceData           // PmuTraceData list
-	cTraceData *C.struct_PmuTraceData	 // Pointer to PmuData in interface C
+	GoTraceData []PmuTraceData         // PmuTraceData list
+	cTraceData  *C.struct_PmuTraceData // Pointer to PmuData in interface C
 }
 
 type PmuDeviceAttr struct {
 	Metric C.enum_PmuDeviceMetric
 
 	// Used for PMU_PCIE_XXX_BW and PMU_SMMU_XXX to collect a specific pcie device.
-    // The string of bdf is something like '7a:01.0'.
+	// The string of bdf is something like '7a:01.0'.
 	Bdf string
-    // Used for PMU_PCIE_XXX_LAT to collect latency data.
-    // Only one port supported.
+	// Used for PMU_PCIE_XXX_LAT to collect latency data.
+	// Only one port supported.
 	Port string
 }
 
 type DdrDataStructure struct {
 	ChannelId uint32
 	DdrNumaId uint32
-	SocketId uint32
+	SocketId  uint32
 }
 
 type PmuDeviceData struct {
 	Metric C.enum_PmuDeviceMetric
 	// The metric value. The meaning of value depends on metric type.
-    // Refer to comments of PmuDeviceMetric for detailed info.
-	Count float64
-	Mode C.enum_PmuMetricMode  // Field of union depends on the above <mode>.
-	CoreId uint32    // for percore metric
-	NumaId uint32    // for pernuma metric
-	ClusterId uint32 // for percluster metric
-	Bdf string       // for perpcie metric
-	Port string      // for perpcie metric
-	DdrDataStructure // for perchannel metric
+	// Refer to comments of PmuDeviceMetric for detailed info.
+	Count            float64
+	Mode             C.enum_PmuMetricMode // Field of union depends on the above <mode>.
+	CoreId           uint32               // for percore metric
+	NumaId           uint32               // for pernuma metric
+	ClusterId        uint32               // for percluster metric
+	Bdf              string               // for perpcie metric
+	Port             string               // for perpcie metric
+	DdrDataStructure                      // for perchannel metric
 }
 
 type PmuDeviceDataVo struct {
 	GoDeviceData []PmuDeviceData
-	cDeviceData *C.struct_PmuDeviceData
+	cDeviceData  *C.struct_PmuDeviceData
 }
 
 type PmuCpuFreqDetail struct {
-	CpuId int       // core id
-	MinFreq uint64  // minimum frequency of core
-	MaxFreq uint64  // maximum frequency of core
-	AvgFreq uint64  // average frequency of core
+	CpuId   int    // core id
+	MinFreq uint64 // minimum frequency of core
+	MaxFreq uint64 // maximum frequency of core
+	AvgFreq uint64 // average frequency of core
 }
 
 func FreePmuAttr(attr *C.struct_PmuAttr) {
@@ -543,15 +545,15 @@ func ToCPmuAttr(attr PmuAttr) (*C.struct_PmuAttr, int) {
 
 	pidLen := len(attr.PidList)
 	if pidLen > 0 {
-		 pidList := make([]C.int, pidLen)
-		 for i, pid := range attr.PidList {
+		pidList := make([]C.int, pidLen)
+		for i, pid := range attr.PidList {
 			pidList[i] = C.int(pid)
-		 }
-		 cAttr.pidList = &pidList[0]
-		 cAttr.numPid = C.uint32_t(pidLen)
+		}
+		cAttr.pidList = &pidList[0]
+		cAttr.numPid = C.uint32_t(pidLen)
 	}
 
-	cpuLen := len(attr.CpuList) 
+	cpuLen := len(attr.CpuList)
 	if cpuLen > 0 {
 		cpuList := make([]C.int, cpuLen)
 		for i, cpu := range attr.CpuList {
@@ -658,13 +660,7 @@ func PmuEventList(eventType C.enum_PmuEventType) []string {
 		return nil
 	}
 	goEvtList := make([]string, int(numEvt))
-	ptr := unsafe.Pointer(evtList)
-	slice := reflect.SliceHeader{
-		Data: uintptr(ptr),
-		Len: int(numEvt),
-		Cap: int(numEvt),
-	}
-	stringList := *(*[]*C.char)(unsafe.Pointer(&slice))
+	stringList := unsafe.Slice(evtList, int(numEvt))
 	for i := 0; i < int(numEvt); i++ {
 		goEvtList[i] = C.GoString(stringList[i])
 	}
@@ -730,7 +726,6 @@ func PmuCollectV(fds []int, milliseconds int) error {
 	return nil
 }
 
-
 // Free PmuData pointer.
 // param pmuDataVo
 func PmuDataFree(data PmuDataVo) {
@@ -760,7 +755,6 @@ func PmuStop(fd int) {
 	}
 	C.PmuStop(C.int(fd))
 }
-
 
 // Collect data
 // Pmu data are collected starting from the last PmuEnable or PmuRead
@@ -802,9 +796,7 @@ func PmuAppendData(from *PmuDataVo, to *PmuDataVo) error {
 	if int(cDataLen) == 0 {
 		return errors.New(C.GoString(C.Perror()))
 	}
-	for _, v := range from.GoData {
-		to.GoData = append(to.GoData, v)
-	}
+	to.GoData = append(to.GoData, from.GoData...)
 	return nil
 }
 
@@ -830,7 +822,7 @@ func PmuDumpData(dataVo PmuDataVo, filePath string, dumpDwf bool) error {
 	}
 	return nil
 }
- 
+
 // When symbol mode is SNO_SYMBOL_RESOLVE, you can use this resolve PmuData Symbol after PmuRead function
 // param PmuDataVo the data from PmuRead
 // return nil indicates resolve success, otherwise return error code
@@ -840,13 +832,7 @@ func ResolvePmuDataSymbol(dataVo PmuDataVo) error {
 		return errors.New(C.GoString(C.Perror()))
 	}
 	dataLen := len(dataVo.GoData)
-	ptr := unsafe.Pointer(dataVo.cData)
-	slice := reflect.SliceHeader {
-		Data: uintptr(ptr),
-		Len: dataLen,
-		Cap: dataLen,
-	}
-	cPmuDatas := *(*[]C.struct_PmuData)(unsafe.Pointer(&slice))
+	cPmuDatas := unsafe.Slice(dataVo.cData, dataLen)
 	for i := 0; i < dataLen; i++ {
 		dataObj := cPmuDatas[i]
 		if dataObj.stack != nil {
@@ -875,21 +861,21 @@ func PmuTraceOpen(traceType C.enum_PmuTraceType, traceAttr PmuTraceAttr) (int, e
 	pidLen := len(traceAttr.PidList)
 	if pidLen > 0 {
 		pidList := make([]C.int, pidLen)
-		for i, pid := range(traceAttr.PidList) {
+		for i, pid := range traceAttr.PidList {
 			pidList[i] = C.int(pid)
 		}
 		cAttr.pidList = &pidList[0]
-		cAttr.numPid  = C.uint32_t(pidLen)
+		cAttr.numPid = C.uint32_t(pidLen)
 	}
 
 	cpuLen := len(traceAttr.CpuList)
 	if cpuLen > 0 {
 		cpuList := make([]C.int, cpuLen)
-		for i, cpu := range(traceAttr.CpuList) {
+		for i, cpu := range traceAttr.CpuList {
 			cpuList[i] = C.int(cpu)
 		}
 		cAttr.cpuList = &cpuList[0]
-		cAttr.numCpu  = C.uint32_t(cpuLen)
+		cAttr.numCpu = C.uint32_t(cpuLen)
 	}
 
 	funcLen := len(traceAttr.Funcs)
@@ -900,7 +886,7 @@ func PmuTraceOpen(traceType C.enum_PmuTraceType, traceAttr PmuTraceAttr) (int, e
 			defer C.free(unsafe.Pointer(funcs[i]))
 		}
 		cAttr.numFuncs = C.uint32_t(funcLen)
-		cAttr.funcs   = &funcs[0]
+		cAttr.funcs = &funcs[0]
 	}
 
 	taskId := C.PmuTraceOpen(traceType, cAttr)
@@ -954,19 +940,13 @@ func PmuTraceRead(taskId int) (PmuTraceDataVo, error) {
 		return res, errors.New(C.GoString(C.Perror()))
 	}
 
-	ptr := unsafe.Pointer(cTraceData)
-	slice := reflect.SliceHeader {
-		Data: uintptr(ptr),
-		Len:  int(traceLen),
-		Cap:  int(traceLen),
-	}
-	cDataList := *(*[]C.struct_PmuTraceData)(unsafe.Pointer(&slice))
+	cDataList := unsafe.Slice(cTraceData, int(traceLen))
 	goTraceData := make([]PmuTraceData, int(traceLen))
 	for i, v := range cDataList {
-		goTraceData[i] = PmuTraceData{FuncName:C.GoString(v.funcs), StartTs: int64(v.startTs), ElapsedTime:float64(v.elapsedTime), Pid:int(v.pid), Tid: int(v.tid), Cpu: int(v.cpu), Comm: C.GoString(v.comm)}
+		goTraceData[i] = PmuTraceData{FuncName: C.GoString(v.funcs), StartTs: int64(v.startTs), ElapsedTime: float64(v.elapsedTime), Pid: int(v.pid), Tid: int(v.tid), Cpu: int(v.cpu), Comm: C.GoString(v.comm)}
 	}
 	res.GoTraceData = goTraceData
-	res.cTraceData  = cTraceData
+	res.cTraceData = cTraceData
 	return res, nil
 }
 
@@ -976,7 +956,6 @@ func PmuTraceRead(taskId int) (PmuTraceDataVo, error) {
 func PmuTraceClose(taskId int) {
 	C.PmuTraceClose(C.int(taskId))
 }
-
 
 // Free PmuTraceData pointer.
 // param PmuTraceDataVo
@@ -992,14 +971,7 @@ func PmuSysCallFuncList() []string {
 	if uint32(funcNum) == 0 {
 		return nil
 	}
-	ptr := unsafe.Pointer(funcs)
-	slice := reflect.SliceHeader{
-		Data: uintptr(ptr),
-		Len:  int(funcNum),
-		Cap:  int(funcNum),
-	}
-
-	stringList := *(*[]*C.char)(unsafe.Pointer(&slice))
+	stringList := unsafe.Slice(funcs, int(funcNum))
 	goFuncList := make([]string, int(funcNum))
 	for i, v := range stringList {
 		goFuncList[i] = C.GoString(v)
@@ -1017,7 +989,7 @@ func (data PmuData) GetRawFieldExp(fieldName string) (SampleRawField, error) {
 		return SampleRawField{}, errors.New(C.GoString(C.Perror()))
 	}
 	srf := SampleRawField{FieldName: C.GoString(rs.fieldName), FieldStr: C.GoString(rs.fieldStr), Offset: uint32(rs.offset), Size: uint32(rs.size), IsSigned: uint32(rs.isSigned)}
-	return srf, nil	
+	return srf, nil
 }
 
 // Get the pointer trace event raw field
@@ -1041,7 +1013,6 @@ func (data PmuData) GetField(fieldName string, valuePointer unsafe.Pointer) erro
 	return nil
 }
 
-
 // Query all available bdf list from system.
 // param bdfType type of bdf chosen by user
 // param numBdf length of bdf list
@@ -1052,14 +1023,7 @@ func PmuDeviceBdfList(bdfType C.enum_PmuBdfType) ([]string, error) {
 	if bdfList == nil {
 		return nil, errors.New(C.GoString(C.Perror()))
 	}
-	ptr := unsafe.Pointer(bdfList)
-	slice := reflect.SliceHeader{
-		Data: uintptr(ptr),
-		Len:  int(numBdf),
-		Cap:  int(numBdf),
-	}
-
-	stringList := *(*[]*C.char)(unsafe.Pointer(&slice))
+	stringList := unsafe.Slice(bdfList, int(numBdf))
 	goBdfList := make([]string, int(numBdf))
 	for i, v := range stringList {
 		goBdfList[i] = C.GoString(v)
@@ -1102,7 +1066,7 @@ func PmuDeviceOpen(attr []PmuDeviceAttr) (int, error) {
 // param attrLen length of metric array
 // param data output metric data array, the length of array is the returned value
 // return On success, length of metric data array is returned.
-// On fail, error is returned 
+// On fail, error is returned
 func PmuGetDevMetric(dataVo PmuDataVo, deviceAttr []PmuDeviceAttr) (PmuDeviceDataVo, error) {
 	cAttr := make([]C.struct_PmuDeviceAttr, len(deviceAttr))
 	for i, v := range deviceAttr {
@@ -1124,19 +1088,13 @@ func PmuGetDevMetric(dataVo PmuDataVo, deviceAttr []PmuDeviceAttr) (PmuDeviceDat
 	if int(metricLen) == -1 {
 		return res, errors.New(C.GoString(C.Perror()))
 	}
-	
+
 	goDeviceList := make([]PmuDeviceData, int(metricLen))
-	ptr := unsafe.Pointer(metricData)
-	slice := reflect.SliceHeader {
-		Data: uintptr(ptr),
-		Len:  int(metricLen),
-		Cap:  int(metricLen),
-	}
-	cMetricList := *(*[]C.struct_PmuDeviceData)(unsafe.Pointer(&slice))
+	cMetricList := unsafe.Slice(metricData, int(metricLen))
 	for i, v := range cMetricList {
 		goDeviceList[i].Metric = v.metric
-		goDeviceList[i].Count  = float64(v.count)
-		goDeviceList[i].Mode   = v.mode
+		goDeviceList[i].Count = float64(v.count)
+		goDeviceList[i].Mode = v.mode
 		metricDataExt := C.struct_MetricDataExt{}
 		C.IPmuGetMetricDataExt(&v, &metricDataExt)
 		goDeviceList[i].CoreId = uint32(metricDataExt.coreId)
@@ -1151,7 +1109,7 @@ func PmuGetDevMetric(dataVo PmuDataVo, deviceAttr []PmuDeviceAttr) (PmuDeviceDat
 	res.GoDeviceData = goDeviceList
 	res.cDeviceData = metricData
 	return res, nil
-}	
+}
 
 // Free PmuDeviceData pointer.
 func DevDataFree(devVo PmuDeviceDataVo) {
@@ -1169,21 +1127,14 @@ func PmuGetClusterCore(clusterId uint) ([]uint, error) {
 	if coreList == nil {
 		return nil, errors.New(C.GoString(C.Perror()))
 	}
-	ptr := unsafe.Pointer(coreList)
-	slice := reflect.SliceHeader {
-		Data: uintptr(ptr),
-		Len:  int(coreLen),
-		Cap:  int(coreLen),
-	}
-	cCoreList := *(*[]C.uint32_t)(unsafe.Pointer(&slice))
+	cCoreList := unsafe.Slice(coreList, int(coreLen))
 	goCoreList := make([]uint, int(coreLen))
 	for i, v := range cCoreList {
 		goCoreList[i] = uint(v)
 	}
-	
+
 	return goCoreList, nil
 }
-
 
 // brief Get core list of a numa node.
 // param clusterId numa id
@@ -1196,18 +1147,12 @@ func PmuGetNumaCore(nodeId uint) ([]uint, error) {
 	if coreList == nil {
 		return nil, errors.New(C.GoString(C.Perror()))
 	}
-	ptr := unsafe.Pointer(coreList)
-	slice := reflect.SliceHeader {
-		Data: uintptr(ptr),
-		Len:  int(coreLen),
-		Cap:  int(coreLen),
-	}
-	cCoreList := *(*[]C.uint32_t)(unsafe.Pointer(&slice))
+	cCoreList := unsafe.Slice(coreList, int(coreLen))
 	goCoreList := make([]uint, int(coreLen))
 	for i, v := range cCoreList {
 		goCoreList[i] = uint(v)
 	}
-	
+
 	return goCoreList, nil
 }
 
@@ -1215,7 +1160,7 @@ func PmuGetNumaCore(nodeId uint) ([]uint, error) {
 // param core Index of core
 // return On success, core frequency(Hz) is returned
 // On error, -1 and error are returned
-func PmuGetCpuFreq(core	uint) (int64, error) {
+func PmuGetCpuFreq(core uint) (int64, error) {
 	freq := C.PmuGetCpuFreq(C.uint(core))
 	if freq == -1 {
 		return -1, errors.New(C.GoString(C.Perror()))
@@ -1223,11 +1168,10 @@ func PmuGetCpuFreq(core	uint) (int64, error) {
 	return int64(freq), nil
 }
 
-
 // open cpu core freq sampling
 // period unit ms
 // return error or nil
-func PmuOpenCpuFreqSampling(period uint) (error) {
+func PmuOpenCpuFreqSampling(period uint) error {
 	c_period := C.uint32_t(period)
 	ret := C.PmuOpenCpuFreqSampling(c_period)
 	if int(ret) == -1 {
@@ -1236,7 +1180,7 @@ func PmuOpenCpuFreqSampling(period uint) (error) {
 	return nil
 }
 
-// close cpu freq sampling 
+// close cpu freq sampling
 func PmuCloseCpuFreqSampling() {
 	C.PmuCloseCpuFreqSampling()
 }
@@ -1244,22 +1188,15 @@ func PmuCloseCpuFreqSampling() {
 // get the maximum frequency,minimum frequency,and average frequency of each core
 // param cpuNum
 // return PmuCpuFreqDetail array
-func PmuReadCpuFreqDetail() ([]PmuCpuFreqDetail) {
+func PmuReadCpuFreqDetail() []PmuCpuFreqDetail {
 	cpuNum := C.uint32_t(0)
 	cpuFreqList := C.PmuReadCpuFreqDetail(&cpuNum)
 
-	if (uint32(cpuNum) == 0) {
+	if uint32(cpuNum) == 0 {
 		return nil
 	}
 
-	ptr := unsafe.Pointer(cpuFreqList)
-	slice := reflect.SliceHeader{
-		Data: uintptr(ptr),
-		Len:  int(cpuNum),
-		Cap:  int(cpuNum),
-	}
-
-	cCpuFreqList := *(*[]C.struct_PmuCpuFreqDetail)(unsafe.Pointer(&slice))
+	cCpuFreqList := unsafe.Slice(cpuFreqList, int(cpuNum))
 	goCpuFreqList := make([]PmuCpuFreqDetail, int(cpuNum))
 
 	for i, v := range cCpuFreqList {
@@ -1272,13 +1209,7 @@ func PmuReadCpuFreqDetail() ([]PmuCpuFreqDetail) {
 }
 
 func transferCPmuDataToGoData(cPmuData *C.struct_PmuData, dataLen int, fd int) []PmuData {
-	ptr := unsafe.Pointer(cPmuData)
-	slice := reflect.SliceHeader {
-		Data: uintptr(ptr),
-		Len: dataLen,
-		Cap: dataLen,
-	}
-	cPmuDatas := *(*[]C.struct_PmuData)(unsafe.Pointer(&slice))
+	cPmuDatas := unsafe.Slice(cPmuData, dataLen)
 	goDatas := make([]PmuData, dataLen)
 	for i := 0; i < dataLen; i++ {
 		dataObj := cPmuDatas[i]
@@ -1316,7 +1247,7 @@ func transferCPmuDataToGoData(cPmuData *C.struct_PmuData, dataLen int, fd int) [
 func (data *PmuData) appendSpeExt(pmuData C.struct_PmuData) {
 	speDataExt := C.struct_SpeDataExt{}
 	C.IPmuGetSpeDataExt(&pmuData, &speDataExt)
-	data.SpeExt = SpeDataExt{Pa:uint64(speDataExt.pa), Va: uint64(speDataExt.va), Event: uint64(speDataExt.event), Lat: uint16(speDataExt.lat), Source: uint16(speDataExt.source)}
+	data.SpeExt = SpeDataExt{Pa: uint64(speDataExt.pa), Va: uint64(speDataExt.va), Event: uint64(speDataExt.event), Lat: uint16(speDataExt.lat), Source: uint16(speDataExt.source)}
 }
 
 func (data *PmuData) appendSymbols(pmuData C.struct_PmuData) {
@@ -1328,15 +1259,15 @@ func (data *PmuData) appendSymbols(pmuData C.struct_PmuData) {
 	for curStack != nil {
 		cSymbol := curStack.symbol
 		if cSymbol != nil {
-			oneSymbol := sym.Symbol{Addr:uint64(cSymbol.addr),
-				 Module:C.GoString(cSymbol.module),
-				 SymbolName:C.GoString(cSymbol.symbolName),
-				 MangleName:C.GoString(cSymbol.mangleName),
-				 FileName:C.GoString(cSymbol.fileName),
-				 LineNum:uint32(cSymbol.lineNum),
-				 Offset:uint64(cSymbol.offset),
-				 CodeMapEndAddr:uint64(cSymbol.codeMapEndAddr),
-				 CodeMapAddr:uint64(cSymbol.codeMapAddr)}
+			oneSymbol := sym.Symbol{Addr: uint64(cSymbol.addr),
+				Module:         C.GoString(cSymbol.module),
+				SymbolName:     C.GoString(cSymbol.symbolName),
+				MangleName:     C.GoString(cSymbol.mangleName),
+				FileName:       C.GoString(cSymbol.fileName),
+				LineNum:        uint32(cSymbol.lineNum),
+				Offset:         uint64(cSymbol.offset),
+				CodeMapEndAddr: uint64(cSymbol.codeMapEndAddr),
+				CodeMapAddr:    uint64(cSymbol.codeMapAddr)}
 			symbols = append(symbols, oneSymbol)
 		}
 		curStack = curStack.next
@@ -1351,27 +1282,22 @@ func (data *PmuData) appendBranchRecords(pmuData C.struct_PmuData) {
 		return
 	}
 	branchList := make([]BranchSampleRecord, int(nr))
-	ptr := unsafe.Pointer(records)
-	slice := reflect.SliceHeader {
-		Data: uintptr(ptr),
-		Len:  int(nr),
-		Cap:  int(nr),
-	}
-	branchRecords := *(*[]C.struct_BranchSampleRecord)(unsafe.Pointer(&slice))
+	branchRecords := unsafe.Slice(records, int(nr))
 	for i := 0; i < int(nr); i++ {
 		branchList[i].FromAddr = uint64(branchRecords[i].fromAddr)
-		branchList[i].ToAddr   = uint64(branchRecords[i].toAddr)
-		branchList[i].Cycles   = uint64(branchRecords[i].cycles)
-		branchList[i].MisPred  = uint8(branchRecords[i].misPred)
+		branchList[i].ToAddr = uint64(branchRecords[i].toAddr)
+		branchList[i].Cycles = uint64(branchRecords[i].cycles)
+		branchList[i].MisPred = uint8(branchRecords[i].misPred)
 		branchList[i].Predicted = uint8(branchRecords[i].predicted)
 	}
 	data.BranchRecords = branchList
 }
 
 // brief Begin to write PmuData list to perf.data file.
-//        It is a simplified perf.data only include basic fields for perf sample,
-//        including id, cpu, tid, pid, addr and branch stack.
-//        It also includes sample like mmap, mmap2, comm, fork.
+//
+//	It is a simplified perf.data only include basic fields for perf sample,
+//	including id, cpu, tid, pid, addr and branch stack.
+//	It also includes sample like mmap, mmap2, comm, fork.
 func PmuBeginWrite(path string, attr PmuAttr, addIdHdr int) (C.PmuFile, error) {
 	cAttr, err := ToCPmuAttr(attr)
 	defer FreePmuAttr(cAttr)
