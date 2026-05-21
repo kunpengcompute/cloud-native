@@ -30,4 +30,3 @@ repos:
     rev: v2.12.2
     hooks:
       - id: golangci-lint-full
-        args: ["--config", ".golangci.yml"] # 使用项目根目录下的golangci.yml配置文件
