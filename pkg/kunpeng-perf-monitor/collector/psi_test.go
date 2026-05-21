@@ -194,10 +194,10 @@ func TestGetFinalPath(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}
-				f.Close()
+				require.NoError(t, f.Close())
 
 				return func() {
-					os.Remove(filePath)
+					_ = os.Remove(filePath)
 				}
 			},
 			expectedPath: "/tmp/existing_file",
@@ -214,10 +214,10 @@ func TestGetFinalPath(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}
-				f.Close()
+				require.NoError(t, f.Close())
 
 				return func() {
-					os.Remove(filePath)
+					_ = os.Remove(filePath)
 				}
 			},
 			expectedPath: "/tmp/existing_file",
@@ -244,7 +244,7 @@ func TestGetFinalPath(t *testing.T) {
 				}
 
 				return func() {
-					os.RemoveAll(dirPath)
+					_ = os.RemoveAll(dirPath)
 				}
 			},
 			expectedPath: "/tmp/existing_dir",
@@ -267,10 +267,10 @@ func TestGetFinalPath(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}
-				f.Close()
+				require.NoError(t, f.Close())
 
 				return func() {
-					os.RemoveAll(dirPath)
+					_ = os.RemoveAll(dirPath)
 				}
 			},
 			expectedPath: "/tmp/subdir/file",
@@ -287,10 +287,10 @@ func TestGetFinalPath(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}
-				f.Close()
+				require.NoError(t, f.Close())
 
 				return func() {
-					os.Remove(filePath)
+					_ = os.Remove(filePath)
 				}
 			},
 			expectedPath: "test_file",
@@ -557,7 +557,7 @@ func TestNewPSICollector(t *testing.T) {
 			setupFunc: func(t *testing.T) (string, []byte, func(), error) {
 				tmpDir := t.TempDir()
 				// 删除临时目录，使其不存在
-				os.RemoveAll(tmpDir)
+				_ = os.RemoveAll(tmpDir)
 				return tmpDir, []byte("cgroup2\n"), func() {}, nil
 			},
 			expectError:     true,

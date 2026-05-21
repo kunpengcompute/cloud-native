@@ -236,7 +236,7 @@ func writePID(targetTasksPath, pid string) error {
 	if err != nil {
 		return fmt.Errorf("open target tasks file %s failed: %w", targetTasksPath, err)
 	}
-	defer f.Close()
+	defer f.Close() // nolint: errcheck
 
 	if _, err := f.WriteString(pid); err != nil {
 		if errors.Is(err, syscall.ESRCH) {

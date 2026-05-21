@@ -35,7 +35,7 @@ var _ = Describe("Node", func() {
 	})
 
 	AfterEach(func() {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 	})
 
 	Describe("Basic node methods", func() {
@@ -195,7 +195,7 @@ No proper key-value pairs
 		Context("with missing meminfo file", func() {
 			It("should return an error", func() {
 				// Ensure the meminfo file doesn't exist
-				os.Remove(filepath.Join(tempDir, "meminfo"))
+				_ = os.Remove(filepath.Join(tempDir, "meminfo"))
 
 				memInfo, err := testNode.MemoryInfo()
 				Expect(err).To(HaveOccurred())

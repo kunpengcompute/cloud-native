@@ -50,5 +50,5 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	os.RemoveAll(utSocketPathPrefix)
+	_ = os.RemoveAll(utSocketPathPrefix)
 })

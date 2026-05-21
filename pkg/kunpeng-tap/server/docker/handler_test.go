@@ -91,14 +91,14 @@ var _ = Describe("Handler", Ordered, func() {
 				w.WriteHeader(200)
 			}
 
-			w.Write(data)
+			_, _ = w.Write(data)
 		}))
 
 		fakeContainerRuntimeSocketPath := path.Join(utSocketPathPrefix, "containerruntime.sock")
 		if _, err := os.Stat(fakeContainerRuntimeSocketPath); err == nil {
 			err := syscall.Unlink(fakeContainerRuntimeSocketPath)
 			Expect(err).To(BeNil())
-			os.Remove(fakeContainerRuntimeSocketPath)
+			_ = os.Remove(fakeContainerRuntimeSocketPath)
 		}
 
 		By("create fake docker client")
@@ -147,10 +147,12 @@ var _ = Describe("Handler", Ordered, func() {
 		if _, err := os.Stat(options.RuntimeProxyEndpoint); err == nil {
 			err := syscall.Unlink(options.RuntimeProxyEndpoint)
 			Expect(err).To(BeNil())
-			os.Remove(options.RuntimeProxyEndpoint)
+			_ = os.Remove(options.RuntimeProxyEndpoint)
 		}
 		dockerServer = docker.NewDockerServer(dockerHandler, nil)
-		go dockerServer.Run()
+		go func() {
+			_ = dockerServer.Run()
+		}()
 
 		By("wait dockerServer start")
 		Eventually(func() error {
@@ -169,14 +171,16 @@ var _ = Describe("Handler", Ordered, func() {
 
 	AfterAll(func() {
 		dockerServer.Shutdown(context.Background())
-		os.Remove(options.RuntimeProxyEndpoint)
+		_ = os.Remove(options.RuntimeProxyEndpoint)
 	})
 
 	Describe("Create pod", func() {
 		It("should return 200", func() {
 			file, err := os.Open("../../../../test/kunpeng-tap/fake/fake_docker_pod_http_create_request.json")
 			Expect(err).To(BeNil())
-			defer file.Close()
+			defer func() {
+				_ = file.Close()
+			}()
 			requestInFile, err := io.ReadAll(file)
 			Expect(err).To(BeNil())
 			_, err = file.Seek(0, 0)
@@ -184,7 +188,9 @@ var _ = Describe("Handler", Ordered, func() {
 
 			resp, err := unixHttpClient.Post("http://unix/v1.39/containers/create?name=0_containername_podname_podnamespace_podid_5", ContentType, file)
 			Expect(err).NotTo(HaveOccurred())
-			defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 			body, err := io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -212,7 +218,7 @@ var _ = Describe("Handler", Ordered, func() {
 			var port string
 			_, port, err = net.SplitHostPort(l.Addr().String())
 			Expect(err).To(BeNil())
-			l.Close()
+			_ = l.Close()
 			options.MetricsAddr = "127.0.0.1:" + port
 			go monitoring.ExportMetrics()
 
@@ -222,7 +228,7 @@ var _ = Describe("Handler", Ordered, func() {
 				if err != nil {
 					return err
 				}
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				return nil
 			}, timeout, interval).Should(BeNil())
 		})
@@ -230,7 +236,9 @@ var _ = Describe("Handler", Ordered, func() {
 		It("should expose prometheus metrics", func() {
 			metricsResp, err := http.Get("http://" + options.MetricsAddr + "/metrics")
 			Expect(err).NotTo(HaveOccurred())
-			defer metricsResp.Body.Close()
+			defer func() {
+				_ = metricsResp.Body.Close()
+			}()
 			metricsBody, err := io.ReadAll(metricsResp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(metricsBody)).Should(ContainSubstring("tap_proxy_request_duration_seconds"))
@@ -241,7 +249,9 @@ var _ = Describe("Handler", Ordered, func() {
 		It("should return 200", func() {
 			file, err := os.Open("../../../../test/kunpeng-tap/fake/fake_docker_http_create_request.json")
 			Expect(err).To(BeNil())
-			defer file.Close()
+			defer func() {
+				_ = file.Close()
+			}()
 			requestInFile, err := io.ReadAll(file)
 			Expect(err).To(BeNil())
 			_, err = file.Seek(0, 0)
@@ -249,7 +259,9 @@ var _ = Describe("Handler", Ordered, func() {
 
 			resp, err := unixHttpClient.Post("http://unix/v1.39/containers/create?name=0_containername_2_3_4_5", ContentType, file)
 			Expect(err).NotTo(HaveOccurred())
-			defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 			body, err := io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -271,7 +283,9 @@ var _ = Describe("Handler", Ordered, func() {
 		It("should return 200", func() {
 			resp, err := unixHttpClient.Post("http://unix/v1.39/containers/c2ada9df5af8/start", ContentType, nil)
 			Expect(err).NotTo(HaveOccurred())
-			defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 			body, err := io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -290,7 +304,9 @@ var _ = Describe("Handler", Ordered, func() {
 		It("should return 200", func() {
 			resp, err := unixHttpClient.Post("http://unix/v1.39/containers/c2ada9df5af8/stop", ContentType, nil)
 			Expect(err).NotTo(HaveOccurred())
-			defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 			body, err := io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -309,7 +325,9 @@ var _ = Describe("Handler", Ordered, func() {
 		It("should return 200", func() {
 			resp, err := unixHttpClient.Post("http://unix/v1.39/containers/c2ada9df5af8/update", ContentType, nil)
 			Expect(err).NotTo(HaveOccurred())
-			defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 			body, err := io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -363,7 +381,9 @@ var _ = Describe("Handler", Ordered, func() {
 		It("should return 200", func() {
 			file, err := os.Open("../../../../test/kunpeng-tap/fake/fake_docker_pod_skip_http_create_request.json")
 			Expect(err).To(BeNil())
-			defer file.Close()
+			defer func() {
+				_ = file.Close()
+			}()
 			requestInFile, err := io.ReadAll(file)
 			Expect(err).To(BeNil())
 			_, err = file.Seek(0, 0)
@@ -371,7 +391,9 @@ var _ = Describe("Handler", Ordered, func() {
 
 			resp, err := unixHttpClient.Post("http://unix/v1.39/containers/create?name=0_containername_podname_podnamespace_podid_5", ContentType, file)
 			Expect(err).NotTo(HaveOccurred())
-			defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 			body, err := io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -389,7 +411,9 @@ var _ = Describe("Handler", Ordered, func() {
 		It("should return 200", func() {
 			file, err := os.Open("../../../../test/kunpeng-tap/fake/fake_docker_skip_http_create_request.json")
 			Expect(err).To(BeNil())
-			defer file.Close()
+			defer func() {
+				_ = file.Close()
+			}()
 			requestInFile, err := io.ReadAll(file)
 			Expect(err).To(BeNil())
 			_, err = file.Seek(0, 0)
@@ -397,7 +421,9 @@ var _ = Describe("Handler", Ordered, func() {
 
 			resp, err := unixHttpClient.Post("http://unix/v1.39/containers/create?name=0_containername_2_3_4_5", ContentType, file)
 			Expect(err).NotTo(HaveOccurred())
-			defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 			body, err := io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))

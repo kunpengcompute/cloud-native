@@ -180,7 +180,7 @@ var _ = Describe("Cluster", func() {
 		})
 
 		AfterEach(func() {
-			os.RemoveAll(tempDir)
+			_ = os.RemoveAll(tempDir)
 		})
 
 		It("should discover clusters from sysfs", func() {

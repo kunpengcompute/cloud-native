@@ -57,7 +57,7 @@ func TestGetMPAMGroups(t *testing.T) {
 		groupDirs := []string{"groupA", "groupB", "groupC"}
 		for _, dir := range groupDirs {
 			path := filepath.Join(testDir, dir, DirNameInAGroup)
-			os.MkdirAll(path, 0755)
+			require.NoError(t, os.MkdirAll(path, 0755))
 		}
 
 		// 执行测试
@@ -85,7 +85,7 @@ func TestGetMPAMGroups(t *testing.T) {
 		groupDirs := []string{"groupA", "groupB", "groupC"}
 		for _, dir := range groupDirs {
 			path := filepath.Join(testDir, DirNameInAGroup, dir)
-			os.MkdirAll(path, 0755)
+			require.NoError(t, os.MkdirAll(path, 0755))
 		}
 
 		// 执行测试
@@ -230,8 +230,8 @@ func TestUpdateResUsageMetrics(t *testing.T) {
 
 		// 创建测试目录结构
 		mpamPath := filepath.Join(*resctlMountPath, "groupA", dirPathForMPAMGroupData, nameKeyForCacheUsageDirs+"_test")
-		os.MkdirAll(mpamPath, 0755)
-		os.WriteFile(filepath.Join(mpamPath, fileNameForCache), []byte("1024"), 0644)
+		require.NoError(t, os.MkdirAll(mpamPath, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(mpamPath, fileNameForCache), []byte("1024"), 0644))
 
 		c := &mpamCollector{
 			logger:     slog.Default(), // 必须有
@@ -258,8 +258,8 @@ func TestUpdateResUsageMetrics(t *testing.T) {
 		*resctlMountPath = testDir
 
 		mpamPath := filepath.Join(*resctlMountPath, "groupB", dirPathForMPAMGroupData, nameKeyForCacheUsageDirs+"_test")
-		os.MkdirAll(mpamPath, 0755)
-		os.WriteFile(filepath.Join(mpamPath, fileNameForCache), []byte("invalid"), 0644)
+		require.NoError(t, os.MkdirAll(mpamPath, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(mpamPath, fileNameForCache), []byte("invalid"), 0644))
 
 		c := &mpamCollector{
 			logger:     logger, // 使用可捕获的logger
@@ -309,7 +309,7 @@ func TestUpdateResUsageMetrics(t *testing.T) {
 		labels := mpamMetricsCommonLabels{
 			groupName: "empty_dir",
 		}
-		os.MkdirAll(filepath.Join(*resctlMountPath, "empty_dir", dirPathForMPAMGroupData), 0644)
+		require.NoError(t, os.MkdirAll(filepath.Join(*resctlMountPath, "empty_dir", dirPathForMPAMGroupData), 0644))
 		err := c.updateResUsageMetrics(ch, "empty_dir", labels, c.cacheUsage, []string{})
 
 		// 预期返回错误，包含"non fatal error, targetDir is empty"
@@ -331,10 +331,10 @@ func TestUpdateMPAMResUsageMetrics(t *testing.T) {
 		cacheDir := filepath.Join(groupDir, dirPathForMPAMGroupData, nameKeyForCacheUsageDirs+"test1")
 		memDir := filepath.Join(groupDir, dirPathForMPAMGroupData, nameKeyForMemUsageDirs+"test1")
 		// 权限必须是07XX
-		os.MkdirAll(cacheDir, 0744)
-		os.MkdirAll(memDir, 0744)
-		os.WriteFile(filepath.Join(cacheDir, fileNameForCache), []byte("1024"), 0644)
-		os.WriteFile(filepath.Join(memDir, fileNameForMem), []byte("2048"), 0644)
+		require.NoError(t, os.MkdirAll(cacheDir, 0744))
+		require.NoError(t, os.MkdirAll(memDir, 0744))
+		require.NoError(t, os.WriteFile(filepath.Join(cacheDir, fileNameForCache), []byte("1024"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(memDir, fileNameForMem), []byte("2048"), 0644))
 		c := &mpamCollector{
 			logger: slog.Default(), // 必须有
 			cacheUsage: prometheus.NewDesc(
@@ -367,10 +367,10 @@ func TestUpdateMPAMResUsageMetrics(t *testing.T) {
 		cacheDir := filepath.Join(groupDir, dirPathForMPAMGroupData, nameKeyForCacheUsageDirs+"test1")
 		memDir := filepath.Join(groupDir, dirPathForMPAMGroupData, nameKeyForMemUsageDirs+"test1")
 		// 07XX的权限
-		os.MkdirAll(cacheDir, 0755)
-		os.MkdirAll(memDir, 0755)
-		os.WriteFile(filepath.Join(cacheDir, fileNameForCache), []byte("1024"), 0644)
-		os.WriteFile(filepath.Join(memDir, fileNameForMem), []byte("2048"), 0644)
+		require.NoError(t, os.MkdirAll(cacheDir, 0755))
+		require.NoError(t, os.MkdirAll(memDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(cacheDir, fileNameForCache), []byte("1024"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(memDir, fileNameForMem), []byte("2048"), 0644))
 
 		// 然后修改权限为0300（有写和执行权限，无读权限，必定返回错误）
 		monDataDir := filepath.Join(groupDir, dirPathForMPAMGroupData)
@@ -378,7 +378,9 @@ func TestUpdateMPAMResUsageMetrics(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 在测试结束后恢复权限，确保清理能正常进行
-		defer os.Chmod(monDataDir, 0755)
+		defer func() {
+			_ = os.Chmod(monDataDir, 0755)
+		}()
 
 		c := &mpamCollector{
 			logger: slog.Default(), // 必须有
@@ -413,8 +415,8 @@ func TestUpdateMPAMResUsageMetrics(t *testing.T) {
 
 		// 只创建缓存目录（不创建内存目录）
 		cacheDir := filepath.Join(testDir, "groupY", dirPathForMPAMGroupData, nameKeyForCacheUsageDirs+"test1")
-		os.MkdirAll(cacheDir, 0755)
-		os.WriteFile(filepath.Join(cacheDir, fileNameForCache), []byte("1024"), 0644)
+		require.NoError(t, os.MkdirAll(cacheDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(cacheDir, fileNameForCache), []byte("1024"), 0644))
 
 		c := &mpamCollector{
 			logger: slog.Default(), // 必须有
@@ -520,7 +522,9 @@ func TestUpdateMPAMResConfigMetrics(t *testing.T) {
 
 		// 创建临时测试文件
 		testFile := createTestConfigFile(t, "L3:0=256\nMB:0=1024")
-		defer os.Remove(testFile)
+		defer func() {
+			_ = os.Remove(testFile)
+		}()
 
 		// 替换全局变量便于测试
 		oldPath := *resctlMountPath
@@ -546,7 +550,9 @@ func TestUpdateMPAMResConfigMetrics(t *testing.T) {
 		defer close(ch)
 
 		testFile := createTestConfigFile(t, "L3:0=512")
-		defer os.Remove(testFile)
+		defer func() {
+			_ = os.Remove(testFile)
+		}()
 
 		oldPath := *resctlMountPath
 		*resctlMountPath = filepath.Dir(testFile)

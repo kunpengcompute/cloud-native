@@ -274,8 +274,7 @@ func waitForServer(socket string, timeout time.Duration) error {
 		return errors.Wrap(err, "Cannot create a gRPC client")
 	}
 
-	defer conn.Close()
-
+	defer conn.Close() // nolint: errcheck
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
 	defer cancel()
@@ -306,7 +305,7 @@ func (srv *server) registerWithKubelet(kubeletSocket, pluginEndPoint, resourceNa
 		return errors.Wrap(err, "Cannot create a gRPC client")
 	}
 
-	defer conn.Close()
+	defer conn.Close() // nolint: errcheck
 
 	client := pluginapi.NewRegistrationClient(conn)
 	reqt := &pluginapi.RegisterRequest{
@@ -328,7 +327,7 @@ func watchFile(file string) error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to create watcher for %s", file)
 	}
-	defer watcher.Close()
+	defer watcher.Close() // nolint: errcheck
 
 	err = watcher.Add(filepath.Dir(file))
 	if err != nil {

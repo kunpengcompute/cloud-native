@@ -60,7 +60,9 @@ func (p *policyManager) Setup() error {
 func (p *policyManager) Start() error {
 	klog.InfoS("Starting runtime hook server", "endpoint", p.endpoint)
 	go func() {
-		p.server.Serve(p.listener)
+		if err := p.server.Serve(p.listener); err != nil {
+			klog.ErrorS(err, "Runtime hook server stopped with error")
+		}
 	}()
 	return nil
 }
