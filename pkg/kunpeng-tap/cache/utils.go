@@ -429,7 +429,6 @@ func (cch *cache) processContainer(containerdClient criv1.RuntimeServiceClient, 
 
 func (cch *cache) LoadStoreContainerd(containerdClient criv1.RuntimeServiceClient) error {
 
-	podResponse := &criv1.ListPodSandboxResponse{}
 	podResponse, err := containerdClient.ListPodSandbox(context.TODO(), &criv1.ListPodSandboxRequest{})
 	if err != nil {
 		return err
