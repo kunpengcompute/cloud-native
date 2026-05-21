@@ -56,13 +56,6 @@ func (m *TopologyMetricsManager) UpdateAllMetrics() {
 	klog.V(4).InfoS("Topology metrics updated successfully")
 }
 
-// resetMetrics 重置所有监控指标
-func (m *TopologyMetricsManager) resetMetrics() {
-	monitoring.TopologyNodeCapacity.Reset()
-	monitoring.TopologyNodeUsage.Reset()
-	monitoring.TopologyNodeContainerCount.Reset()
-}
-
 // updateNodeCapacityMetrics 更新节点容量指标
 func (m *TopologyMetricsManager) updateNodeCapacityMetrics() {
 	if m.policy == nil || m.policy.root == nil {

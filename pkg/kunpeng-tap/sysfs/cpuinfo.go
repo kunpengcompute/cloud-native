@@ -18,16 +18,12 @@
 package sysfs
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"k8s.io/klog/v2"
@@ -130,117 +126,6 @@ type ProcessorInfo struct {
 
 func GetLocalCPUInfo() (*LocalCPUInfo, error) {
 	return getCpu()
-}
-
-const cpuCmdTimeout time.Duration = 5 * time.Second
-
-func lsCPU(option string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cpuCmdTimeout)
-	defer cancel()
-
-	executable, err := exec.LookPath("lscpu")
-	if err != nil {
-		return "", fmt.Errorf("failed to lookup lscpu path, err: %w", err)
-	}
-	output, err := exec.CommandContext(ctx, executable, option).Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to exec command %s, err: %v", executable, err)
-	}
-	return string(output), nil
-}
-
-func getProcessorInfos(lsCPUStr string) ([]ProcessorInfo, error) {
-	if len(lsCPUStr) <= 0 {
-		return nil, fmt.Errorf("lscpu output is empty")
-	}
-
-	var processorInfos []ProcessorInfo
-	for _, line := range strings.Split(lsCPUStr, "\n") {
-		items := strings.Fields(line)
-		if len(items) < 6 {
-			continue
-		}
-		cpu, err := strconv.ParseInt(items[0], 10, 32)
-		if err != nil {
-			continue
-		}
-		node, err := strconv.ParseInt(items[1], 10, 32)
-		if err != nil {
-			klog.ErrorS(err, "Failed to parse node ID", "line", line)
-			continue
-		}
-		socket, err := strconv.ParseInt(items[2], 10, 32)
-		if err != nil {
-			klog.ErrorS(err, "Failed to parse socket ID", "line", line)
-			continue
-		}
-		core, err := strconv.ParseInt(items[3], 10, 32)
-		if err != nil {
-			klog.ErrorS(err, "Failed to parse core ID", "line", line)
-			continue
-		}
-
-		processorInfos = append(processorInfos, ProcessorInfo{
-			CPUID:    int32(cpu),
-			CoreID:   int32(core),
-			SocketID: int32(socket),
-			NodeID:   int32(node),
-		})
-	}
-	if len(processorInfos) <= 0 {
-		return nil, fmt.Errorf("no valid processor info")
-	}
-
-	// sorted by cpu topology
-	// NOTE: in some cases, max(cpuId[...]) can be not equal to len(processors)
-	sort.Slice(processorInfos, func(i, j int) bool {
-		return sortProcessorInfosByTopology(processorInfos[i], processorInfos[j])
-	})
-
-	return processorInfos, nil
-}
-
-// sortProcessorInfosByTopology sorts processor infos by topology hierarchy:
-// NUMA Node -> Socket -> Core -> CPU
-func sortProcessorInfosByTopology(a, b ProcessorInfo) bool {
-	switch {
-	case a.NodeID != b.NodeID:
-		return a.NodeID < b.NodeID
-	case a.SocketID != b.SocketID:
-		return a.SocketID < b.SocketID
-	case a.CoreID != b.CoreID:
-		return a.CoreID < b.CoreID
-	default:
-		return a.CPUID < b.CPUID
-	}
-}
-
-func calculateCPUTotalInfo(processorInfos []ProcessorInfo) CPUTotalInfo {
-	cpuMap := make(map[int32]struct{})
-	coreMap := make(map[int32][]ProcessorInfo)
-	socketMap := make(map[int32][]ProcessorInfo)
-	nodeMap := make(map[int32][]ProcessorInfo)
-
-	for i := range processorInfos {
-		p := processorInfos[i]
-		cpuMap[p.CPUID] = struct{}{}
-		coreMap[p.CoreID] = append(coreMap[p.CoreID], p)
-		socketMap[p.SocketID] = append(socketMap[p.SocketID], p)
-		nodeMap[p.NodeID] = append(nodeMap[p.NodeID], p)
-	}
-
-	klog.InfoS("CPU total info",
-		"numberCPUs", int32(len(cpuMap)),
-		"coreToCPU", coreMap,
-		"socketToCPU", socketMap,
-		"nodeToCPU", nodeMap)
-
-	return CPUTotalInfo{
-		NumberCPUs:  int32(len(cpuMap)),
-		CoreToCPU:   coreMap,
-		SocketToCPU: socketMap,
-		NodeToCPU:   nodeMap,
-	}
 }
 
 func GetNumaNodeCPUSet(c *CPUTopology, nodeid int) string {

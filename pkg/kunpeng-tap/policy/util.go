@@ -44,27 +44,6 @@ func ParseCgroupForQOSClass(cgroupPath string) corev1.PodQOSClass {
 	return qos
 }
 
-// cgroupParentToQOS tries to map Pod cgroup parent to QOS class.
-func cgroupParentToQOS(dir string) corev1.PodQOSClass {
-	var qos corev1.PodQOSClass
-
-	// The parent directory naming scheme depends on the cgroup driver in use.
-	// Thus, rely on substring matching
-	split := strings.Split(strings.TrimPrefix(dir, "/"), "/")
-	switch {
-	case len(split) < 2:
-		qos = corev1.PodQOSClass("")
-	case strings.Contains(split[1], strings.ToLower(string(corev1.PodQOSBurstable))):
-		qos = corev1.PodQOSBurstable
-	case strings.Contains(split[1], strings.ToLower(string(corev1.PodQOSBestEffort))):
-		qos = corev1.PodQOSBestEffort
-	default:
-		qos = corev1.PodQOSGuaranteed
-	}
-
-	return qos
-}
-
 func mergeAllocations(allocs []*Allocation, resp *koor.ContainerResourceHookResponse) {
 	for _, alloc := range allocs {
 		if alloc == nil {

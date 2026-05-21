@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 
 	"github.com/containerd/nri/pkg/api"
@@ -315,7 +314,6 @@ var (
 	cacheDirPerm  = &permissions{prefer: 0710, reject: 0022}
 	cacheFilePerm = &permissions{prefer: 0644, reject: 0022}
 	dataDirPerm   = &permissions{prefer: 0755, reject: 0022}
-	dataFilePerm  = &permissions{prefer: 0644, reject: 0022}
 )
 
 // Our cache of objects.
@@ -373,22 +371,6 @@ func NewCache(options Options) (Cache, error) {
 		cch.CpuInfo = cpuInfo
 	}
 	return cch, nil
-}
-
-// Derive cache id using pod uid, or allocate a new unused local cache id.
-func (cch *cache) createCacheID(c *container) string {
-	if pod, ok := c.cache.LookupPod(c.PodID); ok {
-		uid := pod.GetUID()
-		if uid != "" {
-			return uid + ":" + c.Name
-		}
-	}
-
-	klog.InfoS("Couldn't find unique id for", "pod", c.PodID, "assigning local cache id")
-	id := "cache:" + strconv.FormatUint(cch.NextID, 16)
-	cch.NextID++
-
-	return id
 }
 
 // Insert a pod into the cache.

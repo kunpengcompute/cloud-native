@@ -79,8 +79,6 @@ const (
 	Cgroupfs CgroupDriverType = "cgroupfs"
 	Systemd  CgroupDriverType = "systemd"
 
-	kubeletDefaultCgroupDriver = Cgroupfs
-
 	KubeRootNameSystemd       = "kubepods.slice/"
 	KubeBurstableNameSystemd  = "kubepods-burstable.slice/"
 	KubeBesteffortNameSystemd = "kubepods-besteffort.slice/"

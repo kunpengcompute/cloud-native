@@ -43,7 +43,6 @@ type Score interface {
 type score struct {
 	supply          Supply  // CPU supply (node)
 	request         Request // CPU request (container)
-	isolated        int     // remaining isolated CPUs
 	shared          int     // remaining shared capacity
 	sharedByRequest int     // remaining shared capacity by request
 	sharedByLimit   int     // remaining shared capacity by limit
