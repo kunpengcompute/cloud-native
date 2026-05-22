@@ -170,7 +170,7 @@ func createTestFile(t *testing.T, content string) string {
 	assert.NoError(t, err)
 	_, err = tmpfile.WriteString(content)
 	assert.NoError(t, err)
-	tmpfile.Close()
+	assert.NoError(t, tmpfile.Close())
 	return tmpfile.Name()
 }
 
@@ -179,7 +179,9 @@ func TestGetMPAMConfigData(t *testing.T) {
 	t.Run("valid_file", func(t *testing.T) {
 		content := "L3cache: 1=100\nmem: 2=200"
 		tmpfile := createTestFile(t, content)
-		defer os.Remove(tmpfile)
+		defer func() {
+			_ = os.Remove(tmpfile)
+		}()
 
 		config1, config2, err := getMPAMConfigData(tmpfile, "cache", "mem")
 		assert.NoError(t, err)
@@ -195,7 +197,9 @@ func TestGetMPAMConfigData(t *testing.T) {
 	t.Run("invalid_line_format", func(t *testing.T) {
 		content := `invalid_line`
 		tmpfile := createTestFile(t, content)
-		defer os.Remove(tmpfile)
+		defer func() {
+			_ = os.Remove(tmpfile)
+		}()
 
 		_, _, err := getMPAMConfigData(tmpfile, "", "")
 		assert.ErrorContains(t, err, "error parsing line 1")
@@ -203,7 +207,9 @@ func TestGetMPAMConfigData(t *testing.T) {
 
 	t.Run("empty_file", func(t *testing.T) {
 		tmpfile := createTestFile(t, "")
-		defer os.Remove(tmpfile)
+		defer func() {
+			_ = os.Remove(tmpfile)
+		}()
 
 		config1, config2, err := getMPAMConfigData(tmpfile, "", "")
 		assert.NoError(t, err)
@@ -224,8 +230,8 @@ func TestGetAllTargetDirWhenIsDirIsTrue(t *testing.T) {
 		// │   └── l3_cache/
 		// └── group2/
 		//     └── l3_cache/
-		os.MkdirAll(filepath.Join(tmpRoot, "group1", "l3_cache"), 0755)
-		os.MkdirAll(filepath.Join(tmpRoot, "group2", "l3_cache"), 0755)
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpRoot, "group1", "l3_cache"), 0755))
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpRoot, "group2", "l3_cache"), 0755))
 
 		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true, logger)
 		assert.NoError(t, err)
@@ -236,7 +242,7 @@ func TestGetAllTargetDirWhenIsDirIsTrue(t *testing.T) {
 
 	t.Run("no_target_subdir", func(t *testing.T) {
 		tmpRoot := t.TempDir()
-		os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755)
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755))
 
 		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true, logger)
 		assert.NoError(t, err)
@@ -257,8 +263,8 @@ func TestGetAllTargetDirWhenIsDirIsTrue(t *testing.T) {
 		//     │   └── l3_cache/
 		//     └── child2/
 		//         └── l3_cache/
-		os.MkdirAll(filepath.Join(tmpRoot, "parent", "child1", "l3_cache"), 0755)
-		os.MkdirAll(filepath.Join(tmpRoot, "parent", "child2", "l3_cache"), 0755)
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpRoot, "parent", "child1", "l3_cache"), 0755))
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpRoot, "parent", "child2", "l3_cache"), 0755))
 
 		result, err := getAllTargetDirs(tmpRoot, "l3_cache", true, logger)
 		assert.NoError(t, err)
@@ -279,10 +285,14 @@ func TestGetAllTargetDirWhenIsDirIsFalse(t *testing.T) {
 		// │   └── l3_cache/
 		// └── group2/
 		//     └── l3_cache/
-		os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755)
-		os.MkdirAll(filepath.Join(tmpRoot, "group2"), 0755)
-		os.Create(filepath.Join(tmpRoot, "group1", "l3_cache"))
-		os.Create(filepath.Join(tmpRoot, "group2", "l3_cache"))
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755))
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpRoot, "group2"), 0755))
+		file, err := os.Create(filepath.Join(tmpRoot, "group1", "l3_cache"))
+		assert.NoError(t, err)
+		assert.NoError(t, file.Close())
+		file, err = os.Create(filepath.Join(tmpRoot, "group2", "l3_cache"))
+		assert.NoError(t, err)
+		assert.NoError(t, file.Close())
 
 		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false, logger)
 		assert.NoError(t, err)
@@ -293,7 +303,7 @@ func TestGetAllTargetDirWhenIsDirIsFalse(t *testing.T) {
 
 	t.Run("no_target_subfile", func(t *testing.T) {
 		tmpRoot := t.TempDir()
-		os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755)
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpRoot, "group1"), 0755))
 
 		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false, logger)
 		assert.NoError(t, err)
@@ -314,10 +324,14 @@ func TestGetAllTargetDirWhenIsDirIsFalse(t *testing.T) {
 		//     │   └── l3_cache/
 		//     └── child2/
 		//         └── l3_cache/
-		os.MkdirAll(filepath.Join(tmpRoot, "parent", "child1"), 0755)
-		os.MkdirAll(filepath.Join(tmpRoot, "parent", "child2"), 0755)
-		os.Create(filepath.Join(tmpRoot, "parent", "child1", "l3_cache"))
-		os.Create(filepath.Join(tmpRoot, "parent", "child2", "l3_cache"))
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpRoot, "parent", "child1"), 0755))
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpRoot, "parent", "child2"), 0755))
+		file, err := os.Create(filepath.Join(tmpRoot, "parent", "child1", "l3_cache"))
+		assert.NoError(t, err)
+		assert.NoError(t, file.Close())
+		file, err = os.Create(filepath.Join(tmpRoot, "parent", "child2", "l3_cache"))
+		assert.NoError(t, err)
+		assert.NoError(t, file.Close())
 
 		result, err := getAllTargetDirs(tmpRoot, "l3_cache", false, logger)
 		assert.NoError(t, err)
@@ -332,9 +346,9 @@ func TestListResInfoSubDirs(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// 创建测试目录结构
-		os.MkdirAll(filepath.Join(tmpDir, "l3cache_group1"), 0755)
-		os.MkdirAll(filepath.Join(tmpDir, "mem_group1"), 0755)
-		os.MkdirAll(filepath.Join(tmpDir, "l3cache_group2"), 0755)
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "l3cache_group1"), 0755))
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "mem_group1"), 0755))
+		assert.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "l3cache_group2"), 0755))
 
 		l3Dirs, memDirs, err := listResInfoSubDirs(tmpDir, "l3cache", "mem")
 		assert.NoError(t, err)
@@ -361,8 +375,8 @@ func TestListResInfoSubDirs(t *testing.T) {
 	t.Run("mixed_files_and_dirs", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		// 创建文件和目录混合场景
-		os.WriteFile(filepath.Join(tmpDir, "l3cache_file"), []byte("data"), 0644)
-		os.Mkdir(filepath.Join(tmpDir, "mem_group1"), 0755)
+		assert.NoError(t, os.WriteFile(filepath.Join(tmpDir, "l3cache_file"), []byte("data"), 0644))
+		assert.NoError(t, os.Mkdir(filepath.Join(tmpDir, "mem_group1"), 0755))
 
 		l3Dirs, memDirs, err := listResInfoSubDirs(tmpDir, "l3cache", "mem")
 		assert.NoError(t, err)
@@ -384,7 +398,9 @@ func TestListResInfoSubDirs(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 在测试结束后恢复权限，确保清理能正常进行
-		defer os.Chmod(restrictedDir, 0755)
+		defer func() {
+			_ = os.Chmod(restrictedDir, 0755)
+		}()
 
 		// 测试：尝试读取没有执行权限的目录
 		l3Dirs, memDirs, err := listResInfoSubDirs(restrictedDir, "l3cache", "mem")
@@ -408,19 +424,21 @@ func TestListResInfoSubDirs(t *testing.T) {
 		restrictedDir := filepath.Join(tmpDir, "restricted")
 
 		// 正常目录
-		os.MkdirAll(normalDir, 0755)
-		os.MkdirAll(filepath.Join(normalDir, "l3cache_normal"), 0755)
+		assert.NoError(t, os.MkdirAll(normalDir, 0755))
+		assert.NoError(t, os.MkdirAll(filepath.Join(normalDir, "l3cache_normal"), 0755))
 
 		// 受限目录
-		os.MkdirAll(restrictedDir, 0644)
-		os.MkdirAll(filepath.Join(restrictedDir, "l3cache_restricted"), 0755)
+		assert.NoError(t, os.MkdirAll(restrictedDir, 0644))
+		assert.NoError(t, os.MkdirAll(filepath.Join(restrictedDir, "l3cache_restricted"), 0755))
 
 		// 然后修改权限为0300（有写和执行权限，无读权限，必定返回错误）
 		err := os.Chmod(restrictedDir, 0300)
 		assert.NoError(t, err)
 
 		// 在测试结束后恢复权限，确保清理能正常进行
-		defer os.Chmod(restrictedDir, 0755)
+		defer func() {
+			_ = os.Chmod(restrictedDir, 0755)
+		}()
 
 		// 测试正常目录应该能正常工作
 		l3Dirs, _, err := listResInfoSubDirs(normalDir, "l3cache", "mem")
@@ -442,7 +460,7 @@ func TestListResInfoSubDirs(t *testing.T) {
 func TestGetFileContent(t *testing.T) {
 	t.Run("normal_file", func(t *testing.T) {
 		tmpFile := filepath.Join(t.TempDir(), "test")
-		os.WriteFile(tmpFile, []byte("  test content\n"), 0644)
+		assert.NoError(t, os.WriteFile(tmpFile, []byte("  test content\n"), 0644))
 
 		content, err := getFileContent(tmpFile)
 		assert.NoError(t, err)
@@ -456,7 +474,7 @@ func TestGetFileContent(t *testing.T) {
 
 	t.Run("permission_denied", func(t *testing.T) {
 		tmpFile := filepath.Join(t.TempDir(), "restricted.txt")
-		os.WriteFile(tmpFile, []byte("data"), 0200) // 只写权限
+		assert.NoError(t, os.WriteFile(tmpFile, []byte("data"), 0200)) // 只写权限
 
 		_, err := getFileContent(tmpFile)
 		if err == nil {

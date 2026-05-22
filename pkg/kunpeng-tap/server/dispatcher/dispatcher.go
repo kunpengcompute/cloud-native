@@ -332,7 +332,7 @@ func (d *dispatcher) parseCRICreateContainerRequest(request *runtimeapi.CreateCo
 
 // parseDockerCreateContainerRequest parses Docker CreateContainerRequest
 func (d *dispatcher) parseDockerCreateContainerRequest(request utils.DockerCreateRequest) interface{} {
-	podID := request.ConfigWrapper.Config.Labels[utils.SandboxIDLabelKey]
+	podID := request.Labels[utils.SandboxIDLabelKey]
 	podInfo, err := d.getPodInfo(podID)
 	if err != nil {
 		klog.Errorf("fail to parse request %v %v", request, err)
@@ -426,8 +426,8 @@ func (d *dispatcher) ParsePodRequest(req interface{}) interface{} {
 			},
 			Labels:         request.ContainerRawLabel,
 			Annotations:    request.ContainerRawAnnotations,
-			CgroupParent:   utils.ToCriCgroupPath(d.dockerCgroupDriver, request.ConfigWrapper.HostConfig.CgroupParent),
-			Resources:      utils.HostConfigToResource(request.ConfigWrapper.HostConfig),
+			CgroupParent:   utils.ToCriCgroupPath(d.dockerCgroupDriver, request.HostConfig.CgroupParent),
+			Resources:      utils.HostConfigToResource(request.HostConfig),
 			RuntimeHandler: "docker",
 		}
 	}

@@ -32,7 +32,7 @@ var _ = Describe("Server", func() {
 		if _, err := os.Stat(options.RuntimeProxyEndpoint); err == nil {
 			err := syscall.Unlink(options.RuntimeProxyEndpoint)
 			Expect(err).To(BeNil())
-			os.Remove(options.RuntimeProxyEndpoint)
+			_ = os.Remove(options.RuntimeProxyEndpoint)
 		}
 
 		var err error
@@ -66,7 +66,7 @@ var _ = Describe("Server", func() {
 	})
 
 	AfterEach(func() {
-		containerRuntimeConn.Close()
+		_ = containerRuntimeConn.Close()
 		server.Shutdown(context.Background())
 	})
 
@@ -79,7 +79,9 @@ var _ = Describe("Server", func() {
 			)
 
 			Expect(err).To(BeNil())
-			defer conn.Close()
+			defer func() {
+				_ = conn.Close()
+			}()
 
 			client := runtimeapi.NewRuntimeServiceClient(conn)
 			versionResp, err := client.Version(context.Background(), &runtimeapi.VersionRequest{})

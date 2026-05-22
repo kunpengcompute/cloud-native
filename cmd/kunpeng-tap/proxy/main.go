@@ -60,7 +60,11 @@ func main() {
 	proxyServer := createProxyServer(d, policyManager, cache)
 
 	startMonitor(proxyServer)
-	go proxyServer.Run()
+	go func() {
+		if err := proxyServer.Run(); err != nil {
+			klog.ErrorS(err, "Proxy server stopped with error")
+		}
+	}()
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)

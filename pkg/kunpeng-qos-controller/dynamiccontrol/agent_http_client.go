@@ -173,7 +173,7 @@ func (c *HTTPAgentClient) PublishOnlinePods(ctx context.Context, req AgentAnalyz
 	if err != nil {
 		return fmt.Errorf("publish online pods failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint: errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return decodeAgentHTTPError(resp)
@@ -218,7 +218,7 @@ func (c *HTTPAgentClient) GetInterference(ctx context.Context, nodeName string) 
 	if err != nil {
 		return AgentAnalyzeResult{}, fmt.Errorf("get interference failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint: errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return AgentAnalyzeResult{}, decodeAgentHTTPError(resp)

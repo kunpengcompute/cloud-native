@@ -40,7 +40,7 @@ func NewTestHelper() *TestHelper {
 
 func (h *TestHelper) Cleanup() {
 	if h.tempDir != "" {
-		os.RemoveAll(h.tempDir)
+		_ = os.RemoveAll(h.tempDir)
 	}
 }
 
@@ -696,7 +696,7 @@ var _ = Describe("System", func() {
 
 		AfterEach(func() {
 			if tmpDir != "" {
-				os.RemoveAll(tmpDir)
+				_ = os.RemoveAll(tmpDir)
 			}
 		})
 
@@ -991,8 +991,8 @@ Node 1 MemUsed:        4194304 kB
 			}
 
 			// Remove the has_memory and has_normal_memory files
-			os.Remove(filepath.Join(helper.TempDir(), "devices/system/node/has_memory"))
-			os.Remove(filepath.Join(helper.TempDir(), "devices/system/node/has_normal_memory"))
+			_ = os.Remove(filepath.Join(helper.TempDir(), "devices/system/node/has_memory"))
+			_ = os.Remove(filepath.Join(helper.TempDir(), "devices/system/node/has_normal_memory"))
 
 			// Discover nodes first
 			err := newSys.discoverNodes()

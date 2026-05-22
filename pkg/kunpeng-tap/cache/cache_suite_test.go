@@ -18,15 +18,9 @@ package cache_test
 
 import (
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-)
-
-var (
-	interval = 1 * time.Second
-	timeout  = 10 * time.Second
 )
 
 func TestCache(t *testing.T) {

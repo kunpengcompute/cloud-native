@@ -18,17 +18,12 @@ package policy_test
 
 import (
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var (
-	interval           = 1 * time.Second
-	timeout            = 10 * time.Second
-	utSocketPathPrefix = "/tmp/tap-test"
-)
+const utSocketPathPrefix = "/tmp/tap-test"
 
 func TestPolicy(t *testing.T) {
 	RegisterFailHandler(Fail)

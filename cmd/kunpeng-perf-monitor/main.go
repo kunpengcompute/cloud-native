@@ -91,7 +91,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(collects) > 0 && len(excludes) > 0 {
 		h.logger.Debug("rejecting combined collect and exclude queries")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Combined collect and exclude queries are not allowed."))
+		_, _ = w.Write([]byte("Combined collect and exclude queries are not allowed."))
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Warn("Couldn't create filtered metrics handler:", "err", err)
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "Couldn't create filtered metrics handler: %s", err)
+		_, _ = fmt.Fprintf(w, "Couldn't create filtered metrics handler: %s", err)
 		return
 	}
 	filteredHandler.ServeHTTP(w, r)

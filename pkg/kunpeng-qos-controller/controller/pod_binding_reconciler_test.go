@@ -27,13 +27,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-type noopPodBinder struct{}
-
-func (b noopPodBinder) BindPodToGroup(_ context.Context, _ *corev1.Pod, _ string) error { return nil }
-
 type noopCPUQoSSetter struct{}
 
-func (s noopCPUQoSSetter) SetPodCPUQoSLevel(_ context.Context, _ *corev1.Pod, _ string) error { return nil }
+func (s noopCPUQoSSetter) SetPodCPUQoSLevel(_ context.Context, _ *corev1.Pod, _ string) error {
+	return nil
+}
 
 func TestResolvePodGroup(t *testing.T) {
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{PodQoSGroupLabelKey: "group-b"}}}

@@ -32,7 +32,7 @@ type mockRespWriter struct {
 }
 
 func (m *mockRespWriter) Write(p []byte) (n int, err error) {
-	m.w.Write(p)
+	_, _ = m.w.Write(p)
 	return m.ResponseWriter.Write(p)
 }
 

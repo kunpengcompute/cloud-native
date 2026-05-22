@@ -35,7 +35,7 @@ var _ = Describe("Utils", func() {
 	})
 
 	AfterEach(func() {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 	})
 
 	Context("readSysfsEntry", func() {
