@@ -225,6 +225,25 @@ kubectl exec -it offline-small-nginx -- cat /sys/fs/cgroup/cpu/cpu.qos_level
 可能的回显结果如下，可以看到`offline-small-nginx`的`cpu.qos_level`为`-1`,说明`offline-small-nginx`已加入到`offline-small`控制组中，且`cpu.qos_level`为`-1`
 ![图：验证](../images/kunpeng-qos-controller-pod-qos-level.png)
 
+## 删除控制组示例
+
+控制组的删除通过删除对应 `QoSPolicy` 完成，`QoSPolicy` 删除后，Operator 会在本节点清理同名 `resctrl` 控制组。
+
+```bash
+kubectl delete qospolicy offline-small
+```
+
+### 删除后验证
+
+```bash
+kubectl get qospolicy offline-small
+POD=$(kubectl -n qos-system get pod -l app=qos-controller -o name | head -n1)
+kubectl -n qos-system exec -it "${POD#pod/}" -- ls /sys/fs/resctrl
+```
+
+可能的回显结果如下，`qospolicy` 查询不到对象，且 `resctrl` 目录中不存在 `offline-small`，说明控制组已删除。
+
+![图：删除 QoSPolicy 后控制组清理结果](../images/kunpeng-qos-controller-delete.png)
 ## 常用清单路径
 
 - CRD：
