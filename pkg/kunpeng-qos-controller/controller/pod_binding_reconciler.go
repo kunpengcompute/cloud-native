@@ -237,14 +237,23 @@ func dynamicOfflineGroupName(nodeName string) string {
 func (r *PodBindingReconciler) mapQoSPolicyToPods(ctx context.Context, obj client.Object) []reconcile.Request {
 	policy, ok := obj.(*qosv1alpha1.QoSPolicy)
 	if !ok || policy == nil || policy.Name == "" {
+		klog.V(4).Infof("skip QoSPolicy-to-Pod mapping for invalid object: %#v", obj)
 		return nil
 	}
+	klog.V(2).Infof(
+		"map QoSPolicy %s to pods on node %s, selector=%v",
+		policy.Name, r.nodeIdentity().NodeName(), policy.Spec.NodeSelector,
+	)
 	nodeLabels, err := r.nodeIdentity().NodeLabels(ctx, r.Client)
 	if err != nil {
 		klog.Warningf("get labels for node %s failed when handling QoSPolicy %s: %v", r.nodeIdentity().NodeName(), policy.Name, err)
 		return nil
 	}
 	if !util.MatchNodeSelector(nodeLabels, policy.Spec.NodeSelector) {
+		klog.V(2).Infof(
+			"skip QoSPolicy %s mapping on node %s: nodeSelector mismatch, nodeLabels=%v selector=%v",
+			policy.Name, r.nodeIdentity().NodeName(), nodeLabels, policy.Spec.NodeSelector,
+		)
 		return nil
 	}
 
@@ -253,13 +262,19 @@ func (r *PodBindingReconciler) mapQoSPolicyToPods(ctx context.Context, obj clien
 		klog.Warningf("list pods for QoSPolicy %s failed: %v", policy.Name, err)
 		return nil
 	}
+	klog.V(2).Infof("listed %d pods with label %s=%s", len(pods.Items), PodQoSGroupLabelKey, policy.Name)
 
 	requests := make([]reconcile.Request, 0, len(pods.Items))
 	for i := range pods.Items {
 		pod := &pods.Items[i]
 		if !r.shouldProcessPod(pod) {
+			klog.V(4).Infof(
+				"skip pod %s/%s for QoSPolicy %s mapping: shouldProcessPod=false (node=%s phase=%s labels=%v)",
+				pod.Namespace, pod.Name, policy.Name, pod.Spec.NodeName, pod.Status.Phase, pod.Labels,
+			)
 			continue
 		}
+		klog.V(3).Infof("enqueue pod %s/%s for QoSPolicy %s update", pod.Namespace, pod.Name, policy.Name)
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: pod.Namespace,
@@ -267,6 +282,7 @@ func (r *PodBindingReconciler) mapQoSPolicyToPods(ctx context.Context, obj clien
 			},
 		})
 	}
+	klog.V(2).Infof("mapped QoSPolicy %s to %d pod reconcile requests", policy.Name, len(requests))
 	return requests
 }
 
