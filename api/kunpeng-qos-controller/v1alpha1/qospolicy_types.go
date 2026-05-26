@@ -48,7 +48,7 @@ type CPUPolicy struct {
 	// Update rule:
 	// - create can set any value in [-1, 1]
 	// - update only allows: 0 -> -1/0/1, or value unchanged
-	// +kubebuilder:validation:XValidation:rule="oldSelf == null || self == oldSelf || oldSelf == 0",message="qosLevel update only allows transitions from 0 to -1/0/1 (or keep unchanged)"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf || oldSelf == 0",message="qosLevel update only allows transitions from 0 to -1/0/1 (or keep unchanged)"
 	// +kubebuilder:validation:Minimum=-1
 	// +kubebuilder:validation:Maximum=1
 	// +kubebuilder:default:=0
