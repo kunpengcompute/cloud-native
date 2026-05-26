@@ -58,7 +58,7 @@ make kunpeng-qos-controller-docker
 如果集群运行时使用的是 `containerd`，可先导出镜像，再在目标节点导入：
 
 ```bash
-docker save kunpeng-qos-controller:1.0 -o kunpeng-qos-controller.tar
+docker save kunpeng-qos-controller:0.1.0 -o kunpeng-qos-controller.tar
 ```
 
 将 `kunpeng-qos-controller.tar` 复制到目标节点后，执行：
