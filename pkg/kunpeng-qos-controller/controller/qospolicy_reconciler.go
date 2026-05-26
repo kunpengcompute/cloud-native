@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -76,21 +78,15 @@ func (r *QoSPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			return ctrl.Result{}, err
 		}
 
-		if controllerutil.ContainsFinalizer(&policy, finalizer) {
-			controllerutil.RemoveFinalizer(&policy, finalizer)
-			if err := r.Update(ctx, &policy); err != nil {
-				return ctrl.Result{}, err
-			}
+		if err := r.removeFinalizerWithRetry(ctx, req.NamespacedName, finalizer); err != nil {
+			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
 
 	// Ensure finalizer on normal reconcile so delete can trigger local cleanup.
-	if !controllerutil.ContainsFinalizer(&policy, finalizer) {
-		controllerutil.AddFinalizer(&policy, finalizer)
-		if err := r.Update(ctx, &policy); err != nil {
-			return ctrl.Result{}, err
-		}
+	if err := r.ensureFinalizerWithRetry(ctx, req.NamespacedName, finalizer); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	nodeLabels, err := r.nodeIdentity().NodeLabels(ctx, r.Client)
@@ -189,4 +185,51 @@ func (r *QoSPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 		}).
 		Complete(r)
+}
+
+func (r *QoSPolicyReconciler) ensureFinalizerWithRetry(
+	ctx context.Context,
+	key types.NamespacedName,
+	finalizer string,
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var latest qosv1alpha1.QoSPolicy
+		if err := r.Get(ctx, key, &latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		if !latest.DeletionTimestamp.IsZero() {
+			return nil
+		}
+		if controllerutil.ContainsFinalizer(&latest, finalizer) {
+			return nil
+		}
+		base := latest.DeepCopy()
+		controllerutil.AddFinalizer(&latest, finalizer)
+		return r.Patch(ctx, &latest, client.MergeFrom(base))
+	})
+}
+
+func (r *QoSPolicyReconciler) removeFinalizerWithRetry(
+	ctx context.Context,
+	key types.NamespacedName,
+	finalizer string,
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var latest qosv1alpha1.QoSPolicy
+		if err := r.Get(ctx, key, &latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		if !controllerutil.ContainsFinalizer(&latest, finalizer) {
+			return nil
+		}
+		base := latest.DeepCopy()
+		controllerutil.RemoveFinalizer(&latest, finalizer)
+		return r.Patch(ctx, &latest, client.MergeFrom(base))
+	})
 }
