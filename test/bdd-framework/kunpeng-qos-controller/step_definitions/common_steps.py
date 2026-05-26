@@ -535,6 +535,14 @@ def given_cpu_qos_minus_one_policy(name: str):
     create_cpu_qos_minus_one_policy(name)
 
 
+@given(parsers.parse('创建 cpu.qos_level 为 {level:d} 的全局 QoSPolicy "{name}"'))
+def given_policy_with_cpu_qos_level(name: str, level: int):
+    doc = _default_policy_doc(name)
+    doc["spec"]["cpu"] = {"qosLevel": level}
+    _apply_policy(doc)
+    test_context["current_group"] = name
+
+
 @when(parsers.parse('创建仅在当前节点生效的 QoSPolicy "{name}"'))
 def create_node_selector_match_policy(name: str):
     key, value = _select_node_label_for_policy_selector()
@@ -696,6 +704,25 @@ def update_policy(name: str, mb_max: int, l3_ways: int):
     _apply_policy(doc)
 
 
+def _patch_policy_cpu_qos_level(name: str, level: int, check: bool) -> subprocess.CompletedProcess:
+    patch = f'{{"spec":{{"cpu":{{"qosLevel":{level}}}}}}}'
+    return _run_kubectl(
+        ["patch", "qospolicy", name, "--type=merge", "-p", patch],
+        check=check,
+    )
+
+
+@when(parsers.parse('将 QoSPolicy "{name}" 的 cpu.qos_level 更新为 {level:d}'))
+def update_policy_cpu_qos_level(name: str, level: int):
+    _patch_policy_cpu_qos_level(name, level, check=True)
+
+
+@when(parsers.parse('尝试将 QoSPolicy "{name}" 的 cpu.qos_level 更新为 {level:d}'))
+def try_update_policy_cpu_qos_level(name: str, level: int):
+    res = _patch_policy_cpu_qos_level(name, level, check=False)
+    test_context["last_apply_error"] = (res.stderr or "") + (res.stdout or "")
+
+
 @when(parsers.parse('更新 QoSPolicy "{name}" 的 NodeSelector 为不匹配当前节点'))
 def update_policy_node_selector_mismatch(name: str):
     specs = test_context.get("policy_specs")
@@ -782,6 +809,11 @@ def assert_invalid_rejected():
     lowered = msg.lower()
     if "invalid" not in lowered and "denied" not in lowered:
         raise AssertionError(f"unexpected apply failure message: {msg}")
+
+
+@then("更新应被 API 直接拒绝")
+def assert_update_rejected():
+    assert_invalid_rejected()
 
 
 @then(parsers.parse('不应创建名为 "{group_name}" 的 resctrl 控制组'))

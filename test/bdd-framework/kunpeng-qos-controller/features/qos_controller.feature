@@ -39,6 +39,28 @@ Feature: QoS Operator 核心闭环
     Then Pod "offline-qos-pod" 最终应为 Running
     And Pod "offline-qos-pod" 的所有容器 cpu.qos_level 应为 "-1"
 
+  @e2e @smoke @negative
+  Scenario Outline: cpu.qos_level 非法过渡在更新时应被拒绝
+    Given 创建 cpu.qos_level 为 <from_level> 的全局 QoSPolicy "cpu-transition-policy"
+    When 尝试将 QoSPolicy "cpu-transition-policy" 的 cpu.qos_level 更新为 <to_level>
+    Then 更新应被 API 直接拒绝
+
+    Examples:
+      | from_level | to_level |
+      | -1         | 0        |
+      | -1         | 1        |
+      | 1          | 0        |
+      | 1          | -1       |
+
+  @e2e @smoke @lifecycle
+  Scenario: Pod 已绑定后，cpu.qos_level 从 0 更新为 -1 应生效
+    Given 创建默认全局 QoSPolicy "cpu-update-policy"
+    And 创建带控制组标签 "cpu-update-policy" 的测试 Pod "cpu-update-pod"
+    Then Pod "cpu-update-pod" 最终应为 Running
+    And Pod "cpu-update-pod" 的所有容器 cpu.qos_level 应为 "0"
+    When 将 QoSPolicy "cpu-update-policy" 的 cpu.qos_level 更新为 -1
+    Then Pod "cpu-update-pod" 的所有容器 cpu.qos_level 应为 "-1"
+
   @e2e @smoke @lifecycle @resctrl
   Scenario: NodeSelector 匹配当前节点时策略应生效
     When 创建仅在当前节点生效的 QoSPolicy "node-selector-match"

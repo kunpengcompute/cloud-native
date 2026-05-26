@@ -67,6 +67,9 @@ spec:
                     maximum: 1
                     minimum: -1
                     type: integer
+                    x-kubernetes-validations:
+                    - message: qosLevel update only allows transitions from 0 to -1/0/1 (or keep unchanged)
+                      rule: oldSelf == null || self == oldSelf || oldSelf == 0
                 type: object
               l3:
                 default: {}
