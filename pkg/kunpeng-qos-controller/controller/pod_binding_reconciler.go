@@ -137,7 +137,16 @@ func resolvePodGroup(pod *corev1.Pod) (string, bool) {
 
 func (r *PodBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Pod{}).
+		For(
+			&corev1.Pod{},
+			builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+				pod, ok := obj.(*corev1.Pod)
+				if !ok {
+					return false
+				}
+				return r.shouldProcessPod(pod)
+			})),
+		).
 		Watches(
 			&qosv1alpha1.QoSPolicy{},
 			handler.EnqueueRequestsFromMapFunc(r.mapQoSPolicyToPods),
@@ -162,13 +171,6 @@ func (r *PodBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				},
 			}),
 		).
-		WithEventFilter(predicate.NewPredicateFuncs(func(obj client.Object) bool {
-			pod, ok := obj.(*corev1.Pod)
-			if !ok {
-				return false
-			}
-			return r.shouldProcessPod(pod)
-		})).
 		Complete(r)
 }
 
