@@ -37,6 +37,12 @@ import (
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-qos-controller/dynamiccontrol"
 )
 
+var (
+	version   = "dev"
+	gitCommit = "unknown"
+	buildTime = "unknown"
+)
+
 func main() {
 	klog.InitFlags(nil)
 	defer klog.Flush()
@@ -50,6 +56,7 @@ func main() {
 }
 
 func run() error {
+	showVersion := flag.Bool("version", false, "print version information and exit")
 	enableDynamicControl := flag.Bool("enable-dynamic-control", false, "enable dynamic interference control loops")
 	enableMetrics := flag.Bool("enable-metrics", false, "enable metrics endpoint")
 	metricsBindAddress := flag.String("metrics-bind-address", ":8080", "metrics endpoint bind address when --enable-metrics=true")
@@ -58,6 +65,12 @@ func run() error {
 	applyInterval := flag.Duration("dynamic-apply-interval", 30*time.Second, "interval for pulling interference and applying tuning decisions")
 	taskTimeout := flag.Duration("dynamic-task-timeout", 10*time.Second, "timeout for one dynamic-control task execution")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("kunpeng-qos-controller version=%s commit=%s buildTime=%s\n", version, gitCommit, buildTime)
+		return nil
+	}
+
 	ctrl.SetLogger(klog.NewKlogr())
 
 	if *publishInterval <= 0 {
