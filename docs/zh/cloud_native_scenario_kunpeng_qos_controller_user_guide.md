@@ -212,7 +212,7 @@ kubectl apply -f pod-offline-small.yaml
 #### 验证 Pod 是否加入到指定控制组中
 ```bash
 POD=$(kubectl -n qos-system get pod -l app=qos-controller -o name | head -n1)
-kubectl -n qos-system exec -it "${POD#pod/}" -- cat /sys/fs/resctrl/offline-small/schemata
+kubectl -n qos-system exec -it "${POD#pod/}" -- cat /sys/fs/resctrl/offline-small/tasks
 ```
 可能的回显结果如下，可以看到在`offline-small`控制组中的`tasks`中有相应的`pid`,说明`offline-small-nginx`已加入到`offline-small`控制组中。
 ![图：验证](../images/kunpeng-qos-controller-pod-join-resctrl.png)
