@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-tap/policy-manager/v1alpha1"
 	koor "kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-tap/policy-manager/v1alpha1"
 	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/cache"
 )
@@ -43,7 +42,7 @@ func (cc *ContainerContext) GetContainerID() string {
 }
 
 func (cc *ContainerContext) FromProxy(req interface{}) {
-	request, ok := req.(*v1alpha1.ContainerResourceHookRequest)
+	request, ok := req.(*koor.ContainerResourceHookRequest)
 	if !ok {
 		klog.ErrorS(fmt.Errorf("request is not ContainerResourceHookRequest"), "Failed to get ContainerResourceHookRequest")
 		return
@@ -79,8 +78,6 @@ const (
 
 	Cgroupfs CgroupDriverType = "cgroupfs"
 	Systemd  CgroupDriverType = "systemd"
-
-	kubeletDefaultCgroupDriver = Cgroupfs
 
 	KubeRootNameSystemd       = "kubepods.slice/"
 	KubeBurstableNameSystemd  = "kubepods-burstable.slice/"
@@ -232,7 +229,7 @@ var (
 				return RuntimeTypeUnknown, "", err
 			}
 			if hashID[0] == RuntimeTypeDocker || hashID[0] == RuntimeTypeContainerd || hashID[0] == RuntimeTypePouch || hashID[0] == RuntimeTypeCrio {
-				return hashID[0], fmt.Sprintf("%s", hashID[1]), nil
+				return hashID[0], hashID[1], nil
 			} else {
 				err := fmt.Errorf("unknown container protocol %s", id)
 				klog.ErrorS(err, "Unknown container protocol", "id", id)
@@ -292,7 +289,7 @@ type ContainerMeta struct {
 	Sandbox bool
 }
 
-func (c *ContainerMeta) FromProxy(containerMeta *v1alpha1.ContainerMetadata, podAnnotations map[string]string) {
+func (c *ContainerMeta) FromProxy(containerMeta *koor.ContainerMetadata, podAnnotations map[string]string) {
 	c.Name = containerMeta.GetName()
 	uid := containerMeta.GetId()
 	c.ID = getContainerID(podAnnotations, uid)
@@ -313,7 +310,7 @@ type PodMeta struct {
 	UID       string
 }
 
-func (p *PodMeta) FromProxy(meta *v1alpha1.PodSandboxMetadata) {
+func (p *PodMeta) FromProxy(meta *koor.PodSandboxMetadata) {
 	p.Namespace = meta.GetNamespace()
 	p.Name = meta.GetName()
 	p.UID = meta.GetUid()
@@ -330,7 +327,7 @@ type ContainerRequest struct {
 	ExtendedResources *ExtendedResourceContainerSpec
 }
 
-func (c *ContainerRequest) FromProxy(req *v1alpha1.ContainerResourceHookRequest) {
+func (c *ContainerRequest) FromProxy(req *koor.ContainerResourceHookRequest) {
 	c.PodMeta.FromProxy(req.PodMeta)
 	c.ContainerMeta.FromProxy(req.ContainerMeta, req.PodAnnotations)
 	c.PodLabels = req.GetPodLabels()
@@ -520,7 +517,7 @@ func (r *Resources) IsOriginResSet() bool {
 		r.CpuSetCpus != nil || r.MemoryLimitInBytes != nil || r.CpuSetMems != nil
 }
 
-func (r *Resources) FromProxy(req *v1alpha1.ContainerResourceHookRequest) {
+func (r *Resources) FromProxy(req *koor.ContainerResourceHookRequest) {
 	ctrRes := req.ContainerResources
 	if ctrRes == nil {
 		klog.ErrorS(fmt.Errorf("linux container resources is nil"), "Failed to get Linux Container Resources")
@@ -564,10 +561,10 @@ type LinuxDevice struct {
 	FileModeValue uint32
 }
 
-func (c *ContainerResponse) ProxyDone(resp *v1alpha1.ContainerResourceHookResponse) {
+func (c *ContainerResponse) ProxyDone(resp *koor.ContainerResourceHookResponse) {
 	if c.Resources.IsOriginResSet() && resp.ContainerResources == nil {
 		// resource value is injected but origin request is nil, init resource response
-		resp.ContainerResources = &v1alpha1.LinuxContainerResources{}
+		resp.ContainerResources = &koor.LinuxContainerResources{}
 	}
 	if c.Resources.CpuSetCpus != nil {
 		resp.ContainerResources.CpusetCpus = *c.Resources.CpuSetCpus

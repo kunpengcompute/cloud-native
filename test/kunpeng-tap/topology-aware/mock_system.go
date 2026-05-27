@@ -750,7 +750,6 @@ func (p *MockCPUPackage) MemoryInfo() (*system.MemInfo, error) {
 
 // MockDie represents a die within a package
 type MockDie struct {
-	id      system.ID
 	cpuSet  cpuset.CPUSet
 	nodeIDs []system.ID
 }

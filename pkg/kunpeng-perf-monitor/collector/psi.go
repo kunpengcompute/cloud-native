@@ -243,7 +243,7 @@ func (c *psiCollector) getPSIData(psiFilePath string) (PSICgroupResourceData, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to open psi file: %w", err)
 	}
-	defer file.Close()
+	defer file.Close() // nolint: errcheck
 
 	psiCgroupResourceData := PSICgroupResourceData{}
 

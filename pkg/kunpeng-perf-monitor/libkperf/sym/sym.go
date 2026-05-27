@@ -184,7 +184,7 @@ func StackToHash(pid int, address []uint64) ([]Symbol, error) {
 func MapAddr(pid int, addr uint64) (Symbol, error) {
 	cSymbol := C.SymResolverMapAddr(C.int(pid), C.ulong(addr))
 	if cSymbol == nil {
-		return Symbol{}, errors.New("Corresponding symbol not found")
+		return Symbol{}, errors.New("corresponding symbol not found")
 	}
 	return getGoSymbol(cSymbol), nil
 }
@@ -219,7 +219,7 @@ func GetAsmCode(moduleName string, startAddr uint64, endAddr uint64) (AsmStack, 
 func MapCodeAddr(moduleName string, startAddr uint64) (Symbol, error) {
 	cSymbol := C.SymResolverMapCodeAddr(C.CString(moduleName), C.ulong(startAddr))
 	if cSymbol == nil {
-		return Symbol{}, errors.New("Corresponding symbol not found")
+		return Symbol{}, errors.New("corresponding symbol not found")
 	}
 	return getGoSymbol(cSymbol), nil
 }

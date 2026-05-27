@@ -28,7 +28,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
 )
 
 const (
@@ -39,7 +38,7 @@ const (
 func main() {
 	klog.InitFlags(nil)
 	defer klog.Flush()
-	ctrl.SetLogger(klogr.New())
+	ctrl.SetLogger(klog.NewKlogr())
 
 	kernelVfDrivers := flag.String("kernel-vf-drivers", "hisi_hpre", "Comma separated VF Device Driver of the KAE Devices in the system. Devices supported: hisi_hpre,hisi_zip,hisi_sec2")
 	enableQos := flag.Bool("enable-qos", false, "Enable KAE QoS")

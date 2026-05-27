@@ -397,7 +397,9 @@ func TestAllocate(t *testing.T) {
 		t.Fatal("couldn't create temporary dir", err)
 	}
 
-	defer os.RemoveAll(tmpRoot)
+	defer func() {
+		_ = os.RemoveAll(tmpRoot)
+	}()
 
 	tcases := []struct {
 		devices           map[string]DeviceInfo

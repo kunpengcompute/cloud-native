@@ -89,9 +89,9 @@ func cgroupParentToQoS(dir string) corev1.PodQOSClass {
 	switch {
 	case len(split) < 2:
 		qos = corev1.PodQOSClass("")
-	case strings.Index(split[1], strings.ToLower(string(corev1.PodQOSBurstable))) != -1:
+	case strings.Contains(split[1], strings.ToLower(string(corev1.PodQOSBurstable))):
 		qos = corev1.PodQOSBurstable
-	case strings.Index(split[1], strings.ToLower(string(corev1.PodQOSBestEffort))) != -1:
+	case strings.Contains(split[1], strings.ToLower(string(corev1.PodQOSBestEffort))):
 		qos = corev1.PodQOSBestEffort
 	default:
 		qos = corev1.PodQOSGuaranteed
@@ -287,7 +287,10 @@ func (cch *cache) LoadStoreDocker(dockerClient client.CommonAPIClient, cgroupDri
 			RuntimeHandler: "Docker",
 			Resources:      utils.HostConfigToResource(s.ContainerJSON.HostConfig),
 		}
-		cch.InsertPod(s.ID, podInfo, nil)
+		if _, err := cch.InsertPod(s.ID, podInfo, nil); err != nil {
+			klog.ErrorS(err, "Failed to insert pod into cache", "podId", s.ID)
+			return err
+		}
 	}
 
 	for _, c := range containers {
@@ -316,7 +319,10 @@ func (cch *cache) LoadStoreDocker(dockerClient client.CommonAPIClient, cgroupDri
 		if c.Config != nil {
 			cInfo.ContainerEnvs = utils.SplitDockerEnv(c.Config.Env)
 		}
-		cch.InsertContainer(cInfo.ContainerMeta.Id, cInfo)
+		if _, err := cch.InsertContainer(cInfo.ContainerMeta.Id, cInfo); err != nil {
+			klog.ErrorS(err, "Failed to insert container into cache", "containerId", cInfo.ContainerMeta.Id)
+			return err
+		}
 	}
 	return nil
 }
@@ -371,7 +377,10 @@ func (cch *cache) processPodSandbox(containerdClient criv1.RuntimeServiceClient,
 	}
 	klog.V(3).InfoS("Get CgroupParent from pod info", "CgroupParent", podInfo.CgroupParent)
 
-	cch.InsertPod(pod.GetId(), podInfo, nil)
+	if _, err := cch.InsertPod(pod.GetId(), podInfo, nil); err != nil {
+		klog.ErrorS(err, "Failed to insert pod into cache", "podId", pod.GetId())
+		return err
+	}
 	return nil
 }
 
@@ -418,7 +427,10 @@ func (cch *cache) processContainer(containerdClient criv1.RuntimeServiceClient, 
 		cInfo.ContainerEnvs = ContainerdEnvConvert(containerInfoInStatus.Config.Envs)
 	}
 
-	cch.InsertContainer(cInfo.ContainerMeta.Id, cInfo)
+	if _, err := cch.InsertContainer(cInfo.ContainerMeta.Id, cInfo); err != nil {
+		klog.ErrorS(err, "Failed to insert container into cache", "containerId", cInfo.ContainerMeta.Id)
+		return err
+	}
 
 	// Set the correct container state from the CRI response.
 	// InsertContainer -> fromDockerRunRequest hardcodes ContainerStateCreating,
@@ -429,7 +441,6 @@ func (cch *cache) processContainer(containerdClient criv1.RuntimeServiceClient, 
 
 func (cch *cache) LoadStoreContainerd(containerdClient criv1.RuntimeServiceClient) error {
 
-	podResponse := &criv1.ListPodSandboxResponse{}
 	podResponse, err := containerdClient.ListPodSandbox(context.TODO(), &criv1.ListPodSandboxRequest{})
 	if err != nil {
 		return err

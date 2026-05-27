@@ -44,31 +44,31 @@ var _ = Describe("Server", Ordered, func() {
 			vars := mux.Vars(req)
 
 			resp.WriteHeader(http.StatusOK)
-			resp.Write([]byte("create container" + vars["dockerversion"]))
+			_, _ = resp.Write([]byte("create container" + vars["dockerversion"]))
 		})
 		FakeDockerHandler.HandleStartContainerReturns(func(resp http.ResponseWriter, req *http.Request) {
 			vars := mux.Vars(req)
 
 			resp.WriteHeader(http.StatusOK)
-			resp.Write([]byte("start container" + vars["dockerversion"] + vars["containerid"]))
+			_, _ = resp.Write([]byte("start container" + vars["dockerversion"] + vars["containerid"]))
 		})
 		FakeDockerHandler.HandleStopContainerReturns(func(resp http.ResponseWriter, req *http.Request) {
 			vars := mux.Vars(req)
 
 			resp.WriteHeader(http.StatusOK)
-			resp.Write([]byte("stop container" + vars["dockerversion"] + vars["containerid"]))
+			_, _ = resp.Write([]byte("stop container" + vars["dockerversion"] + vars["containerid"]))
 		})
 		FakeDockerHandler.HandleUpdateContainerReturns(func(resp http.ResponseWriter, req *http.Request) {
 			vars := mux.Vars(req)
 
 			resp.WriteHeader(http.StatusOK)
-			resp.Write([]byte("update container" + vars["dockerversion"] + vars["containerid"]))
+			_, _ = resp.Write([]byte("update container" + vars["dockerversion"] + vars["containerid"]))
 		})
 		FakeDockerHandler.HandleDeleteContainerReturns(func(resp http.ResponseWriter, req *http.Request) {
 			vars := mux.Vars(req)
 
 			resp.WriteHeader(http.StatusOK)
-			resp.Write([]byte("delete container" + vars["dockerversion"] + vars["containerid"]))
+			_, _ = resp.Write([]byte("delete container" + vars["dockerversion"] + vars["containerid"]))
 		})
 		FakeDockerHandler.DirectReturns("")
 
@@ -76,14 +76,14 @@ var _ = Describe("Server", Ordered, func() {
 		if _, err := os.Stat(options.RuntimeProxyEndpoint); err == nil {
 			err := syscall.Unlink(options.RuntimeProxyEndpoint)
 			Expect(err).To(BeNil())
-			os.Remove(options.RuntimeProxyEndpoint)
+			_ = os.Remove(options.RuntimeProxyEndpoint)
 		}
 
 		server = docker.NewDockerServer(FakeDockerHandler, nil)
 		Expect(server).NotTo(BeNil())
 
 		go func() {
-			server.Run()
+			_ = server.Run()
 		}()
 		Eventually(func() error {
 			_, err := os.Stat(options.RuntimeProxyEndpoint)
@@ -100,14 +100,16 @@ var _ = Describe("Server", Ordered, func() {
 
 	AfterAll(func() {
 		server.Shutdown(context.Background())
-		os.Remove(options.RuntimeProxyEndpoint)
+		_ = os.Remove(options.RuntimeProxyEndpoint)
 	})
 
 	Describe("Call create container url", func() {
 		It("should be pass", func() {
 			resp, err := unixHttpClient.Post("http://unix/v1.39/containers/create", "", nil)
 			Expect(err).NotTo(HaveOccurred())
-			defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 			body, err := io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))

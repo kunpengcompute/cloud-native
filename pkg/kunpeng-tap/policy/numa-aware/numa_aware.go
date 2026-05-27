@@ -132,7 +132,7 @@ func (p *NumaAwarePolicy) AllocateCPUSet(request, limit *v1.ResourceList) *polic
 		return nil
 	}
 	// 选择出 CPU 已分配量最低的节点
-	var preferedNode int = -1
+	var preferedNode = -1
 	used := math.MaxFloat64
 
 	for i, v := range nodeResources {

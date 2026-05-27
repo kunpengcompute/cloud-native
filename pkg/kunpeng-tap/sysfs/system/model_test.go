@@ -35,7 +35,7 @@ var _ = Describe("Model Detection", func() {
 	})
 
 	AfterEach(func() {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		ResetSupportsClusterFeatureCache()
 	})
 

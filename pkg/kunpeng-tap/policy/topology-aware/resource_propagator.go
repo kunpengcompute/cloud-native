@@ -94,7 +94,11 @@ func (p *TopologyAwarePolicy) updateParentResource(parent Node, grant Grant, isA
 			supply.grantedShared -= grant.AllocatedCPUs()
 			supply.grantedCPUByRequest -= grant.AllocatedCPUByRequest()
 			supply.grantedCPUByLimit -= grant.AllocatedCPUByLimit()
-			supply.grantedMemory -= grant.AllocatedMemory()
+			if supply.grantedMemory >= grant.AllocatedMemory() {
+				supply.grantedMemory -= grant.AllocatedMemory()
+			} else {
+				supply.grantedMemory = 0
+			}
 
 			// Ensure values don't go below 0
 			if supply.grantedShared < 0 {
@@ -105,9 +109,6 @@ func (p *TopologyAwarePolicy) updateParentResource(parent Node, grant Grant, isA
 			}
 			if supply.grantedCPUByLimit < 0 {
 				supply.grantedCPUByLimit = 0
-			}
-			if supply.grantedMemory < 0 {
-				supply.grantedMemory = 0
 			}
 		}
 

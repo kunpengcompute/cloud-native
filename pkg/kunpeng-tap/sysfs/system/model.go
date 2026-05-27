@@ -86,7 +86,7 @@ func checkCPUInfoFileForCluster(path string) bool {
 			"error", err)
 		return false
 	}
-	defer file.Close()
+	defer file.Close() // nolint: errcheck
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

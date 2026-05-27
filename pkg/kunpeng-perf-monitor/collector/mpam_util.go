@@ -132,7 +132,7 @@ func getMPAMConfigData(filename string, configKey1 string, configKey2 string) (c
 	if err != nil {
 		return nil, nil, err
 	}
-	defer file.Close()
+	defer file.Close() // nolint: errcheck
 
 	// init configData1 and configData2
 	configData1 = &ConfigData{}

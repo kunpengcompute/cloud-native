@@ -194,10 +194,10 @@ func TestGetFinalPath(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}
-				f.Close()
+				require.NoError(t, f.Close())
 
 				return func() {
-					os.Remove(filePath)
+					_ = os.Remove(filePath)
 				}
 			},
 			expectedPath: "/tmp/existing_file",
@@ -214,10 +214,10 @@ func TestGetFinalPath(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}
-				f.Close()
+				require.NoError(t, f.Close())
 
 				return func() {
-					os.Remove(filePath)
+					_ = os.Remove(filePath)
 				}
 			},
 			expectedPath: "/tmp/existing_file",
@@ -244,7 +244,7 @@ func TestGetFinalPath(t *testing.T) {
 				}
 
 				return func() {
-					os.RemoveAll(dirPath)
+					_ = os.RemoveAll(dirPath)
 				}
 			},
 			expectedPath: "/tmp/existing_dir",
@@ -267,10 +267,10 @@ func TestGetFinalPath(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}
-				f.Close()
+				require.NoError(t, f.Close())
 
 				return func() {
-					os.RemoveAll(dirPath)
+					_ = os.RemoveAll(dirPath)
 				}
 			},
 			expectedPath: "/tmp/subdir/file",
@@ -287,10 +287,10 @@ func TestGetFinalPath(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}
-				f.Close()
+				require.NoError(t, f.Close())
 
 				return func() {
-					os.Remove(filePath)
+					_ = os.Remove(filePath)
 				}
 			},
 			expectedPath: "test_file",
@@ -513,28 +513,28 @@ func TestNewPSICollector(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		setupFunc       func(t *testing.T) (cgroupMountPath string, mockCmdOutput []byte, mockCmdError error, cleanup func())
+		setupFunc       func(t *testing.T) (cgroupMountPath string, mockCmdOutput []byte, cleanup func(), mockCmdError error)
 		expectError     bool
 		errorContains   string
 		expectCollector bool
 	}{
 		{
 			name: "successful creation with cgroup v2 and kubepods",
-			setupFunc: func(t *testing.T) (string, []byte, error, func()) {
+			setupFunc: func(t *testing.T) (string, []byte, func(), error) {
 				tmpDir := t.TempDir()
 				dirPath := filepath.Join(tmpDir, "kubepods")
 				err := os.MkdirAll(dirPath, 0755)
 				if err != nil {
 					t.Fatalf("Failed to create test directory: %v", err)
 				}
-				return tmpDir, []byte("cgroup2\n"), nil, func() {}
+				return tmpDir, []byte("cgroup2\n"), func() {}, nil
 			},
 			expectError:     false,
 			expectCollector: true,
 		},
 		{
 			name: "successful creation with cgroup v1 and kubepods.slice",
-			setupFunc: func(t *testing.T) (string, []byte, error, func()) {
+			setupFunc: func(t *testing.T) (string, []byte, func(), error) {
 				tmpDir := t.TempDir()
 				basePath := filepath.Join(tmpDir, "cpu,cpuacct")
 				err := os.MkdirAll(basePath, 0755)
@@ -547,18 +547,18 @@ func TestNewPSICollector(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create test directory: %v", err)
 				}
-				return tmpDir, []byte("tmpfs\n"), nil, func() {}
+				return tmpDir, []byte("tmpfs\n"), func() {}, nil
 			},
 			expectError:     false,
 			expectCollector: true,
 		},
 		{
 			name: "cgroup mount path stat fails",
-			setupFunc: func(t *testing.T) (string, []byte, error, func()) {
+			setupFunc: func(t *testing.T) (string, []byte, func(), error) {
 				tmpDir := t.TempDir()
 				// 删除临时目录，使其不存在
-				os.RemoveAll(tmpDir)
-				return tmpDir, []byte("cgroup2\n"), nil, func() {}
+				_ = os.RemoveAll(tmpDir)
+				return tmpDir, []byte("cgroup2\n"), func() {}, nil
 			},
 			expectError:     true,
 			errorContains:   "failed to stat cgroup mount path",
@@ -566,14 +566,14 @@ func TestNewPSICollector(t *testing.T) {
 		},
 		{
 			name: "getCgroupSearchPath fails with stat error",
-			setupFunc: func(t *testing.T) (string, []byte, error, func()) {
+			setupFunc: func(t *testing.T) (string, []byte, func(), error) {
 				tmpDir := t.TempDir()
 				// 创建目录确保stat成功
 				err := os.MkdirAll(tmpDir, 0755)
 				if err != nil {
 					t.Fatalf("Failed to create test directory: %v", err)
 				}
-				return tmpDir, nil, assert.AnError, func() {}
+				return tmpDir, nil, func() {}, assert.AnError
 			},
 			expectError:     true,
 			errorContains:   "failed to check cgroup version",
@@ -581,14 +581,14 @@ func TestNewPSICollector(t *testing.T) {
 		},
 		{
 			name: "getCgroupSearchPath fails with unknown filesystem",
-			setupFunc: func(t *testing.T) (string, []byte, error, func()) {
+			setupFunc: func(t *testing.T) (string, []byte, func(), error) {
 				tmpDir := t.TempDir()
 				// 创建目录确保stat成功
 				err := os.MkdirAll(tmpDir, 0755)
 				if err != nil {
 					t.Fatalf("Failed to create test directory: %v", err)
 				}
-				return tmpDir, []byte("ext4\n"), nil, func() {}
+				return tmpDir, []byte("ext4\n"), func() {}, nil
 			},
 			expectError:     true,
 			errorContains:   "failed to check cgroup version",
@@ -596,14 +596,14 @@ func TestNewPSICollector(t *testing.T) {
 		},
 		{
 			name: "getCgroupSearchPath fails with no target directories",
-			setupFunc: func(t *testing.T) (string, []byte, error, func()) {
+			setupFunc: func(t *testing.T) (string, []byte, func(), error) {
 				tmpDir := t.TempDir()
 				// 创建目录确保stat成功，但不创建目标目录
 				err := os.MkdirAll(tmpDir, 0755)
 				if err != nil {
 					t.Fatalf("Failed to create test directory: %v", err)
 				}
-				return tmpDir, []byte("cgroup2\n"), nil, func() {}
+				return tmpDir, []byte("cgroup2\n"), func() {}, nil
 			},
 			expectError:     true,
 			errorContains:   "failed to get cgroupSearchPath path",
@@ -611,13 +611,13 @@ func TestNewPSICollector(t *testing.T) {
 		},
 		{
 			name: "nil cgroupMountPath",
-			setupFunc: func(t *testing.T) (string, []byte, error, func()) {
+			setupFunc: func(t *testing.T) (string, []byte, func(), error) {
 				// 保存原始值并设置为nil
 				originalCgroupMountPath := cgroupMountPath
 				cgroupMountPath = nil
-				return "", nil, nil, func() {
+				return "", nil, func() {
 					cgroupMountPath = originalCgroupMountPath
-				}
+				}, nil
 			},
 			expectError:     true,
 			errorContains:   "cgroupMountPath uninitialized",
@@ -625,14 +625,14 @@ func TestNewPSICollector(t *testing.T) {
 		},
 		{
 			name: "empty cgroupMountPath",
-			setupFunc: func(t *testing.T) (string, []byte, error, func()) {
+			setupFunc: func(t *testing.T) (string, []byte, func(), error) {
 				// 保存原始值并设置为空字符串
 				originalCgroupMountPath := cgroupMountPath
 				emptyPath := ""
 				cgroupMountPath = &emptyPath
-				return "", nil, nil, func() {
+				return "", nil, func() {
 					cgroupMountPath = originalCgroupMountPath
-				}
+				}, nil
 			},
 			expectError:     true,
 			errorContains:   "cgroupMountPath uninitialized",
@@ -647,7 +647,7 @@ func TestNewPSICollector(t *testing.T) {
 			originalCgroupMountPath := cgroupMountPath
 
 			// 执行setup函数获取路径、mock数据和清理函数
-			cgroupMountPathStr, mockCmdOutput, mockCmdError, cleanup := tt.setupFunc(t)
+			cgroupMountPathStr, mockCmdOutput, cleanup, mockCmdError := tt.setupFunc(t)
 			defer cleanup()
 
 			// 设置mock的execCommand

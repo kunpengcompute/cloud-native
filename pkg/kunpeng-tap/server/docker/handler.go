@@ -82,8 +82,8 @@ func (d *dockerHandler) Direct(wr http.ResponseWriter, req *http.Request) string
 
 func (d *dockerHandler) HandleStartContainer() func(http.ResponseWriter, *http.Request) {
 	return func(wr http.ResponseWriter, req *http.Request) {
-		d.Mutex.Lock()
-		defer d.Mutex.Unlock()
+		d.Lock()
+		defer d.Unlock()
 		klog.V(3).InfoS("Start container", "url", req.URL.String())
 		start := time.Now()
 		defer func() {
@@ -102,8 +102,8 @@ func (d *dockerHandler) HandleStartContainer() func(http.ResponseWriter, *http.R
 
 func (d *dockerHandler) HandleStopContainer() func(http.ResponseWriter, *http.Request) {
 	return func(wr http.ResponseWriter, req *http.Request) {
-		d.Mutex.Lock()
-		defer d.Mutex.Unlock()
+		d.Lock()
+		defer d.Unlock()
 		klog.V(3).InfoS("Stop container", "url", req.URL.String())
 		start := time.Now()
 		defer func() {
@@ -167,8 +167,8 @@ func (d *dockerHandler) HandleStopContainer() func(http.ResponseWriter, *http.Re
 
 func (d *dockerHandler) HandleUpdateContainer() func(http.ResponseWriter, *http.Request) {
 	return func(wr http.ResponseWriter, req *http.Request) {
-		d.Mutex.Lock()
-		defer d.Mutex.Unlock()
+		d.Lock()
+		defer d.Unlock()
 		klog.V(3).InfoS("Update container", "url", req.URL.String())
 		start := time.Now()
 		defer func() {
@@ -187,8 +187,8 @@ func (d *dockerHandler) HandleUpdateContainer() func(http.ResponseWriter, *http.
 
 func (d *dockerHandler) HandleDeleteContainer() func(http.ResponseWriter, *http.Request) {
 	return func(wr http.ResponseWriter, req *http.Request) {
-		d.Mutex.Lock()
-		defer d.Mutex.Unlock()
+		d.Lock()
+		defer d.Unlock()
 		klog.V(3).InfoS("Delete container", "url", req.URL.String())
 		start := time.Now()
 		defer func() {
@@ -216,8 +216,8 @@ func (d *dockerHandler) HandleDeleteContainer() func(http.ResponseWriter, *http.
 
 func (d *dockerHandler) HandleCreateContainer() func(http.ResponseWriter, *http.Request) {
 	return func(wr http.ResponseWriter, req *http.Request) {
-		d.Mutex.Lock()
-		defer d.Mutex.Unlock()
+		d.Lock()
+		defer d.Unlock()
 
 		d.CleanCache()
 
@@ -236,7 +236,7 @@ func (d *dockerHandler) HandleCreateContainer() func(http.ResponseWriter, *http.
 
 		var hookReq, hookResp interface{}
 		if dockerCreateRequest.RuntimeResourceType == server.RuntimeContainerResource {
-			podID := dockerCreateRequest.ConfigWrapper.Config.Labels[utils.SandboxIDLabelKey]
+			podID := dockerCreateRequest.Labels[utils.SandboxIDLabelKey]
 			podInfo, exist := d.cache.LookupPod(podID)
 			if !exist {
 				// refuse the req
@@ -258,9 +258,9 @@ func (d *dockerHandler) HandleCreateContainer() func(http.ResponseWriter, *http.
 		}
 
 		cfgBody := utils.ConfigWrapper{
-			Config:           dockerCreateRequest.ConfigWrapper.Config,
-			HostConfig:       dockerCreateRequest.ConfigWrapper.HostConfig,
-			NetworkingConfig: dockerCreateRequest.ConfigWrapper.NetworkingConfig,
+			Config:           dockerCreateRequest.Config,
+			HostConfig:       dockerCreateRequest.HostConfig,
+			NetworkingConfig: dockerCreateRequest.NetworkingConfig,
 		}
 
 		d.dispatcher.BackfillRequest(&cfgBody, hookReq, hookResp)
