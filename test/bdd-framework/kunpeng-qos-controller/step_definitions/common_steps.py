@@ -521,6 +521,10 @@ def create_default_policy(name: str):
     _apply_policy(_default_policy_doc(name))
     test_context["current_group"] = name
 
+@given(parsers.parse('创建默认全局 QoSPolicy "{name}"'))
+def given_create_default_policy(name: str):
+    create_default_policy(name)
+
 
 @when(parsers.parse('创建 cpu.qos_level 为 -1 的全局 QoSPolicy "{name}"'))
 def create_cpu_qos_minus_one_policy(name: str):
@@ -581,6 +585,10 @@ def create_group_pod(group_name: str, pod_name: str):
     if isinstance(pods, set):
         pods.add(pod_name)
     test_context["current_group"] = group_name
+
+@given(parsers.parse('创建带控制组标签 "{group_name}" 的测试 Pod "{pod_name}"'))
+def given_create_group_pod(group_name: str, pod_name: str):
+    create_group_pod(group_name, pod_name)
 
 
 @when(parsers.parse('创建带离线标签和控制组标签 "{group_name}" 的测试 Pod "{pod_name}"'))
