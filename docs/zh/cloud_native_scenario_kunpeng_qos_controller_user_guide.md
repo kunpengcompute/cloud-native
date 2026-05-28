@@ -106,6 +106,10 @@ export NODE_NAME=<你的节点名>
 
 ## 创建策略并下发到节点
 
+> 说明：`cpu.qos_level` 依赖内核能力，要求内核版本为 `6.6.0-154.0.0` 之后版本。  
+> 同时需要在内核启动参数中添加 `xint`，并在系统启动后执行以下命令启用调度特性：  
+> `echo SMT_TAG_PULL > /sys/kernel/debug/sched/features`
+
 ### QoSPolicy 字段说明
 
 | 字段 | 含义 | 取值范围/默认值 | 说明 |
