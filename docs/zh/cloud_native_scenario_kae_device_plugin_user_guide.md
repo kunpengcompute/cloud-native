@@ -57,7 +57,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
         ![](figures/zh-cn_image_0000002549892321.png)
 
-    - 如果没有结果输出，可能是当前计算节点没有安装License，请参见[获取License](https://www.hikunpeng.com/document/detail/zh/kunpengaccel/kae/usermanual/kunpengaccel_06_0008.html)安装对应的License。
+    - 如果没有结果输出，可能是当前计算节点没有安装License，请参见[获取License](https://www.hikunpeng.com/document/detail/zh/kunpengaccel/kae/kae/docs/zh/installation_guide.md#%E8%8E%B7%E5%8F%96license)安装对应的License。
 
 3. 使用如下命令查看计算节点是否已经安装KAE相关驱动。
 
@@ -65,7 +65,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
     ls /sys/class/uacce
     ```
 
-    可能的回显如下，如果没有结果输出，可能是没有安装KAE相关驱动，请参见[源码安装](https://www.hikunpeng.com/document/detail/zh/kunpengaccel/kae/usermanual/kunpengaccel_06_0012.html)安装KAE驱动。
+    可能的回显如下，如果没有结果输出，可能是没有安装KAE相关驱动，请参见[源码安装](https://www.hikunpeng.com/document/detail/zh/kunpengaccel/kae/kae/docs/zh/installation_guide.md#%E6%96%B9%E5%BC%8F%E4%B8%80%EF%BC%9A%E6%BA%90%E7%A0%81%E5%AE%89%E8%A3%85)安装KAE驱动。
 
     ![](figures/zh-cn_image_0000002518252552.png)
 

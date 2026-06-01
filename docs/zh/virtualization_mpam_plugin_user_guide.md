@@ -302,7 +302,7 @@ Kubernetes使能MPAM特性后，可以在创建Pod时指定对应的资源组，
       ```
 
     >![](public_sys-resources/icon-note.gif) **说明：** 
-        >-   将llc中的schemata替换为对L3 Cache的限制，将mb中的schemata替换为对带宽的限制，请根据实际情况进行修改。example-config.yaml文件的完整配置样例请参见下方参考示例。
+        >-   将llc中的schemata替换为对L3 Cache的限制，将mb中的schemata替换为对带宽的限制，请根据实际情况进行修改。example-config.yaml文件的完整配置样例请参见下方[参考示例](#参考示例)。
         >-   最多可以设置32个资源组（根分组默认占一个资源组，根分组下最多实际只能创建出31个资源组），每条<schemata\>必须要满足语法规则。
         >-   如果某个资源组中没有对某一项进行配置或者已配置的配置项不满足语法规则，该资源组将使用该配置项的默认配置。L3 cache的默认配置为 **"L3:0=fffffff;1=fffffff;2=fffffff;3=fffffff"** ；带宽的默认配置为 **"MB:0=100;1=100;2=100;3=100"** ；如果挂载的时候选择了mbHdl参数，Hard Limit的默认配置为 **"MBHDL:0=1;1=1;2=1;3=1"** 。
 
@@ -327,7 +327,7 @@ Kubernetes使能MPAM特性后，可以在创建Pod时指定对应的资源组，
     >cat group1/schemata
     >```
 
-**参考示例<a name="section13967105919315"></a>**
+**参考示例<a name="section13967105919315" id="参考示例"></a>**
 
 以下为example-config.yaml配置样例，样例中展示了MPAM资源组的配置项。
 
