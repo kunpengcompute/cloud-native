@@ -27,8 +27,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	qosv1alpha1 "kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-qos-controller/v1alpha1"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-qos-controller/util"
 )
 
 const (
@@ -130,14 +137,40 @@ func resolvePodGroup(pod *corev1.Pod) (string, bool) {
 
 func (r *PodBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Pod{}).
-		WithEventFilter(predicate.NewPredicateFuncs(func(obj client.Object) bool {
-			pod, ok := obj.(*corev1.Pod)
-			if !ok {
-				return false
-			}
-			return r.shouldProcessPod(pod)
-		})).
+		For(
+			&corev1.Pod{},
+			builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+				pod, ok := obj.(*corev1.Pod)
+				if !ok {
+					return false
+				}
+				return r.shouldProcessPod(pod)
+			})),
+		).
+		Watches(
+			&qosv1alpha1.QoSPolicy{},
+			handler.EnqueueRequestsFromMapFunc(r.mapQoSPolicyToPods),
+			builder.WithPredicates(predicate.Funcs{
+				CreateFunc: func(_ event.CreateEvent) bool {
+					return true
+				},
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					oldObj, oldOK := e.ObjectOld.(*qosv1alpha1.QoSPolicy)
+					newObj, newOK := e.ObjectNew.(*qosv1alpha1.QoSPolicy)
+					if !oldOK || !newOK || oldObj == nil || newObj == nil {
+						return false
+					}
+					// Only react to cpu qos-level changes on policy update.
+					return oldObj.Spec.CPU.QoSLevel != newObj.Spec.CPU.QoSLevel
+				},
+				DeleteFunc: func(_ event.DeleteEvent) bool {
+					return false
+				},
+				GenericFunc: func(_ event.GenericEvent) bool {
+					return false
+				},
+			}),
+		).
 		Complete(r)
 }
 
@@ -201,6 +234,58 @@ func dynamicOfflineGroupName(nodeName string) string {
 		name = "unknown-node"
 	}
 	return "qos-dynamic-offline-" + name
+}
+
+func (r *PodBindingReconciler) mapQoSPolicyToPods(ctx context.Context, obj client.Object) []reconcile.Request {
+	policy, ok := obj.(*qosv1alpha1.QoSPolicy)
+	if !ok || policy == nil || policy.Name == "" {
+		klog.V(4).Infof("skip QoSPolicy-to-Pod mapping for invalid object: %#v", obj)
+		return nil
+	}
+	klog.V(2).Infof(
+		"map QoSPolicy %s to pods on node %s, selector=%v",
+		policy.Name, r.nodeIdentity().NodeName(), policy.Spec.NodeSelector,
+	)
+	nodeLabels, err := r.nodeIdentity().NodeLabels(ctx, r.Client)
+	if err != nil {
+		klog.Warningf("get labels for node %s failed when handling QoSPolicy %s: %v", r.nodeIdentity().NodeName(), policy.Name, err)
+		return nil
+	}
+	if !util.MatchNodeSelector(nodeLabels, policy.Spec.NodeSelector) {
+		klog.V(2).Infof(
+			"skip QoSPolicy %s mapping on node %s: nodeSelector mismatch, nodeLabels=%v selector=%v",
+			policy.Name, r.nodeIdentity().NodeName(), nodeLabels, policy.Spec.NodeSelector,
+		)
+		return nil
+	}
+
+	var pods corev1.PodList
+	if err := r.List(ctx, &pods, client.MatchingLabels{PodQoSGroupLabelKey: policy.Name}); err != nil {
+		klog.Warningf("list pods for QoSPolicy %s failed: %v", policy.Name, err)
+		return nil
+	}
+	klog.V(2).Infof("listed %d pods with label %s=%s", len(pods.Items), PodQoSGroupLabelKey, policy.Name)
+
+	requests := make([]reconcile.Request, 0, len(pods.Items))
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		if !r.shouldProcessPod(pod) {
+			klog.V(4).Infof(
+				"skip pod %s/%s for QoSPolicy %s mapping: shouldProcessPod=false (node=%s phase=%s labels=%v)",
+				pod.Namespace, pod.Name, policy.Name, pod.Spec.NodeName, pod.Status.Phase, pod.Labels,
+			)
+			continue
+		}
+		klog.V(3).Infof("enqueue pod %s/%s for QoSPolicy %s update", pod.Namespace, pod.Name, policy.Name)
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: pod.Namespace,
+				Name:      pod.Name,
+			},
+		})
+	}
+	klog.V(2).Infof("mapped QoSPolicy %s to %d pod reconcile requests", policy.Name, len(requests))
+	return requests
 }
 
 func clientKeyForPolicy(name string) types.NamespacedName {

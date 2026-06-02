@@ -24,13 +24,37 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	qosv1alpha1 "kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-qos-controller/v1alpha1"
 )
 
 type noopCPUQoSSetter struct{}
 
 func (s noopCPUQoSSetter) SetPodCPUQoSLevel(_ context.Context, _ *corev1.Pod, _ string) error {
 	return nil
+}
+
+type staticNodeIdentity struct {
+	name   string
+	labels map[string]string
+	err    error
+}
+
+func (n staticNodeIdentity) NodeName() string {
+	return n.name
+}
+
+func (n staticNodeIdentity) NodeLabels(_ context.Context, _ client.Client) (map[string]string, error) {
+	if n.err != nil {
+		return nil, n.err
+	}
+	out := make(map[string]string, len(n.labels))
+	for k, v := range n.labels {
+		out[k] = v
+	}
+	return out, nil
 }
 
 func TestResolvePodGroup(t *testing.T) {
@@ -124,5 +148,91 @@ func TestPodBindingReconcilerEnsureOfflineGroupLabel(t *testing.T) {
 	}
 	if got := pod.Labels[PodQoSGroupLabelKey]; got != "qos-dynamic-offline-node-a" {
 		t.Fatalf("group label=%q, want qos-dynamic-offline-node-a", got)
+	}
+}
+
+func TestMapQoSPolicyToPods(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add corev1 scheme failed: %v", err)
+	}
+	if err := qosv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add qosv1alpha1 scheme failed: %v", err)
+	}
+
+	policy := &qosv1alpha1.QoSPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "group-a"},
+	}
+
+	podMatched := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "pod-a",
+			Labels: map[string]string{
+				PodQoSGroupLabelKey: "group-a",
+			},
+		},
+		Spec: corev1.PodSpec{NodeName: "node-a"},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
+	}
+	podWrongNode := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "pod-b",
+			Labels: map[string]string{
+				PodQoSGroupLabelKey: "group-a",
+			},
+		},
+		Spec: corev1.PodSpec{NodeName: "node-b"},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
+	}
+	podPending := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "pod-c",
+			Labels: map[string]string{
+				PodQoSGroupLabelKey: "group-a",
+			},
+		},
+		Spec: corev1.PodSpec{NodeName: "node-a"},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+		},
+	}
+
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(policy, podMatched, podWrongNode, podPending).
+		Build()
+
+	r := &PodBindingReconciler{
+		Client:       cl,
+		NodeIdentity: staticNodeIdentity{
+			name:   "node-a",
+			labels: map[string]string{"kubernetes.io/hostname": "node-a"},
+		},
+		CPUQoSSetter: noopCPUQoSSetter{},
+		Actions: []PodAction{
+			BindResctrlGroupAction{},
+			SetCPUQoSAction{},
+		},
+	}
+
+	reqs := r.mapQoSPolicyToPods(context.Background(), policy)
+	if len(reqs) != 1 {
+		t.Fatalf("mapQoSPolicyToPods() got %d requests, want 1", len(reqs))
+	}
+	if reqs[0].Namespace != "default" || reqs[0].Name != "pod-a" {
+		t.Fatalf("mapQoSPolicyToPods() got request %s/%s, want default/pod-a", reqs[0].Namespace, reqs[0].Name)
+	}
+
+	policy.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": "node-x"}
+	reqs = r.mapQoSPolicyToPods(context.Background(), policy)
+	if len(reqs) != 0 {
+		t.Fatalf("mapQoSPolicyToPods() got %d requests for non-matching policy selector, want 0", len(reqs))
 	}
 }
