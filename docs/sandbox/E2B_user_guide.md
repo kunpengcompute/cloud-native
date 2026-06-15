@@ -253,15 +253,14 @@ E2B 管理平台的核心能力包括：
 
     命令说明：启动E2B管理平台及相关服务，安装过程需要输入邮箱等必要信息。此外，若安装阶段使用过HTTP或Docker代理，执行该命令前需要关闭。
 
-5. 启动失败时清理并重试。
+5. 启动失败时清理。
 
     ```bash
     bash build.sh --stop
     bash build.sh --uninstall
-    bash build.sh --start
     ```
 
-    命令说明：`--stop`用于停止已启动服务，`--uninstall`用于清理已安装组件，最后重新执行`--start`启动服务。
+    命令说明：`--stop`用于停止已启动服务，`--uninstall`用于清理已安装组件。
 
 ### Harbor默认账号
 
