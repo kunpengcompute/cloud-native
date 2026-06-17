@@ -233,7 +233,7 @@ E2B 管理平台的核心能力包括：
 
     命令说明：执行部署脚本的依赖下载阶段，下载arm64所需依赖包。若遇到网络问题，可手动下载相关依赖并上传至`/opt/e2b-infra/dep`目录。
 
-    ![arm64 依赖包列表](images/arm64-deps.png)
+    ![arm64 依赖包列表](figures/arm64-deps.png)
 
 3. 安装E2B服务组件。
 
@@ -243,7 +243,7 @@ E2B 管理平台的核心能力包括：
 
     命令说明：安装E2B依赖组件并拉取所需Docker镜像。若镜像拉取失败，可临时配置Docker代理手动拉取镜像。
 
-    ![Docker 镜像列表](images/docker-images.png)
+    ![Docker 镜像列表](figures/docker-images.png)
 
 4. 启动服务。
 
@@ -253,15 +253,14 @@ E2B 管理平台的核心能力包括：
 
     命令说明：启动E2B管理平台及相关服务，安装过程需要输入邮箱等必要信息。此外，若安装阶段使用过HTTP或Docker代理，执行该命令前需要关闭。
 
-5. 启动失败时清理并重试。
+5. 启动失败时清理。
 
     ```bash
     bash build.sh --stop
     bash build.sh --uninstall
-    bash build.sh --start
     ```
 
-    命令说明：`--stop`用于停止已启动服务，`--uninstall`用于清理已安装组件，最后重新执行`--start`启动服务。
+    命令说明：`--stop`用于停止已启动服务，`--uninstall`用于清理已安装组件。
 
 ### Harbor默认账号
 
@@ -290,7 +289,7 @@ Harbor默认访问信息如下：
 
     说明：将`{server_ip}`替换为实际server节点IP。
 
-    ![Nomad 登录页面](images/nomad-login.png)
+    ![Nomad 登录页面](figures/nomad-login.png)
 
 2. 获取Nomad登录Token。
 
@@ -304,7 +303,7 @@ Harbor默认访问信息如下：
 
     在Nomad页面中查看各服务状态。如果服务状态显示为`Healthy`，表示服务启动正常。
 
-    ![Healthy 状态示意](images/healthy-status.png)
+    ![Healthy 状态示意](figures/healthy-status.png)
 
 ### 修改沙箱超时时间
 
@@ -368,11 +367,11 @@ Nomad中的`template-manager-system`任务在Job Definition中对CPU、内存等
 
 3. 找到`template-manager-system`。
 
-    ![Jobs 页面定位 template-manager-system](images/jobs-template-manager.png)
+    ![Jobs 页面定位 template-manager-system](figures/jobs-template-manager.png)
 
 4. 进入任务详情，打开`Definition`页签。
 
-    ![Job Definition 配置界面](images/job-definition.png)
+    ![Job Definition 配置界面](figures/job-definition.png)
 
 5. 修改CPU、内存等资源配置。
 
