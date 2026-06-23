@@ -20,7 +20,6 @@ package util
 import (
 	"fmt"
 	"os"
-	"strconv"
 )
 
 // File permission
@@ -35,21 +34,6 @@ const (
 	DefaultFileWriteMode os.FileMode = 0644
 )
 
-// ReadIntFromFile 从文件中读取内容并将其转换为int类型
-func ReadIntFromFile(file string) (int, error) {
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return 0, fmt.Errorf("read file failed, file: %s, err: %s", file, err)
-	}
-
-	res, err := strconv.Atoi(string(data))
-	if err != nil {
-		return 0, fmt.Errorf("string to int failed, string: %s, err: %s", string(data), err)
-	}
-
-	return res, nil
-}
-
 // ReadFile 将文件中的内容读取成byte并返回
 func ReadFile(path string) ([]byte, error) {
 	if IsDir(path) {
@@ -63,19 +47,6 @@ func ReadFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-// WriteFile 将指定内容写入到指定文件
-func WriteFile(path string, data string) error {
-	if IsDir(path) {
-		return fmt.Errorf("%s is not a file", path)
-	}
-
-	if !PathExist(path) {
-		return fmt.Errorf("%s is not exist", path)
-	}
-
-	return os.WriteFile(path, []byte(data), DefaultFileWriteMode)
-}
-
 // IsDir 判断一个文件是否为目录
 func IsDir(path string) bool {
 	file, err := os.Lstat(path)
@@ -83,15 +54,6 @@ func IsDir(path string) bool {
 		return false
 	}
 	return file.IsDir()
-}
-
-// Mkdir 在指定路径创建目录
-func Mkdir(name string, perm os.FileMode) error {
-	if err := os.Mkdir(name, perm); err != nil && !os.IsExist(err) {
-		return fmt.Errorf("failed to create directory: %s, err: %s", name, err)
-	}
-
-	return nil
 }
 
 // PathExist returns true if the path exists

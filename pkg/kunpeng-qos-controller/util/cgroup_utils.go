@@ -17,11 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -45,11 +41,6 @@ func GetPodCgroupParentDir(pod *corev1.Pod) string {
 	)
 }
 
-// GetPodCgroupPerfEventParentDir gets the perfevent subsystem path for a cgroup
-func GetPodCgroupPerfEventParentDir(cgroupDir string) string {
-	return CgroupRootDir + "/" + PerfEventDir + "/" + cgroupDir
-}
-
 // GetContainerCgroupParentDirByID gets the CgroupParentDir for a container by container id
 func GetContainerCgroupParentDirByID(podParentDir string, containerID string) (string, error) {
 	_, containerDir, err := CgroupPathFormatter.ContainerDirFn(containerID)
@@ -61,39 +52,4 @@ func GetContainerCgroupParentDirByID(podParentDir string, containerID string) (s
 		podParentDir,
 		containerDir,
 	), nil
-}
-
-// GetPIDsInContainer gets the pid of all process running in container
-func GetPIDsInContainer(podParentDir string, containerID string) ([]uint32, error) {
-	containerCgroupPath, err := GetContainerCgroupParentDirByID(podParentDir, containerID)
-	if err != nil {
-		return nil, err
-	}
-	containerCgroupProcPath := CgroupRootDir + "/" + containerCgroupPath + "/" + CgroupProc
-	rawContent, err := os.ReadFile(containerCgroupProcPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return ParseCgroupProcs(string(rawContent))
-}
-
-// ParseCgroupProcs parses the content in cgroup.procs.
-// pattern: `7742\n10971\n11049\n11051...`
-func ParseCgroupProcs(content string) ([]uint32, error) {
-	pidStrs := strings.Fields(strings.TrimSpace(content))
-	pids := make([]uint32, len(pidStrs))
-	for i := 0; i < len(pidStrs); i++ {
-		p, err := strconv.ParseUint(pidStrs[i], 10, 32)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse row %s into pid, err: %w", pidStrs[i], err)
-		}
-		pids[i] = uint32(p)
-	}
-	return pids, nil
-}
-
-// GetCgroupPathFromSubSysAndFile gets the cgroup subsystem path for a cgroup path
-func GetCgroupPathFromSubSysAndFile(cgroupDir string, subsys string, file string) string {
-	return CgroupRootDir + "/" + subsys + "/" + cgroupDir + "/" + file
 }
