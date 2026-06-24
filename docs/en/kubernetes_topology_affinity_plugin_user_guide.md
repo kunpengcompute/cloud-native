@@ -1,4 +1,4 @@
-# Kunpeng Topology Affinity Plugin User Guide<a name="EN-US_TOPIC_0000002521090488"></a>
+# Kunpeng Topology Affinity Plugin User Guide
 
 ## Introduction<a name="EN-US_TOPIC_0000002525264761"></a>
 
@@ -37,13 +37,11 @@ Kunpeng TAP adopts a request proxy approach. It adjusts resource parameters for 
 |kubelet|Runs on each node in a cluster to ensure that containers (Pods) run properly on nodes and manage the lifecycle of these containers.|
 |Container runtime|Creates, manages, and runs containers.|
 
-
 In NRI mode supported by containerd v1.7.0 and later versions, Kunpeng TAP communicates with containerd as a plugin, which does not interfere with the original container request link and provides better stability. See [**Figure 2**](#operating-architecture-in-nri-mode).
 
 **Figure 2** Operating architecture in NRI mode<a name="fig19472125713354"></a><a id="operating-architecture-in-nri-mode"></a>
 
 ![](figures/en-us_architecture_in_NRI_mode.png)
-
 
 ## Environment Requirements<a name="EN-US_TOPIC_0000002514027348"></a>
 
@@ -54,7 +52,6 @@ This document provides guidance based on openEuler environments. Before performi
 |Item|Description|
 |--|--|
 |Processor|Kunpeng 920 series processor or Kunpeng 950 processor|
-
 
 **Table 2** OS and software requirements<a id="os-and-software-requirements"></a>
 
@@ -71,20 +68,19 @@ This document provides guidance based on openEuler environments. Before performi
 |Kunpeng TAP source code|release-0.3|[Link](https://gitcode.com/boostkit/cloud-native)|
 |Kunpeng TAP|release-0.3|Executable file of Kunpeng TAP, which is obtained by compilation. For details, see [Compiling Kunpeng TAP](#compiling-kunpeng-tap).|
 
-
 ## Compiling Kunpeng TAP<a name="EN-US_TOPIC_0000002525264763"></a>
 
 Compile the Kunpeng TAP source code and generate a plugin executable file.
 
 1. Obtain the Kunpeng TAP source code of the latest version `kunpeng-tap-release-0.3.0-rc0` on the `Tags` tab.
 
-    ```
+    ```shell
     git clone --branch kunpeng-tap-release-0.3.0-rc0 https://gitcode.com/boostkit/cloud-native.git
     ```
 
 2. Go to the `cloud-native` directory and download the dependencies required by the project.
 
-    ```
+    ```shell
     cd /path/to/cloud-native
     go mod tidy
     ```
@@ -95,7 +91,7 @@ Compile the Kunpeng TAP source code and generate a plugin executable file.
 
     Run the following command to build the plugin:
 
-    ```
+    ```shell
     make kunpeng-tap-build
     ```
 
@@ -103,7 +99,7 @@ Compile the Kunpeng TAP source code and generate a plugin executable file.
 
     For the NRI mode, you must also run the following command to build the plugin image:
 
-    ```
+    ```shell
     make kunpeng-tap-build-nri
     ```
 
@@ -130,7 +126,7 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
     1. Go to the source code directory.
 
-        ```
+        ```shell
         cd /path/to/cloud-native
         ```
 
@@ -138,19 +134,19 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
     2. Install the plugin. By default, the plugin is started in Docker.
 
-        ```
+        ```shell
         make kunpeng-tap-install-service
         ```
 
         To explicitly specify Docker as the runtime, run the following command:
 
-        ```
+        ```shell
         make kunpeng-tap-install-service-docker
         ```
 
         If you need to modify startup parameters, modify the parameters under `ExecStart=` in the `hack/kunpeng-tap/kunpeng-tap.service.docker` file in the source code directory.
 
-        ```
+        ```txt
         [Unit]
         Description=Kunpeng Topology-Affinity Plugin Service
         After=network.target
@@ -168,19 +164,20 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
         >![](public_sys-resources/icon-note.gif) **Note:**
         >To specify containerd as the runtime, use the following installation command. You can modify the parameters in the `hack/kunpeng-tap/kunpeng-tap.service.containerd` file in the source code directory.
-        >```
+        >
+        >```shell
         >make kunpeng-tap-install-service-containerd
         >```
 
     3. After the installation is complete, run the following command to start the plugin and automatically check the service status after the plugin is started:
 
-        ```
+        ```shell
         make kunpeng-tap-start-service
         ```
 
     4. Check log information.
 
-        ```
+        ```shell
         journalctl -u kunpeng-tap
         ```
 
@@ -188,7 +185,7 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
     - Example startup commands in Docker:
 
-        ```
+        ```shell
         kunpeng-tap --runtime-proxy-endpoint="/var/run/kunpeng/tap-runtime-proxy.sock" \
             --container-runtime-service-endpoint="/var/run/docker.sock" --container-runtime-mode="Docker" \
             --resource-policy="numa-aware"
@@ -196,7 +193,7 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
     - Example startup commands in containerd:
 
-        ```
+        ```shell
         kunpeng-tap --runtime-proxy-endpoint="/var/run/kunpeng/tap-runtime-proxy.sock" \
             --container-runtime-service-endpoint="/var/run/containerd/containerd.sock" --container-runtime-mode="Containerd" \
             --resource-policy="numa-aware"
@@ -207,14 +204,13 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
     **Table 1** Parameter description<a id="parameter-description"></a>
 
-|Parameter|Description|Default Value|Configuration Principle|
-|--|--|--|--|
-|container-runtime-mode|Container runtime connected to the plugin, which can be Docker, containerd, or NRI.|Docker|Determine the container runtime according to that used in the Kubernetes cluster.|
-|resource-policy|Container resource optimization policy. Currently, numa-aware and topology-aware are supported. numa-aware supports CPU NUMA affinity for containers of the Burstable type. topology-aware provides CPU affinity at the socket, die, and NUMA levels, and supports memory and GPU resource optimization.|topology-aware|Select a policy as required.|
-|enable-memory-topology|After the topology-aware policy is enabled (by setting `--resource-policy=topology-aware`), the memory NUMA optimization function is disabled by default. To enable NUMA affinity for container memory, set `--enable-memory-topology=true`.|false|This configuration is in the alpha phase.|
-|topology-cluster-affinity|Enables cluster-level identification and allocation on the Kunpeng 950 processor. Containers are preferentially allocated at the cluster level.|false|The value is determined based on the server model and performance tuning requirements.|
-|v or verbose|Log level. The value ranges from 2 to 5.|2|The higher the level, the more detailed the logs.|
-
+    |Parameter|Description|Default Value|Configuration Principle|
+    |--|--|--|--|
+    |container-runtime-mode|Container runtime connected to the plugin, which can be Docker, containerd, or NRI.|Docker|Determine the container runtime according to that used in the Kubernetes cluster.|
+    |resource-policy|Container resource optimization policy. Currently, numa-aware and topology-aware are supported. numa-aware supports CPU NUMA affinity for containers of the Burstable type. topology-aware provides CPU affinity at the socket, die, and NUMA levels, and supports memory and GPU resource optimization.|topology-aware|Select a policy as required.|
+    |enable-memory-topology|After the topology-aware policy is enabled (by setting `--resource-policy=topology-aware`), the memory NUMA optimization function is disabled by default. To enable NUMA affinity for container memory, set `--enable-memory-topology=true`.|false|This configuration is in the alpha phase.|
+    |topology-cluster-affinity|Enables cluster-level identification and allocation on the Kunpeng 950 processor. Containers are preferentially allocated at the cluster level.|false|The value is determined based on the server model and performance tuning requirements.|
+    |v or verbose|Log level. The value ranges from 2 to 5.|2|The higher the level, the more detailed the logs.|
 
 3. Configure kubelet parameters on the compute nodes.
 
@@ -222,31 +218,31 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
     - In the Docker scenario, add or modify the following kubelet startup parameter:
 
-        ```
+        ```shell
         --docker-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock
         ```
 
         For example, when using kubeadm to install a cluster, you can add the parameter to `/var/lib/kubelet/kubeadm-flags.env`.
 
-        ```
+        ```txt
         KUBELET_KUBEADM_ARGS="--network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.6 --docker-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock"
         ```
 
     - In the containerd scenario, modify the following kubelet startup parameters.
 
-        ```
+        ```txt
         --container-runtime=remote --container-runtime-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock
         ```
 
         In this case, parameters in `/var/lib/kubelet/kubeadm-flags.env` can be:
 
-        ```
+        ```txt
         KUBELET_KUBEADM_ARGS="--network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.6 --container-runtime=remote --container-runtime-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock"
         ```
 
 4. After the kubelet parameters are modified, run the following commands to restart the kubelet:
 
-    ```
+    ```shell
     systemctl daemon-reload
     systemctl restart kubelet
     ```
@@ -255,13 +251,13 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
 1. Check whether the NRI function is enabled for containerd. Before the deployment, enable the NRI function in the containerd configuration file (`/etc/containerd/config.toml` by default) of compute nodes. If the configuration file does not exist, run the following command to create it:
 
-    ```
+    ```shell
     containerd config default > /etc/containerd/config.toml
     ```
 
 2. Enable the NRI function in the configuration file. If the following information does not exist, add it to the configuration file.
 
-    ```
+    ```txt
     [plugins]
       ...
       # Add the following content:
@@ -277,7 +273,7 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
 3. Restart containerd and check whether the restart is successful.
 
-    ```
+    ```shell
     systemctl daemon-reload
     systemctl restart containerd
     systemctl status containerd
@@ -287,13 +283,13 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
     After the image is compiled using Docker, export the image as a TAR package.
 
-    ```
+    ```shell
     docker save kunpeng-tap-nri:latest -o kunpeng-tap-latest.tar
     ```
 
     Then, import the above image to the worker nodes in the cluster.
 
-    ```
+    ```shell
     ctr -n k8s.io images import kunpeng-tap-latest.tar
     ```
 
@@ -301,19 +297,19 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
     The container will be deployed in the `kunpeng-tap` namespace. If the namespace does not exist, run the following command to create it:
 
-    ```
+    ```shell
     kubectl create namespace kunpeng-tap
     ```
 
     Perform the deployment:
 
-    ```
+    ```shell
     make kunpeng-tap-nri-deploy
     ```
 
     The deployment file of the Kunpeng TAP container is in `config/kunpeng-tap/nri-plugin/daemonset.yaml`. If you need to set options, add the following information:
 
-    ```
+    ```txt
             args:
               - "--container-runtime-mode=NRI"
               - "--nri-socket-path=/var/run/nri/nri.sock"
@@ -323,7 +319,7 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
 6. After the deployment is complete, run the `kubectl` command to check the running status. If `READY` is `1/1` and `STATUS` is `Running`, the container is running properly.
 
-    ```
+    ```txt
     # kubectl get pods -n kunpeng-tap -owide
     NAME                           READY   STATUS    RESTARTS      AGE           IP            NODE        NOMINATED NODE   READINESS GATES
     kunpeng-tap-nri-mhjwk   1/1     Running      0                  25h   10.244.2.59   compute01   <none>           <none>
@@ -331,7 +327,7 @@ Deploy Kunpeng TAP on the target compute nodes and verify that the plugin is run
 
 7. (Optional) Run the following command to view log information:
 
-    ```
+    ```shell
     kubectl logs kunpeng-tap-nri-mhjwk -n kunpeng-tap
     ```
 
@@ -343,7 +339,7 @@ The following is an example YAML file for deploying a single-container Pod. The 
 
 1. Create a YAML file `example.yaml`, and write the following configuration into the file:
 
-    ```
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -370,14 +366,14 @@ The following is an example YAML file for deploying a single-container Pod. The 
     >![](public_sys-resources/icon-note.gif) **Note:**
     >In a Kubernetes cluster with multiple worker nodes, a Pod can be scheduled to different NUMA nodes. To make the Pod run on a specified node, add the `nodeSelector` field to the `spec` section in the YAML file and set `kubernetes.io/hostname` to the name of the target node.
 
-    ```
+    ```txt
       nodeSelector:
         kubernetes.io/hostname: compute01 # Replace this field with the actual node name.
     ```
 
 3. Apply the YAML file on the management node to deploy the Pod.
 
-    ```
+    ```shell
     kubectl apply -f example.yaml
     ```
 
@@ -385,20 +381,20 @@ The following is an example YAML file for deploying a single-container Pod. The 
     1. Using Docker as an example, access the `compute01` node specified by `nodeSelector` in step 2, run the `docker` command to query the `CpusetCpus` parameter of the container, and determine whether NUMA affinity has been established.
     2. Use `docker ps` to query container tasks running on the cluster nodes. In the `NAMES` column, find the `tap-example` container specified by `spec.containers.name` in step 1.
 
-        ```
+        ```txt
         # docker ps | grep tap-example
         ```
 
     3. Query the deployment parameter `CpusetCpus` of the target container based on its container ID. This parameter indicates the range of CPU cores that can be scheduled by the container.
 
-        ```
+        ```txt
         # docker inspect bf32de0d09fe | grep "CpusetCpus"
                     "CpusetCpus": "0-23",
         ```
 
         If memory binding is enabled, you can run the following command to check the corresponding node.
 
-        ```
+        ```txt
         # docker inspect bf32de0d09fe | grep "CpusetMems"
                     "CpusetMems": "0",
         ```
@@ -408,7 +404,7 @@ The following is an example YAML file for deploying a single-container Pod. The 
 
         In the containerd scenario, you can run the following command to check the schedulable CPU range of a container:
 
-        ```
+        ```txt
         # crictl inspect bf32de0d09fe | grep "cpuset_cpus"
                     "cpuset_cpus": "0-23",
         ```
@@ -417,7 +413,7 @@ The following is an example YAML file for deploying a single-container Pod. The 
 
     4. Query the NUMA information of the system and compare it with the schedulable CPU core range of the container. The NUMA node matching the schedulable CPU core range is the affinity node of the container.
 
-        ```
+        ```txt
         # lscpu
         ...
         NUMA node0 CPU(s):               0-23
@@ -431,7 +427,7 @@ The following is an example YAML file for deploying a single-container Pod. The 
 
 5. (Optional) Before configuring GPU resource affinity for the container, run the following command to query the NUMA node distribution of GPUs in the system. The following uses the AMD Radeon GPUs as an example.
 
-    ```
+    ```shell
     lspci -nn|grep VGA|grep Radeon
     ```
 
@@ -441,7 +437,7 @@ The following is an example YAML file for deploying a single-container Pod. The 
 
     In the preceding figure, `1002:67c7` indicates the <*vendor*>:<*device ID*>, which is used for the next query.
 
-    ```
+    ```shell
     lspci -vvv -d 1002:67c7 | grep NUMA
     ```
 
@@ -459,7 +455,7 @@ Stop and uninstall the plugin if it is not required. Uninstall the plugin on wor
 
     Delete the previously added parameter `--docker-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock` and restart the kubelet.
 
-    ```
+    ```shell
     systemctl daemon-reload
     systemctl restart kubelet
     systemctl status kubelet
@@ -467,7 +463,7 @@ Stop and uninstall the plugin if it is not required. Uninstall the plugin on wor
 
 2. On worker nodes, go to the `cloud-native` source code directory and run the following commands to uninstall the plugin:
 
-    ```
+    ```shell
     cd /path/to/cloud-native
     make uninstall-service
     ```
@@ -476,13 +472,13 @@ Stop and uninstall the plugin if it is not required. Uninstall the plugin on wor
 
 3. Check whether the plugin has been deleted.
 
-    ```
+    ```shell
     systemctl status kunpeng-tap
     ```
 
     If the following information is displayed, the plugin has been deleted.
 
-    ```
+    ```txt
     Unit kunpeng-tap.service could not be found.
     ```
 
@@ -492,7 +488,7 @@ Stop and uninstall the plugin if it is not required. Uninstall the plugin on wor
 
     On worker nodes, go to the `cloud-native` source code directory and run the following commands to uninstall the plugin:
 
-    ```
+    ```shell
     cd /path/to/cloud-native
     make kunpeng-tap-nri-undeploy
     ```
@@ -501,7 +497,7 @@ Stop and uninstall the plugin if it is not required. Uninstall the plugin on wor
 
 2. Run the following command to check whether container instances are uninstalled. If no container instance is displayed, the uninstallation is successful.
 
-    ```
+    ```shell
     kubectl get pods -n kunpeng-tap -owide
     ```
 
