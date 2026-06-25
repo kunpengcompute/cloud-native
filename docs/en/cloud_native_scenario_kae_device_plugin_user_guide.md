@@ -1,4 +1,4 @@
-# KAE Device Plugin User Guide<a name="EN-US_TOPIC_0000002521251718"></a>
+# KAE Device Plugin User Guide
 
 ## Overview<a name="EN-US_TOPIC_0000002549772317"></a>
 
@@ -19,7 +19,6 @@ This document provides guidance based on specific environments. Before performin
 |Item|Specifications|
 |--|--|
 |CPU|Kunpeng 920 series processor or Kunpeng 950 processor|
-
 
 **OS and Software Requirements<a name="section21631338357"></a>**
 
@@ -44,7 +43,7 @@ Before compiling the plugin, ensure that KAE devices are available and the KAE d
 1. Obtain the software and code described in [OS and Software Requirements](#verified-os-and-software-versions).
 2. Run the following commands to check whether KAE devices exist on the compute nodes:
 
-    ```
+    ```shell
     lspci | grep HPRE
     lspci | grep SEC
     lspci | grep ZIP
@@ -58,7 +57,7 @@ Before compiling the plugin, ensure that KAE devices are available and the KAE d
 
 3. Run the following command to check whether the KAE drivers have been installed on the compute nodes:
 
-    ```
+    ```shell
     ls /sys/class/uacce
     ```
 
@@ -70,13 +69,13 @@ Before compiling the plugin, ensure that KAE devices are available and the KAE d
 
 1. Obtain the plugin source code.
 
-    ```
+    ```shell
     git clone https://gitcode.com/boostkit/cloud-native.git
     ```
 
 2. Compile the plugin code to obtain an image.
 
-    ```
+    ```shell
     cd /path/to/cloud-native
     make kae-device-plugin-docker
     ```
@@ -86,7 +85,7 @@ Before compiling the plugin, ensure that KAE devices are available and the KAE d
 
 3. Check whether the image is compiled successfully.
 
-    ```
+    ```shell
     docker images | grep kae-device-plugin
     ```
 
@@ -96,20 +95,20 @@ Before compiling the plugin, ensure that KAE devices are available and the KAE d
 
 4. Export the compiled image as `kae-device-plugin.tar`.
 
-    ```
+    ```shell
     docker save kae-device-plugin:1.0 -o kae-device-plugin.tar
     ```
 
 5. Copy the exported TAR package to the compute nodes and run the following command to import the image:
     - If the container runtime used by Kubernetes is containerd, run the following command to import the image:
 
-        ```
+        ```shell
         ctr -n k8s.io images import /path/to/kae-device-plugin.tar
         ```
 
     - If the container runtime used by Kubernetes is Docker, run the following command to import the image:
 
-        ```
+        ```shell
         docker load -i /path/to/kae-device-plugin.tar
         ```
 
@@ -119,7 +118,7 @@ Before deploying the plugin, create KAE virtual functions (VFs) on the compute n
 
 1. Run the following commands to create VFs:
 
-    ```
+    ```shell
     cd /path/to/cloud-native/Boostkit_CloudNative/K8S/deployments/kae-device-plugin
     python3 kae-init.py 4
     ```
@@ -130,14 +129,14 @@ Before deploying the plugin, create KAE virtual functions (VFs) on the compute n
 
 2. Run the following commands on the control node to deploy the KAE device plugin:
 
-    ```
+    ```shell
     cd /path/to/cloud-native/Boostkit_CloudNative/K8S/deployments/
     kubectl apply -k kae-device-plugin/overlay/qos
     ```
 
 3. Check whether the plugin is successfully deployed.
 
-    ```
+    ```shell
     kubectl get pod
     ```
 
@@ -147,7 +146,7 @@ Before deploying the plugin, create KAE virtual functions (VFs) on the compute n
 
 4. Check whether KAE devices have been managed.
 
-    ```
+    ```shell
     kubectl describe node <your compute node name>
     ```
 
@@ -173,7 +172,6 @@ To pass through other devices, change the resource name to that of the correspon
 |SEC|kae.kunpeng.com/hisi_sec2|
 |ZIP|kae.kunpeng.com/hisi_zip|
 
-
 >![](public_sys-resources/icon-notice.gif) **NOTICE:**
 >KAE devices require KAE libraries for normal running. Generally, KAE libraries are not installed in containers. In this example, KAE libraries on the host are mapped to the container. In practice, you can install KAE libraries in the container or map the KAE libraries on the host to the container as required.
 
@@ -181,7 +179,7 @@ To pass through other devices, change the resource name to that of the correspon
 
     The device to be used is declared by adding `kae.kunpeng.com/hisi_hpre: "1"` to `requests` and `limits` in `resources`.
 
-    ```
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -208,26 +206,26 @@ To pass through other devices, change the resource name to that of the correspon
 
 2. Deploy the Pod.
 
-    ```
+    ```shell
     kubectl apply -f kae-pod/kae-test-pod.yaml
     ```
 
 3. After the deployment is complete, check the Pod status.
 
-    ```
+    ```shell
     kubectl get pod
     ```
 
     The command output is as follows. If the Pod status is `Running`, the installation is successful.
 
-    ```
+    ```shell
     NAME       READY   STATUS    RESTARTS   AGE
     kae-test   1/1     Running   0          3h20m
     ```
 
 4. Access the Pod and check whether the KAE device has been mounted.
 
-    ```
+    ```shell
     kubectl exec -it kae-test bash
     ls /dev
     ```
@@ -244,7 +242,7 @@ KAE devices support the quality of service (QoS) function. You can set QoS to al
 
 1. Add the annotation `qos.kae.kunpeng.com/hisi_hpre: "500"` to the YAML file of the Pod to declare the QoS of the KAE devices. For details about how to set the QoS of other devices, see [KAE device QoS annotations](#kae-device-qos-annotations).
 
-    ```
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -273,17 +271,16 @@ KAE devices support the quality of service (QoS) function. You can set QoS to al
 
     **Table 1** KAE device QoS annotations<a id="kae-device-qos-annotations"></a>
 
-|KAE Device|Annotation Name|
-|--|--|
-|HPRE|qos.kae.kunpeng.com/hisi_hpre|
-|SEC|qos.kae.kunpeng.com/hisi_sec2|
-|ZIP|qos.kae.kunpeng.com/hisi_zip|
-
+    |KAE Device|Annotation Name|
+    |--|--|
+    |HPRE|qos.kae.kunpeng.com/hisi_hpre|
+    |SEC|qos.kae.kunpeng.com/hisi_sec2|
+    |ZIP|qos.kae.kunpeng.com/hisi_zip|
 
 2. Deploy the Pod as instructed in [KAE Device Passthrough](#kae-device-passthrough).
 3. Access the container and run the following command to check whether the QoS of the KAE devices is set successfully:
 
-    ```
+    ```shell
     kubectl exec -it kae-test-qos -- bash
     # Execute the following command in the container:
     env
@@ -295,7 +292,7 @@ KAE devices support the quality of service (QoS) function. You can set QoS to al
 
     Based on the PCI addresses, **run the following command on the physical machine** to retrieve the file to check whether the QoS value is the same as that declared in the annotation:
 
-    ```
+    ```shell
     cat /sys/kernel/debug/hisi_hpre/0000:3a:00.0/alg_qos
     ```
 
@@ -303,12 +300,10 @@ KAE devices support the quality of service (QoS) function. You can set QoS to al
 
     ![](figures/en-us_image_0000002518252554.png)
 
-
-
 ## (Optional) Plugin Uninstallation<a name="EN-US_TOPIC_0000002549892315"></a>
 
 Run the following command to uninstall the plugin:
 
-```
+```shell
 kubectl delete -k kae-device-plugin/overlay/qos
 ```
