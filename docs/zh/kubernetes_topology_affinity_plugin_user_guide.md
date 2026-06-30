@@ -37,13 +37,11 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 |Kubelet|运行在集群中的每个节点上，确保容器（Pod）在节点上正确运行，并管理这些容器的生命周期。|
 |容器运行时|负责创建、管理和运行容器。|
 
-
 在Containerd v1.7.0版本及之后支持的NRI（Node Resource Interface）模式下，Kunpeng TAP以插件形式与Containerd进行通信，对原有容器请求链路无干扰，具备更优的稳定性。如[**图 2** NRI模式运行架构](#NRI模式运行架构) 所示。
 
 **图 2** NRI模式运行架构<a name="fig19472125713354"></a><a id="NRI模式运行架构"></a>
 
 ![](figures/NRI模式架构图.png)
-
 
 ## 环境要求<a name="ZH-CN_TOPIC_0000002514027348"></a>
 
@@ -54,7 +52,6 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 |项目|说明|
 |--|--|
 |处理器|鲲鹏920系列处理器、鲲鹏950处理器|
-
 
 **表 2** 操作系统和软件要求<a id="操作系统和软件要求"></a>
 
@@ -69,20 +66,19 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 |Kunpeng TAP源代码|release-0.3|[获取链接](https://gitcode.com/boostkit/cloud-native)|
 |Kunpeng TAP|release-0.3|Kunpeng TAP的可执行文件，通过[编译Kunpeng TAP](#编译Kunpeng-TAP)编译获得。|
 
-
 ## 编译Kunpeng TAP<a id="编译Kunpeng-TAP"></a>
 
 编译Kunpeng TAP源代码并生成插件可执行文件。
 
 1. 获取Kunpeng TAP源代码，在标签中获取最新发布的kunpeng-tap-release-0.3.0-rc0版本。
 
-    ```
+    ```shell
     git clone --branch kunpeng-tap-release-0.3.0-rc0 https://gitcode.com/boostkit/cloud-native.git
     ```
 
 2. 进入cloud-native目录后，下载项目所需依赖。
 
-    ```
+    ```shell
     cd /path/to/cloud-native
     go mod tidy
     ```
@@ -93,7 +89,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     运行如下命令构建插件。
 
-    ```
+    ```shell
     make kunpeng-tap-build
     ```
 
@@ -101,7 +97,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     对于NRI模式，还须运行如下命令构建插件镜像。
 
-    ```
+    ```shell
     make kunpeng-tap-build-nri
     ```
 
@@ -128,7 +124,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     1. 进入源代码目录。
 
-        ```
+        ```shell
         cd /path/to/cloud-native
         ```
 
@@ -136,19 +132,19 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     2. 安装插件，默认以Docker模式启动。
 
-        ```
+        ```shell
         make kunpeng-tap-install-service
         ```
 
         如需显式指定运行时为Docker，运行如下命令。
 
-        ```
+        ```shell
         make kunpeng-tap-install-service-docker
         ```
 
         如果需要修改启动参数，则在源代码目录下的**hack/kunpeng-tap/kunpeng-tap.service.docker**文件的“ExecStart=”下进行修改：
 
-        ```
+        ```shell
         [Unit]
         Description=Kunpeng Topology-Affinity Plugin Service
         After=network.target
@@ -166,19 +162,20 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
         >![](public_sys-resources/icon-note.gif) **说明：** 
         >指定运行时为Containerd，运行如下安装命令，参数配置可在源代码目录下的**hack/kunpeng-tap/kunpeng-tap.service.containerd**文件中修改。
-        >```
+        >
+        >```shell
         >make kunpeng-tap-install-service-containerd
         >```
 
     3. 安装完毕后，执行如下命令启动插件，并且自动查看启动后的服务状态。
 
-        ```
+        ```shell
         make kunpeng-tap-start-service
         ```
 
     4. 查看日志信息。
 
-        ```
+        ```shell
         journalctl -u kunpeng-tap
         ```
 
@@ -186,7 +183,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     - Docker运行时下的启动命令，示例如下：
 
-        ```
+        ```shell
         kunpeng-tap --runtime-proxy-endpoint="/var/run/kunpeng/tap-runtime-proxy.sock" \
             --container-runtime-service-endpoint="/var/run/docker.sock" --container-runtime-mode="Docker" \
             --resource-policy="numa-aware"
@@ -194,7 +191,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     - Containerd运行时下的启动命令，示例如下：
 
-        ```
+        ```shell
         kunpeng-tap --runtime-proxy-endpoint="/var/run/kunpeng/tap-runtime-proxy.sock" \
             --container-runtime-service-endpoint="/var/run/containerd/containerd.sock" --container-runtime-mode="Containerd" \
             --resource-policy="numa-aware"
@@ -205,14 +202,13 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     **表 1** 参数说明<a id="参数说明"></a>
 
-|参数名称|参数描述|默认值|配置原则|
-|--|--|--|--|
-|container-runtime-mode|插件对接的容器运行时，对应集群运行时设置的Docker或Containerd或NRI。|Docker|依照K8s集群使用的容器运行时决定。|
-|resource-policy|容器资源的优化策略，目前支持numa-aware和topology-aware。numa-aware策略支持Burstable类型容器进行CPU的NUMA亲和。topology-aware策略提供Socket、Die、NUMA等拓扑层次的CPU亲和，额外支持内存、GPU资源的优化。|topology-aware|依照需求进行选择。|
-|enable-memory-topology|启用topology-aware策略后（设置--resource-policy=topology-aware），内存资源的NUMA优化功能默认关闭，如需开启容器内存的NUMA亲和功能，则设置--enable-memory-topology=true。|false|暂处于Alpha阶段。|
-|topology-cluster-affinity|用于在鲲鹏950处理器上启用cluster级别的识别和分配，容器将优先从cluster阶段开始进行分配。|false|依据服务器型号和性能调优需求决定。|
-|v或verbose|日志信息等级，调整范围2至5。|2|等级越高，日志输出越详细。|
-
+    |参数名称|参数描述|默认值|配置原则|
+    |--|--|--|--|
+    |container-runtime-mode|插件对接的容器运行时，对应集群运行时设置的Docker或Containerd或NRI。|Docker|依照K8s集群使用的容器运行时决定。|
+    |resource-policy|容器资源的优化策略，目前支持numa-aware和topology-aware。numa-aware策略支持Burstable类型容器进行CPU的NUMA亲和。topology-aware策略提供Socket、Die、NUMA等拓扑层次的CPU亲和，额外支持内存、GPU资源的优化。|topology-aware|依照需求进行选择。|
+    |enable-memory-topology|启用topology-aware策略后（设置--resource-policy=topology-aware），内存资源的NUMA优化功能默认关闭，如需开启容器内存的NUMA亲和功能，则设置--enable-memory-topology=true。|false|暂处于Alpha阶段。|
+    |topology-cluster-affinity|用于在鲲鹏950处理器上启用cluster级别的识别和分配，容器将优先从cluster阶段开始进行分配。|false|依据服务器型号和性能调优需求决定。|
+    |v或verbose|日志信息等级，调整范围2至5。|2|等级越高，日志输出越详细。|
 
 3. 在计算节点配置Kubelet参数。
 
@@ -220,31 +216,31 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     - 在Docker场景下，在Kubelet启动参数中添加或修改对应参数项如下所示：
 
-        ```
+        ```shell
         --docker-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock
         ```
 
         以使用kubeadm安装集群为例，可以在“/var/lib/kubelet/kubeadm-flags.env”添加参数。
 
-        ```
+        ```shell
         KUBELET_KUBEADM_ARGS="--network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.6 --docker-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock"
         ```
 
     - 在Containerd场景下，修改Kubelet的启动参数。
 
-        ```
+        ```shell
         --container-runtime=remote --container-runtime-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock
         ```
 
         此时，“/var/lib/kubelet/kubeadm-flags.env”的参数示例可能如下所示。
 
-        ```
+        ```shell
         KUBELET_KUBEADM_ARGS="--network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.6 --container-runtime=remote --container-runtime-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock"
         ```
 
 4. 修改Kubelet参数后，须运行如下命令重新启动kubelet。
 
-    ```
+    ```shell
     systemctl daemon-reload
     systemctl restart kubelet
     ```
@@ -253,13 +249,13 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
 1. 检查Containerd是否开启NRI功能。开始部署前，在计算节点的Containerd配置文件（默认为“/etc/containerd/config.toml”）当中打开NRI功能。如果不存在上述配置文件，则可运行如下命令创建：
 
-    ```
+    ```shell
     containerd config default > /etc/containerd/config.toml
     ```
 
 2. 在配置文件中，打开NRI功能，如果不存在如下内容则添加。
 
-    ```
+    ```shell
     [plugins]
       ...
       # 增加下述部分
@@ -275,7 +271,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
 3. 重启Containerd，并检查是否重启成功。
 
-    ```
+    ```shell
     systemctl daemon-reload
     systemctl restart containerd
     systemctl status containerd
@@ -285,13 +281,13 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     借助Docker完成镜像编译后，导出为.tar压缩包：
 
-    ```
+    ```shell
     docker save kunpeng-tap-nri:latest -o kunpeng-tap-latest.tar
     ```
 
     随后，在集群的工作节点中导入上述镜像：
 
-    ```
+    ```shell
     ctr -n k8s.io images import kunpeng-tap-latest.tar
     ```
 
@@ -299,19 +295,19 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     容器将部署在“kunpeng-tap”命名空间，如果未创建则使用如下代码进行创建：
 
-    ```
+    ```shell
     kubectl create namespace kunpeng-tap
     ```
 
     正式进行部署：
 
-    ```
+    ```shell
     make kunpeng-tap-nri-deploy
     ```
 
     Kunpeng TAP插件容器的部署文件在“config/kunpeng-tap/nri-plugin/daemonset.yaml”中，如果需要设置选项，请在如下位置增加：
 
-    ```
+    ```shell
             args:
               - "--container-runtime-mode=NRI"
               - "--nri-socket-path=/var/run/nri/nri.sock"
@@ -321,7 +317,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
 6. 部署完成后，通过kubectl查看运行状态，进入READY 1/1和Running即表明正常运行。
 
-    ```
+    ```txt
     # kubectl get pods -n kunpeng-tap -owide
     NAME                           READY   STATUS    RESTARTS      AGE           IP            NODE        NOMINATED NODE   READINESS GATES
     kunpeng-tap-nri-mhjwk   1/1     Running      0                  25h   10.244.2.59   compute01   <none>           <none>
@@ -329,7 +325,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
 7. （可选）查看日志信息，运行命令：
 
-    ```
+    ```shell
     kubectl logs kunpeng-tap-nri-mhjwk -n kunpeng-tap
     ```
 
@@ -341,7 +337,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 1. 创建YAML文件，例如example.yaml，并在YAML文件中写入以下配置。
 
-    ```
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -368,14 +364,14 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
     >![](public_sys-resources/icon-note.gif) **说明：** 
     >在多个工作节点的K8s集群中，Pod可能会被调度到不同节点的NUMA内。如果希望Pod在指定的节点上运行，只需在YAML文件的**spec**部分加入**nodeSelector**字段，并指定**kubernetes.io/hostname**为目标节点的名称。
 
-    ```
+    ```yaml
       nodeSelector:
         kubernetes.io/hostname: compute01 #该字段替换成实际节点名称
     ```
 
 3. 在管理节点应用YAML文件，完成Pod部署。
 
-    ```
+    ```shell
     kubectl apply -f example.yaml
     ```
 
@@ -383,20 +379,20 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
     1. 以Docker运行时为例，进入步骤二中**nodeSelector**所指定的集群节点 _compute01_ 后，通过**docker**命令查询容器的CpusetCpus参数，判断容器是否与NUMA成功亲和。
     2. 通过**docker ps**查询集群节点运行的容器任务，在**NAMES**列中找到步骤一中“spec.containers.name”指定的 _tap-example_ 容器。
 
-        ```
+        ```shell
         # docker ps | grep tap-example
         ```
 
     3. 依据 _CONTAINER ID_ 查询目标容器的部署参数 _CpusetCpus_ ，该参数表示容器的可调度CPU范围。
 
-        ```
+        ```shell
         # docker inspect bf32de0d09fe | grep "CpusetCpus"
                     "CpusetCpus": "0-23",
         ```
 
         如果启用了内存绑定功能，可以通过如下命令查看，注意其取值表示节点的编号：
 
-        ```
+        ```shell
         # docker inspect bf32de0d09fe | grep "CpusetMems"
                     "CpusetMems": "0",
         ```
@@ -406,7 +402,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
         containerd运行时可以运行如下命令查看容器的可调度CPU范围。
 
-        ```
+        ```shell
         # crictl inspect bf32de0d09fe | grep "cpuset_cpus"
                     "cpuset_cpus": "0-23",
         ```
@@ -415,7 +411,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
     4. 查询系统的NUMA信息，与上述的容器可调度CPU范围进行对比，一致则表示亲和于对应NUMA节点。
 
-        ```
+        ```shell
         # lscpu
         ...
         NUMA node0 CPU(s):               0-23
@@ -429,7 +425,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 5. （可选）此外，当对容器的GPU资源进行亲和时，需要查询系统中GPU设备的NUMA分布，可以运行如下命令查看，以AMD Radeon GPU为例。
 
-    ```
+    ```shell
     lspci -nn|grep VGA|grep Radeon
     ```
 
@@ -439,7 +435,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
     图中的1002:67c7为<vendor\>:<deviceID\>，用于下一步查询。
 
-    ```
+    ```shell
     lspci -vvv -d 1002:67c7 | grep NUMA
     ```
 
@@ -457,7 +453,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
     将添加的参数<em>--docker-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock</em>删除，并且重启Kubelet。
 
-    ```
+    ```shell
     systemctl daemon-reload
     systemctl restart kubelet
     systemctl status kubelet
@@ -465,7 +461,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 2. 在工作节点上，进入“cloud-native”源码目录，并执行插件卸载命令。
 
-    ```
+    ```shell
     cd /path/to/cloud-native
     make uninstall-service
     ```
@@ -474,13 +470,13 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 3. 查看插件是否已成功删除。
 
-    ```
+    ```shell
     systemctl status kunpeng-tap
     ```
 
     回显如下表示插件已成功删除。
 
-    ```
+    ```txt
     Unit kunpeng-tap.service could not be found.
     ```
 
@@ -490,7 +486,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
     在工作节点上，进入“cloud-native”源码目录，并执行插件卸载命令。
 
-    ```
+    ```shell
     cd /path/to/cloud-native
     make kunpeng-tap-nri-undeploy
     ```
@@ -499,7 +495,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 2. 执行如下命令，查看到没有部署的容器示例表示卸载成功。
 
-    ```
+    ```shell
     kubectl get pods -n kunpeng-tap -owide
     ```
 
@@ -510,6 +506,3 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 |NUMA|Non-Uniform Memory Access|非统一内存访问|
 |Kunpeng TAP|Kunpeng Topology Affinity Plugin|鲲鹏拓扑亲和插件|
 |NRI|Node Resource Interface|节点资源接口|
-
-
-
