@@ -185,7 +185,7 @@ kae-device-plugin-run: ## Run kae-device-plugin locally.
 	$(MAKE) -f Makefile.kae-device-plugin run
 
 .PHONY: kae-device-plugin-test
-kae-device-plugin-test: ## Test kae-device-plugin.
+kae-device-plugin-test: setup-envtest ## Test kae-device-plugin.
 	$(MAKE) -f Makefile.kae-device-plugin test
 
 .PHONY: kae-device-plugin-tidy
