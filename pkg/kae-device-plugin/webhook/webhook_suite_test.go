@@ -101,9 +101,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = SetupKaePodWithManager(mgr, InjectionConfig{
-		Enabled:         true,
-		DefaultResource: "hisi_hpre",
-		DefaultCount:    1,
+		Enabled:            true,
+		DefaultResource:    "hisi_hpre",
+		DefaultCount:       1,
+		ExcludedNamespaces: []string{"kube-system"},
 		EnvVars: []corev1.EnvVar{
 			{Name: "KAE_MODE", Value: "auto"},
 		},
