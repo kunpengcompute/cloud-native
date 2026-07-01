@@ -82,35 +82,32 @@ func main() {
 }
 
 func startControllers(enableQos bool, webhookEnable bool, webhookOption webhook.Options) {
-	qosManager, err := kaeqos.NewQosManager(timeout)
-	if err != nil {
-		klog.Errorf("Failed to create qos manager: %v", err)
-		os.Exit(1)
-	}
 
-	options := ctrl.Options{
-		LeaderElection:   true,
-		LeaderElectionID: "ecaf1259.kae.huawei.com",
-	}
+	// daemonset deployment，no need to set leader election.
+	options := ctrl.Options{}
 
 	if webhookEnable {
 		options.WebhookServer = webhook.NewServer(webhookOption)
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
-
 	if err != nil {
 		klog.Errorf("Failed to create manager: %v", err)
 		os.Exit(1)
 	}
 
-	nodeName := os.Getenv("NODE_NAME")
-	if nodeName == "" {
-		klog.Errorf("NODE_NAME is empty")
-		os.Exit(1)
-	}
-
 	if enableQos {
+		qosManager, err := kaeqos.NewQosManager(timeout)
+		if err != nil {
+			klog.Errorf("Failed to create qos manager: %v", err)
+			os.Exit(1)
+		}
+
+		nodeName := os.Getenv("NODE_NAME")
+		if nodeName == "" {
+			klog.Errorf("NODE_NAME is empty")
+			os.Exit(1)
+		}
 		if err := (&kaeqos.KaeQosReconciler{
 			QosManager: qosManager,
 			Client:     mgr.GetClient(),
