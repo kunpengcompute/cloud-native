@@ -17,8 +17,6 @@
 package main
 
 import (
-	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -59,29 +57,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	if enableQos || webhookOptions.Enabled {
+		controllerManager, err := newControllerManager(enableQos, webhookOptions)
+		if err != nil {
+			klog.Errorf("Failed to create KAE controller manager: %v", err)
+			klog.Flush()
+			os.Exit(1)
+		}
+		startControllerManager(controllerManager)
+	}
+
 	kaeDevicePluginManager := deviceplugin.NewManager(namespace, plugin)
 	klog.V(1).Infof("KAE device plugin started")
-
-	if !enableQos && !webhookOptions.Enabled {
-		kaeDevicePluginManager.Run()
-		return
-	}
-
-	controllerManager, err := newControllerManager(enableQos, webhookOptions)
-	if err != nil {
-		klog.Errorf("Failed to create KAE controller manager: %v", err)
-		klog.Flush()
-		os.Exit(1)
-	}
-	if err := runComponents(
-		ctrl.SetupSignalHandler(),
-		kaeDevicePluginManager.Run,
-		controllerManager.Start,
-	); err != nil {
-		klog.Errorf("KAE controller manager failed: %v", err)
-		klog.Flush()
-		os.Exit(1)
-	}
+	kaeDevicePluginManager.Run()
 }
 
 func newControllerManager(enableQos bool, webhookOptions kaePodWebhook.Options) (manager.Manager, error) {
@@ -128,28 +116,14 @@ func newControllerManager(enableQos bool, webhookOptions kaePodWebhook.Options) 
 	return mgr, nil
 }
 
-func runComponents(ctx context.Context, runDevicePlugin func(), runController func(context.Context) error) error {
-	runCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	devicePluginDone := make(chan struct{})
+func startControllerManager(mgr manager.Manager) {
 	go func() {
-		runDevicePlugin()
-		close(devicePluginDone)
-	}()
-
-	controllerDone := make(chan error, 1)
-	go func() {
-		controllerDone <- runController(runCtx)
-	}()
-
-	select {
-	case <-devicePluginDone:
-		return nil
-	case err := <-controllerDone:
-		if errors.Is(err, context.Canceled) && runCtx.Err() != nil {
-			return nil
+		if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+			klog.Errorf("KAE controller manager failed: %v", err)
+			klog.Flush()
+			os.Exit(1)
 		}
-		return err
-	}
+		klog.Flush()
+		os.Exit(0)
+	}()
 }
