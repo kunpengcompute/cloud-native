@@ -45,8 +45,17 @@ var _ = Describe("Pod Webhook", func() {
 			err := k8sClient.Create(context.Background(), pod)
 			Expect(err).ToNot(HaveOccurred())
 
-			//todo(cuiyanxiang): add assertions to check if the pod spec has been defaulted to use kae device plugin resources and env vars.
-			//Expect(pod.Spec.Containers[0].Resources.Limits).To(HaveKey("kae.huawei.com/kae-device"))
+			resourceName := corev1.ResourceName("kae.kunpeng.com/hisi_hpre")
+			request, found := pod.Spec.Containers[0].Resources.Requests[resourceName]
+			Expect(found).To(BeTrue())
+			Expect(request.String()).To(Equal("1"))
+			limit, found := pod.Spec.Containers[0].Resources.Limits[resourceName]
+			Expect(found).To(BeTrue())
+			Expect(limit.String()).To(Equal("1"))
+			Expect(pod.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{
+				Name:  "KAE_MODE",
+				Value: "auto",
+			}))
 		})
 	})
 })

@@ -118,7 +118,7 @@ func startControllers(enableQos bool, webhookEnable bool, webhookOption webhook.
 	}
 
 	if webhookEnable {
-		if err := kaePodWebhook.SetupKaePodWithManager(mgr); err != nil {
+		if err := kaePodWebhook.SetupKaePodWithManager(mgr, kaePodWebhook.InjectionConfig{}); err != nil {
 			klog.Errorf("Unable to create kae pod webhook: %v", err)
 			os.Exit(1)
 		}

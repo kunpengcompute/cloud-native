@@ -29,21 +29,27 @@ import (
 var kaePodLog = logf.Log.WithName("kaepod-resource-webhook")
 
 // SetupKaePodWithManager registers the webhook for Pod in the manager.
-func SetupKaePodWithManager(mgr ctrl.Manager) error {
+func SetupKaePodWithManager(mgr ctrl.Manager, config InjectionConfig) error {
 	return ctrl.NewWebhookManagedBy(mgr, &corev1.Pod{}).
-		WithDefaulter(&PodCustomDefaulter{}).
+		WithDefaulter(&PodCustomDefaulter{Config: config}).
 		Complete()
 }
 
 // +kubebuilder:webhook:path=/mutate--v1-pod,mutating=true,failurePolicy=fail,sideEffects=None,groups="",resources=pods,verbs=create;update,versions=v1,name=mpod-v1.kb.io,admissionReviewVersions=v1
 
 type PodCustomDefaulter struct {
-	// TODO(user): Add more fields as needed for defaulting
+	Config InjectionConfig
 }
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Pod.
 func (d *PodCustomDefaulter) Default(_ context.Context, obj *corev1.Pod) error {
 	kaePodLog.Info("Defaulting for pod to use kae", "name", obj.GetName())
-	//todo(cuiyanxiang): add logic to default the pod spec to use kae device plugin resources and env vars.
+	changed, err := MutatePodForKAEInjection(obj, d.Config)
+	if err != nil {
+		return err
+	}
+	if changed {
+		kaePodLog.Info("Defaulted pod to use kae", "name", obj.GetName())
+	}
 	return nil
 }
