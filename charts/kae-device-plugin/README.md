@@ -27,6 +27,22 @@ helm install kae-device-plugin charts/kae-device-plugin \
   --namespace kae-system
 ```
 
+## 使用 Kubernetes 1.16 CSR 脚本启用 Webhook
+
+Chart 提供两阶段脚本简化 CSR、TLS Secret 和 Helm 安装流程。CSR 审批不会自动执行。
+
+```bash
+./hack/kae-admission-webhook-csr.sh request
+
+kubectl get csr kae-admission-webhook -o yaml
+kubectl certificate approve kae-admission-webhook
+
+CLUSTER_SIGNING_CA_FILE=/path/to/cluster-signing-ca.crt \
+  ./hack/kae-admission-webhook-csr.sh install
+```
+
+脚本会使用 `manual` 证书模式调用 `helm upgrade --install`。cluster signing CA 的路径取决于集群部署方式，必须由集群管理员确认。
+
 ## 使用手动证书启用 Webhook
 
 服务端证书必须包含 `kae-admission-webhook.kae-system.svc` DNS SAN。

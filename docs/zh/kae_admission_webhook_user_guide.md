@@ -163,6 +163,57 @@ Kustomize 清单中的 `caBundle` 默认为空。默认 `failurePolicy` 为 `Fai
 
 Kubernetes 1.16 使用 `certificates.k8s.io/v1beta1`。该版本可以不填写 `signerName`；在 Kubernetes 1.18 之前，配置了 cluster signing CA 的 kube-controller-manager 会为已批准的 CSR 签发证书。详细行为参见 [Kubernetes CSR 文档](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/)。
 
+#### 使用部署脚本（推荐）
+
+脚本将 CSR 创建和 Helm 安装拆成两个阶段，CSR 审批仍由管理员手工执行。
+
+1. 创建 namespace、私钥和 CSR。
+
+```bash
+./hack/kae-admission-webhook-csr.sh request
+```
+
+私钥和 CSR 默认保存在 `/tmp/kae-admission-webhook-csr`。CSR 创建完成后，脚本会输出检查和审批命令。
+
+2. 检查并批准 CSR。
+
+```bash
+kubectl get csr kae-admission-webhook -o yaml
+kubectl certificate approve kae-admission-webhook
+```
+
+3. 指定 kube-controller-manager 实际使用的 cluster signing CA，并完成 Secret 创建和 Helm 安装。
+
+```bash
+CLUSTER_SIGNING_CA_FILE=/path/to/cluster-signing-ca.crt \
+  ./hack/kae-admission-webhook-csr.sh install
+```
+
+`install` 阶段会等待签发结果，校验证书 SAN、证书私钥匹配关系及 CA 信任关系，然后创建 TLS Secret，并执行 `helm upgrade --install`。安装成功后默认删除本地私钥目录；设置 `KEEP_WORK_DIR=true` 可以保留文件用于排障。
+
+可以通过环境变量修改默认配置：
+
+```bash
+NAMESPACE=kae-system \
+RELEASE_NAME=kae-device-plugin \
+CSR_NAME=kae-admission-webhook \
+WORK_DIR=/tmp/kae-admission-webhook-csr \
+  ./hack/kae-admission-webhook-csr.sh request
+```
+
+额外 Helm 参数可以追加到 `install` 命令末尾：
+
+```bash
+CLUSTER_SIGNING_CA_FILE=/path/to/cluster-signing-ca.crt \
+  ./hack/kae-admission-webhook-csr.sh install \
+  --set image.repository=example.com/kae-device-plugin \
+  --set image.tag=1.0
+```
+
+如果集群中已经存在由 Kustomize 或手工创建的同名 Service、DaemonSet 或 `MutatingWebhookConfiguration`，Helm 不会自动接管，需要先删除旧资源或补充 Helm ownership metadata。
+
+#### 手工执行
+
 1. 按上一节生成 `/tmp/kae-admission-webhook.key`、CSR 配置和 `/tmp/kae-admission-webhook.csr`。
 
 2. 创建并批准 CSR。
