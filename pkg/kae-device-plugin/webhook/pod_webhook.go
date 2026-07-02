@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -42,14 +43,30 @@ type PodCustomDefaulter struct {
 }
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Pod.
-func (d *PodCustomDefaulter) Default(_ context.Context, obj *corev1.Pod) error {
-	kaePodLog.Info("Defaulting for pod to use kae", "name", obj.GetName())
-	changed, err := MutatePodForKAEInjection(obj, d.Config)
+func (d *PodCustomDefaulter) Default(ctx context.Context, obj *corev1.Pod) error {
+	requestNamespace := ""
+	if request, err := admission.RequestFromContext(ctx); err == nil {
+		requestNamespace = request.Namespace
+	}
+	effectiveNamespace := obj.GetNamespace()
+	if effectiveNamespace == "" {
+		effectiveNamespace = requestNamespace
+	}
+	logValues := []any{
+		"name", obj.GetName(),
+		"objectNamespace", obj.GetNamespace(),
+		"requestNamespace", requestNamespace,
+		"effectiveNamespace", effectiveNamespace,
+		"includedNamespaces", d.Config.IncludedNamespaces,
+		"excludedNamespaces", d.Config.ExcludedNamespaces,
+		"namespaceAllowed", shouldInjectNamespace(effectiveNamespace, d.Config.IncludedNamespaces, d.Config.ExcludedNamespaces),
+	}
+
+	changed, err := mutatePodForKAEInjection(obj, effectiveNamespace, d.Config)
 	if err != nil {
+		kaePodLog.Error(err, "Failed to evaluate KAE pod injection", logValues...)
 		return err
 	}
-	if changed {
-		kaePodLog.Info("Defaulted pod to use kae", "name", obj.GetName())
-	}
+	kaePodLog.Info("Evaluated KAE pod injection", append(logValues, "changed", changed)...)
 	return nil
 }

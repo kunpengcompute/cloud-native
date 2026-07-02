@@ -49,14 +49,22 @@ func NormalizeResourceName(name string) corev1.ResourceName {
 
 // MutatePodForKAEInjection injects configured KAE resources and environment variables into a Pod.
 func MutatePodForKAEInjection(pod *corev1.Pod, config InjectionConfig) (bool, error) {
+	namespace := ""
+	if pod != nil {
+		namespace = pod.Namespace
+	}
+	return mutatePodForKAEInjection(pod, namespace, config)
+}
+
+func mutatePodForKAEInjection(pod *corev1.Pod, namespace string, config InjectionConfig) (bool, error) {
 	if pod == nil {
 		return false, fmt.Errorf("pod is nil")
 	}
-	if !config.Enabled || !shouldInjectNamespace(pod.Namespace, config.IncludedNamespaces, config.ExcludedNamespaces) {
+	if !config.Enabled || !shouldInjectNamespace(namespace, config.IncludedNamespaces, config.ExcludedNamespaces) {
 		return false, nil
 	}
 	if len(pod.Spec.Containers) == 0 {
-		return false, fmt.Errorf("pod %s/%s has no containers", pod.Namespace, pod.Name)
+		return false, fmt.Errorf("pod %s/%s has no containers", namespace, pod.Name)
 	}
 	if config.TargetContainer < 0 || config.TargetContainer >= len(pod.Spec.Containers) {
 		return false, fmt.Errorf("target container index %d out of range", config.TargetContainer)
