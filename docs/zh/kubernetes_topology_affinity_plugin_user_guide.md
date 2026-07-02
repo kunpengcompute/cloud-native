@@ -144,7 +144,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
         如果需要修改启动参数，则在源代码目录下的**hack/kunpeng-tap/kunpeng-tap.service.docker**文件的“ExecStart=”下进行修改：
 
-        ```shell
+        ```ini
         [Unit]
         Description=Kunpeng Topology-Affinity Plugin Service
         After=network.target
@@ -255,7 +255,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
 2. 在配置文件中，打开NRI功能，如果不存在如下内容则添加。
 
-    ```shell
+    ```toml
     [plugins]
       ...
       # 增加下述部分
@@ -307,7 +307,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
     Kunpeng TAP插件容器的部署文件在“config/kunpeng-tap/nri-plugin/daemonset.yaml”中，如果需要设置选项，请在如下位置增加：
 
-    ```shell
+    ```yaml
             args:
               - "--container-runtime-mode=NRI"
               - "--nri-socket-path=/var/run/nri/nri.sock"

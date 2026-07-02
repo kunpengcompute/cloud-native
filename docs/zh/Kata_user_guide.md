@@ -149,7 +149,7 @@ Kata Containers是一个开源的容器运行时项目，旨在将容器的轻�
 
 7. 配置Containerd接入Kata，修改/etc/containerd/config.toml文件，在CRI插件中注册Kata运行时，使用如下命令：
 
-    ```toml
+    ```shell
     sed -i '/\[plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes\]/a\        [plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.kata]\n          runtime_type = \"io.containerd.kata.v2\"\n           [plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.kata.options]\n             ConfigPath = \"/opt/kata/share/defaults/kata-containers/configuration-clh.toml\"' /etc/containerd/config.toml
     ```
 
