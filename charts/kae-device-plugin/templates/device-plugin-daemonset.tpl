@@ -56,9 +56,14 @@ spec:
             - name: https
               containerPort: {{ .Values.admissionWebhook.port }}
               protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
           readinessProbe:
-            tcpSocket:
-              port: https
+            httpGet:
+              path: /readyz
+              port: health
+              scheme: HTTP
 {{- end }}
           resources:
 {{ toYaml .Values.devicePlugin.resources | indent 12 }}

@@ -81,6 +81,7 @@ func newControllerManager(enableQos bool, webhookOptions kaePodWebhook.Options) 
 			return nil, err
 		}
 		managerOptions.WebhookServer = controllerwebhook.NewServer(serverOptions)
+		managerOptions.HealthProbeBindAddress = ":8081"
 		injectionConfig = config
 	}
 
@@ -110,6 +111,9 @@ func newControllerManager(enableQos bool, webhookOptions kaePodWebhook.Options) 
 	if webhookOptions.Enabled {
 		if err := kaePodWebhook.SetupKaePodWithManager(mgr, injectionConfig); err != nil {
 			return nil, fmt.Errorf("setup KAE pod webhook: %w", err)
+		}
+		if err := mgr.AddReadyzCheck("webhook-server", mgr.GetWebhookServer().StartedChecker()); err != nil {
+			return nil, fmt.Errorf("register KAE webhook readiness check: %w", err)
 		}
 		klog.Infof("KAE admission webhook enabled on %s", webhookOptions.ListenAddr)
 	}

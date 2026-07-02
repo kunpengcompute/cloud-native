@@ -28,9 +28,14 @@ spec:
             - name: https
               containerPort: 9443
               protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
           readinessProbe:
-            tcpSocket:
-              port: https
+            httpGet:
+              path: /readyz
+              port: health
+              scheme: HTTP
           volumeMounts:
             - name: tls
               mountPath: /tls
