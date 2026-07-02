@@ -36,6 +36,7 @@ func TestOptionsAddFlags(t *testing.T) {
 		"--webhook-default-kae-count=2",
 		"--webhook-target-container-index=1",
 		"--webhook-inject-envs=KAE_MODE=auto,KAE_OPTIONS=a=b",
+		"--webhook-included-namespaces=tenant-a,tenant-b",
 		"--webhook-excluded-namespaces=kube-system,custom-system",
 	})
 	if err != nil {
@@ -57,12 +58,16 @@ func TestOptionsAddFlags(t *testing.T) {
 	if options.ExcludedNamespaces != "kube-system,custom-system" {
 		t.Fatalf("ExcludedNamespaces = %q", options.ExcludedNamespaces)
 	}
+	if options.IncludedNamespaces != "tenant-a,tenant-b" {
+		t.Fatalf("IncludedNamespaces = %q", options.IncludedNamespaces)
+	}
 }
 
 func TestOptionsBuild(t *testing.T) {
 	options := NewOptions()
 	options.Enabled = true
 	options.InjectEnvs = "KAE_MODE=auto,KAE_OPTIONS=a=b"
+	options.IncludedNamespaces = "tenant-a, tenant-b,tenant-a"
 
 	serverOptions, injectionConfig, err := options.Build("kae-system")
 	if err != nil {
@@ -84,6 +89,10 @@ func TestOptionsBuild(t *testing.T) {
 	wantNamespaces := []string{"kube-system", "kube-public", "kube-node-lease", "kae-system"}
 	if !reflect.DeepEqual(injectionConfig.ExcludedNamespaces, wantNamespaces) {
 		t.Fatalf("ExcludedNamespaces = %#v, want %#v", injectionConfig.ExcludedNamespaces, wantNamespaces)
+	}
+	wantIncludedNamespaces := []string{"tenant-a", "tenant-b"}
+	if !reflect.DeepEqual(injectionConfig.IncludedNamespaces, wantIncludedNamespaces) {
+		t.Fatalf("IncludedNamespaces = %#v, want %#v", injectionConfig.IncludedNamespaces, wantIncludedNamespaces)
 	}
 	if len(injectionConfig.EnvVars) != 2 || injectionConfig.EnvVars[1].Value != "a=b" {
 		t.Fatalf("unexpected environment variables: %#v", injectionConfig.EnvVars)

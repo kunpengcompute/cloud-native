@@ -40,6 +40,7 @@ type Options struct {
 	DefaultCount       int64
 	TargetContainer    int
 	InjectEnvs         string
+	IncludedNamespaces string
 	ExcludedNamespaces string
 }
 
@@ -65,6 +66,7 @@ func (o *Options) AddFlags(flags *flag.FlagSet) {
 	flags.Int64Var(&o.DefaultCount, "webhook-default-kae-count", o.DefaultCount, "Default KAE device count injected by the admission webhook")
 	flags.IntVar(&o.TargetContainer, "webhook-target-container-index", o.TargetContainer, "Container index targeted by the admission webhook")
 	flags.StringVar(&o.InjectEnvs, "webhook-inject-envs", o.InjectEnvs, "Comma-separated environment variables injected in KEY=VALUE format")
+	flags.StringVar(&o.IncludedNamespaces, "webhook-included-namespaces", o.IncludedNamespaces, "Comma-separated namespaces included in KAE injection")
 	flags.StringVar(&o.ExcludedNamespaces, "webhook-excluded-namespaces", o.ExcludedNamespaces, "Comma-separated namespaces excluded from KAE injection")
 }
 
@@ -131,6 +133,7 @@ func (o Options) Build(podNamespace string) (controllerwebhook.Options, Injectio
 			DefaultResource:    strings.TrimSpace(o.DefaultResource),
 			DefaultCount:       o.DefaultCount,
 			TargetContainer:    o.TargetContainer,
+			IncludedNamespaces: splitCSV(o.IncludedNamespaces),
 			ExcludedNamespaces: excludedNamespaces,
 			EnvVars:            envVars,
 		}, nil

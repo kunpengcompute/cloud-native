@@ -21,6 +21,8 @@ resources:
 - Webhook 默认关闭。
 - 处理 Pod 的 CREATE 和 UPDATE 请求。
 - 跳过 `kube-system`、`kube-public`、`kube-node-lease` 和 Webhook 自身 namespace。
+- include 列表为空时按 exclude 列表过滤；include 列表非空时只向列表中的 namespace 注入。
+- namespace 同时出现在 include 和 exclude 列表中时，include 优先。
 - 默认修改第 0 个普通容器。
 - Pod 已声明任意 `kae.kunpeng.com/*` resource 时，不再注入 resource。
 - 只添加缺失的环境变量，不覆盖同名变量。
@@ -48,6 +50,7 @@ Kubernetes 1.16 部署使用 `admissionregistration.k8s.io/v1` 的 `MutatingWebh
 | `--webhook-default-kae-count` | `1` | 默认注入数量 |
 | `--webhook-target-container-index` | `0` | 目标普通容器下标 |
 | `--webhook-inject-envs` | 空 | 注入的 `KEY=VALUE` 列表 |
+| `--webhook-included-namespaces` | 空 | 允许注入的 namespace 列表 |
 | `--webhook-excluded-namespaces` | Kubernetes 系统 namespace | 排除的 namespace 列表 |
 
 Webhook 开启后，如果配置无效、证书加载失败或 controller-runtime Manager 运行失败，整个 Device Plugin 进程退出并由 DaemonSet 重新拉起。
@@ -385,6 +388,7 @@ config/kae-device-plugin/overlay/webhook/daemonset_patch.yaml
 - -webhook-default-kae-resource=hisi_zip
 - -webhook-default-kae-count=1
 - -webhook-inject-envs=KAE_MODE=auto,KAE_LOG_LEVEL=info
+- -webhook-included-namespaces=tenant-a,tenant-b
 ```
 
 Helm 可以通过 values 或命令行设置：
@@ -395,8 +399,11 @@ helm upgrade --install kae-device-plugin charts/kae-device-plugin \
   --set admissionWebhook.enabled=true \
   --set admissionWebhook.cert.mode=certManager \
   --set admissionWebhook.defaultKaeResource=hisi_zip \
+  --set 'admissionWebhook.includedNamespaces={tenant-a,tenant-b}' \
   --set-string admissionWebhook.injectEnvs='KAE_MODE=auto\,KAE_LOG_LEVEL=info'
 ```
+
+不配置 `includedNamespaces` 时，Webhook 继续向 `excludedNamespaces` 之外的 namespace 注入。配置后只向 include 列表中的 namespace 注入；同名 include 条目优先于 exclude。
 
 ## 验证部署
 

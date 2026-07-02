@@ -40,6 +40,7 @@ spec:
             - "-webhook-default-kae-count={{ .Values.admissionWebhook.defaultKaeCount }}"
             - "-webhook-target-container-index={{ .Values.admissionWebhook.targetContainerIndex }}"
             - "-webhook-inject-envs={{ .Values.admissionWebhook.injectEnvs }}"
+            - "-webhook-included-namespaces={{ join "," .Values.admissionWebhook.includedNamespaces }}"
             - "-webhook-excluded-namespaces={{ join "," .Values.admissionWebhook.excludedNamespaces }}"
 {{- end }}
           env:

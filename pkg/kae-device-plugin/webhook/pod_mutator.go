@@ -33,6 +33,7 @@ type InjectionConfig struct {
 	DefaultResource    string
 	DefaultCount       int64
 	TargetContainer    int
+	IncludedNamespaces []string
 	ExcludedNamespaces []string
 	EnvVars            []corev1.EnvVar
 }
@@ -51,7 +52,7 @@ func MutatePodForKAEInjection(pod *corev1.Pod, config InjectionConfig) (bool, er
 	if pod == nil {
 		return false, fmt.Errorf("pod is nil")
 	}
-	if !config.Enabled || isExcludedNamespace(pod.Namespace, config.ExcludedNamespaces) {
+	if !config.Enabled || !shouldInjectNamespace(pod.Namespace, config.IncludedNamespaces, config.ExcludedNamespaces) {
 		return false, nil
 	}
 	if len(pod.Spec.Containers) == 0 {
@@ -134,9 +135,16 @@ func appendMissingEnvVars(container *corev1.Container, envVars []corev1.EnvVar) 
 	return changed
 }
 
-func isExcludedNamespace(namespace string, excludedNamespaces []string) bool {
-	for _, excluded := range excludedNamespaces {
-		if namespace == strings.TrimSpace(excluded) {
+func shouldInjectNamespace(namespace string, includedNamespaces, excludedNamespaces []string) bool {
+	if len(includedNamespaces) == 0 {
+		return !namespaceInList(namespace, excludedNamespaces)
+	}
+	return namespaceInList(namespace, includedNamespaces)
+}
+
+func namespaceInList(namespace string, namespaces []string) bool {
+	for _, configuredNamespace := range namespaces {
+		if namespace == strings.TrimSpace(configuredNamespace) {
 			return true
 		}
 	}

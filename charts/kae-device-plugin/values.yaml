@@ -31,6 +31,7 @@ admissionWebhook:
   defaultKaeCount: 1
   targetContainerIndex: 0
   injectEnvs: ""
+  includedNamespaces: []
   excludedNamespaces:
     - kube-system
     - kube-public

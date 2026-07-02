@@ -53,6 +53,28 @@ func TestMutatePodForKAEInjection(t *testing.T) {
 			pod: newMutationTestPod("kube-system", "app"),
 		},
 		{
+			name: "included namespace overrides excluded namespace",
+			config: InjectionConfig{
+				Enabled:            true,
+				DefaultResource:    "hisi_hpre",
+				DefaultCount:       1,
+				IncludedNamespaces: []string{"tenant-a"},
+				ExcludedNamespaces: []string{"tenant-a"},
+			},
+			pod:         newMutationTestPod("tenant-a", "app"),
+			wantChanged: true,
+		},
+		{
+			name: "namespace outside non-empty include list is skipped",
+			config: InjectionConfig{
+				Enabled:            true,
+				DefaultResource:    "hisi_hpre",
+				DefaultCount:       1,
+				IncludedNamespaces: []string{"tenant-a"},
+			},
+			pod: newMutationTestPod("tenant-b", "app"),
+		},
+		{
 			name: "injects resource into selected container",
 			config: InjectionConfig{
 				Enabled:         true,

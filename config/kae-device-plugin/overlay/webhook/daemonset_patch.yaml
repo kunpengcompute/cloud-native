@@ -23,6 +23,7 @@ spec:
             - -webhook-default-kae-count=1
             - -webhook-target-container-index=0
             - -webhook-inject-envs=
+            - -webhook-included-namespaces=
             - -webhook-excluded-namespaces=kube-system,kube-public,kube-node-lease
           ports:
             - name: https

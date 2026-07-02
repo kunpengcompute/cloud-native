@@ -87,6 +87,17 @@ helm upgrade --install kae-device-plugin charts/kae-device-plugin \
   --set-string admissionWebhook.injectEnvs='KAE_MODE=auto\,KAE_LOG_LEVEL=info'
 ```
 
+## 限制注入 namespace
+
+```bash
+helm upgrade --install kae-device-plugin charts/kae-device-plugin \
+  --namespace kae-system \
+  --reuse-values \
+  --set 'admissionWebhook.includedNamespaces={tenant-a,tenant-b}'
+```
+
+`includedNamespaces` 为空时按 `excludedNamespaces` 过滤；非空时只向 include 列表中的 namespace 注入。namespace 同时出现在两个列表中时，include 优先。
+
 ## 常用参数
 
 | 参数 | 默认值 | 说明 |
@@ -101,6 +112,7 @@ helm upgrade --install kae-device-plugin charts/kae-device-plugin \
 | `admissionWebhook.defaultKaeCount` | `1` | 默认设备数量 |
 | `admissionWebhook.targetContainerIndex` | `0` | 目标普通容器下标 |
 | `admissionWebhook.injectEnvs` | `""` | `KEY=VALUE` 环境变量列表 |
+| `admissionWebhook.includedNamespaces` | `[]` | 允许注入的 namespace |
 | `admissionWebhook.excludedNamespaces` | Kubernetes 系统 namespace | 排除的 namespace |
 | `admissionWebhook.failurePolicy` | `Fail` | Webhook 调用失败策略 |
 | `admissionWebhook.cert.mode` | `manual` | `manual` 或 `certManager` |
