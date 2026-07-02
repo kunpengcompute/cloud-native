@@ -1,0 +1,47 @@
+image:
+  repository: kae-device-plugin
+  tag: "1.0"
+  pullPolicy: IfNotPresent
+
+devicePlugin:
+  enabled: true
+  name: kunpeng-kae-plugin
+  kernelVfDrivers:
+    - hisi_hpre
+    - hisi_zip
+    - hisi_sec2
+  resources:
+    requests:
+      memory: 100Mi
+      cpu: 70m
+    limits:
+      memory: 300Mi
+      cpu: 140m
+  nodeSelector:
+    kubernetes.io/arch: arm64
+  tolerations: []
+  affinity: {}
+
+admissionWebhook:
+  enabled: false
+  name: kae-admission-webhook
+  port: 9443
+  tlsSecretName: kae-admission-webhook-tls # pragma: allowlist secret
+  defaultKaeResource: hisi_hpre
+  defaultKaeCount: 1
+  targetContainerIndex: 0
+  injectEnvs: ""
+  excludedNamespaces:
+    - kube-system
+    - kube-public
+    - kube-node-lease
+  failurePolicy: Fail
+  cert:
+    mode: manual
+    caBundle: ""
+    certManager:
+      issuerName: kae-admission-webhook-selfsigned
+      caCertificateName: kae-admission-webhook-ca
+      servingCertificateName: kae-admission-webhook-cert
+      duration: 8760h
+      renewBefore: 720h
