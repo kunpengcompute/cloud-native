@@ -1,0 +1,382 @@
+# KAE Admission Webhook 使用指南
+
+## 功能说明
+
+KAE Admission Webhook 与 KAE Device Plugin 运行在同一个 DaemonSet 进程中。Webhook 默认关闭，开启后会在 Pod 创建或更新时自动注入 KAE extended resource 和配置的环境变量，业务 Pod 无需手动声明 KAE resource。
+
+每个就绪的 Device Plugin Pod 都是 Webhook Service 的一个 Endpoint。集群中只创建一个 Service 和一个 `MutatingWebhookConfiguration`，API Server 每次请求只会选择一个 Endpoint。
+
+默认注入结果如下：
+
+```yaml
+resources:
+  requests:
+    kae.kunpeng.com/hisi_hpre: "1"
+  limits:
+    kae.kunpeng.com/hisi_hpre: "1"
+```
+
+默认行为：
+
+- Webhook 默认关闭。
+- 处理 Pod 的 CREATE 和 UPDATE 请求。
+- 跳过 `kube-system`、`kube-public`、`kube-node-lease` 和 Webhook 自身 namespace。
+- 默认修改第 0 个普通容器。
+- Pod 已声明任意 `kae.kunpeng.com/*` resource 时，不再注入 resource。
+- 只添加缺失的环境变量，不覆盖同名变量。
+- Kustomize 和 Helm 默认使用 `failurePolicy: Fail`，可根据集群可用性要求调整为 `Ignore`。
+
+## 环境要求
+
+- Kubernetes 1.16 或更高版本。
+- 使用 Helm 部署时需要 Helm 3，建议 Helm 3.8 或更高版本。
+- KAE 节点已经创建 VF，并安装 KAE 驱动。
+- API Server 可以访问节点 Pod 网络的 TCP 9443 端口。
+- 已构建或拉取 `kae-device-plugin:1.0` 镜像。
+
+Kubernetes 1.16 部署使用 `admissionregistration.k8s.io/v1` 的 `MutatingWebhookConfiguration`，AdmissionReview 协议使用 `v1beta1`。
+
+## 启动参数
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--enable-admission-webhook` | `false` | 是否启用 Webhook |
+| `--webhook-listen-addr` | `:9443` | HTTPS 监听地址 |
+| `--webhook-tls-cert-file` | `/tls/tls.crt` | 服务端证书路径 |
+| `--webhook-tls-key-file` | `/tls/tls.key` | 服务端私钥路径 |
+| `--webhook-default-kae-resource` | `hisi_hpre` | 默认注入的 KAE 资源 |
+| `--webhook-default-kae-count` | `1` | 默认注入数量 |
+| `--webhook-target-container-index` | `0` | 目标普通容器下标 |
+| `--webhook-inject-envs` | 空 | 注入的 `KEY=VALUE` 列表 |
+| `--webhook-excluded-namespaces` | Kubernetes 系统 namespace | 排除的 namespace 列表 |
+
+Webhook 开启后，如果配置无效、证书加载失败或 controller-runtime Manager 运行失败，整个 Device Plugin 进程退出并由 DaemonSet 重新拉起。
+
+## TLS 证书要求
+
+Admission Webhook 必须使用 HTTPS。服务端证书的 DNS SAN 至少包含：
+
+```text
+kae-admission-webhook
+kae-admission-webhook.kae-system
+kae-admission-webhook.kae-system.svc
+```
+
+TLS Secret 固定使用以下名称：
+
+```text
+kae-system/kae-admission-webhook-tls
+```
+
+`MutatingWebhookConfiguration.webhooks[0].clientConfig.caBundle` 必须包含签发服务端证书的 CA，而不是普通服务端叶子证书。
+
+## 使用 Kustomize 部署
+
+### 使用自签名证书
+
+1. 创建 namespace。
+
+```bash
+kubectl apply -f config/kae-device-plugin/overlay/webhook/namespace.yaml
+```
+
+2. 创建 CA。
+
+```bash
+openssl genrsa -out /tmp/kae-webhook-ca.key 2048
+openssl req -x509 -new -nodes \
+  -key /tmp/kae-webhook-ca.key \
+  -sha256 -days 3650 \
+  -subj "/CN=kae-admission-webhook-ca" \
+  -out /tmp/kae-webhook-ca.crt
+```
+
+3. 创建服务端私钥和 CSR 配置。
+
+```bash
+openssl genrsa -out /tmp/kae-admission-webhook.key 2048
+
+cat > /tmp/kae-admission-webhook-csr.conf <<'EOF'
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = kae-admission-webhook.kae-system.svc
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = kae-admission-webhook
+DNS.2 = kae-admission-webhook.kae-system
+DNS.3 = kae-admission-webhook.kae-system.svc
+EOF
+
+openssl req -new \
+  -key /tmp/kae-admission-webhook.key \
+  -out /tmp/kae-admission-webhook.csr \
+  -config /tmp/kae-admission-webhook-csr.conf
+```
+
+4. 使用 CA 签发服务端证书。
+
+```bash
+openssl x509 -req \
+  -in /tmp/kae-admission-webhook.csr \
+  -CA /tmp/kae-webhook-ca.crt \
+  -CAkey /tmp/kae-webhook-ca.key \
+  -CAcreateserial \
+  -out /tmp/kae-admission-webhook.crt \
+  -days 365 -sha256 \
+  -extensions v3_req \
+  -extfile /tmp/kae-admission-webhook-csr.conf
+```
+
+5. 创建 TLS Secret 并部署。
+
+```bash
+kubectl -n kae-system create secret tls kae-admission-webhook-tls \
+  --cert=/tmp/kae-admission-webhook.crt \
+  --key=/tmp/kae-admission-webhook.key
+
+kubectl apply -k config/kae-device-plugin/overlay/webhook
+```
+
+6. 写入 CA Bundle。
+
+```bash
+CA_BUNDLE=$(base64 -w0 /tmp/kae-webhook-ca.crt)
+
+kubectl patch mutatingwebhookconfiguration kae-admission-webhook \
+  --type=json \
+  -p="[{'op':'replace','path':'/webhooks/0/clientConfig/caBundle','value':'${CA_BUNDLE}'}]"
+```
+
+Kustomize 清单中的 `caBundle` 默认为空。默认 `failurePolicy` 为 `Fail`，因此应在 `apply -k` 后立即完成 CA patch，避免其他 Pod 创建请求在此期间失败。
+
+### 使用 Kubernetes 1.16 CSR API
+
+Kubernetes 1.16 使用 `certificates.k8s.io/v1beta1`。该版本可以不填写 `signerName`；在 Kubernetes 1.18 之前，配置了 cluster signing CA 的 kube-controller-manager 会为已批准的 CSR 签发证书。详细行为参见 [Kubernetes CSR 文档](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/)。
+
+1. 按上一节生成 `/tmp/kae-admission-webhook.key`、CSR 配置和 `/tmp/kae-admission-webhook.csr`。
+
+2. 创建并批准 CSR。
+
+```bash
+CSR_BUNDLE=$(base64 -w0 /tmp/kae-admission-webhook.csr)
+
+cat <<EOF | kubectl apply -f -
+apiVersion: certificates.k8s.io/v1beta1
+kind: CertificateSigningRequest
+metadata:
+  name: kae-admission-webhook
+spec:
+  groups:
+    - system:authenticated
+  request: ${CSR_BUNDLE}
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+EOF
+
+kubectl certificate approve kae-admission-webhook
+```
+
+3. 等待并导出证书。
+
+```bash
+kubectl get csr kae-admission-webhook
+
+kubectl get csr kae-admission-webhook \
+  -o jsonpath='{.status.certificate}' | base64 -d \
+  > /tmp/kae-admission-webhook.crt
+```
+
+如果 CSR 长时间保持 `Approved` 且证书为空，检查 kube-controller-manager 的 `--cluster-signing-cert-file`、`--cluster-signing-key-file` 和日志。
+
+4. 创建 Secret 并部署。
+
+```bash
+kubectl apply -f config/kae-device-plugin/overlay/webhook/namespace.yaml
+
+kubectl -n kae-system create secret tls kae-admission-webhook-tls \
+  --cert=/tmp/kae-admission-webhook.crt \
+  --key=/tmp/kae-admission-webhook.key
+
+kubectl apply -k config/kae-device-plugin/overlay/webhook
+```
+
+5. 使用 kube-controller-manager 实际采用的 cluster signing CA 更新 `caBundle`。
+
+```bash
+: "${CLUSTER_SIGNING_CA_FILE:?set the kube-controller-manager cluster signing CA path}"
+CA_BUNDLE=$(base64 -w0 "${CLUSTER_SIGNING_CA_FILE}")
+
+kubectl patch mutatingwebhookconfiguration kae-admission-webhook \
+  --type=json \
+  -p="[{'op':'replace','path':'/webhooks/0/clientConfig/caBundle','value':'${CA_BUNDLE}'}]"
+```
+
+cluster signing CA 的路径取决于集群部署方式，不能假定一定是 `/etc/kubernetes/pki/ca.crt`。
+
+## 使用 Helm 部署
+
+### 仅部署 Device Plugin
+
+Webhook 默认关闭：
+
+```bash
+helm install kae-device-plugin charts/kae-device-plugin \
+  --namespace kae-system \
+  --create-namespace
+```
+
+如果 `kae-system` 已存在，省略 `--create-namespace`。
+
+### 使用手动证书启用 Webhook
+
+先创建 namespace 和 TLS Secret，然后将 CA Bundle 传给 Chart：
+
+```bash
+kubectl create namespace kae-system
+
+kubectl -n kae-system create secret tls kae-admission-webhook-tls \
+  --cert=/path/to/tls.crt \
+  --key=/path/to/tls.key
+
+CA_BUNDLE=$(base64 -w0 /path/to/ca.crt)
+
+helm install kae-device-plugin charts/kae-device-plugin \
+  --namespace kae-system \
+  --set admissionWebhook.enabled=true \
+  --set admissionWebhook.cert.mode=manual \
+  --set-string admissionWebhook.cert.caBundle="${CA_BUNDLE}"
+```
+
+手动证书模式下，Chart 会在 `caBundle` 为空时拒绝渲染。
+
+### 使用 cert-manager 启用 Webhook
+
+集群必须已经安装 cert-manager、cert-manager webhook 和 cainjector。Chart 会创建 Issuer、CA Certificate 和服务端 Certificate，并由 cainjector 写入 CA Bundle。
+
+```bash
+helm install kae-device-plugin charts/kae-device-plugin \
+  --namespace kae-system \
+  --create-namespace \
+  --set admissionWebhook.enabled=true \
+  --set admissionWebhook.cert.mode=certManager
+```
+
+如果 namespace 已存在，省略 `--create-namespace`。
+
+## 修改注入配置
+
+Kustomize 参数位于：
+
+```text
+config/kae-device-plugin/overlay/webhook/daemonset_patch.yaml
+```
+
+例如注入 ZIP 资源和环境变量：
+
+```yaml
+- -webhook-default-kae-resource=hisi_zip
+- -webhook-default-kae-count=1
+- -webhook-inject-envs=KAE_MODE=auto,KAE_LOG_LEVEL=info
+```
+
+Helm 可以通过 values 或命令行设置：
+
+```bash
+helm upgrade --install kae-device-plugin charts/kae-device-plugin \
+  --namespace kae-system \
+  --set admissionWebhook.enabled=true \
+  --set admissionWebhook.cert.mode=certManager \
+  --set admissionWebhook.defaultKaeResource=hisi_zip \
+  --set-string admissionWebhook.injectEnvs='KAE_MODE=auto\,KAE_LOG_LEVEL=info'
+```
+
+## 验证部署
+
+1. 检查组件、Endpoint 和 CA Bundle。
+
+```bash
+kubectl -n kae-system get daemonset,pod,service,endpoints
+kubectl get mutatingwebhookconfiguration kae-admission-webhook
+kubectl get mutatingwebhookconfiguration kae-admission-webhook \
+  -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | wc -c
+```
+
+2. 创建测试 Pod。
+
+```bash
+cat <<'EOF' | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kae-webhook-test
+  namespace: default
+spec:
+  containers:
+    - name: test
+      image: busybox
+      command: ["sleep", "3600"]
+EOF
+```
+
+3. 查看注入结果并删除测试 Pod。
+
+```bash
+kubectl get pod kae-webhook-test -n default -o yaml
+kubectl delete pod kae-webhook-test -n default
+```
+
+## 常见问题
+
+### `x509: certificate signed by unknown authority`
+
+检查 `caBundle` 是否为签发服务端证书的 CA，并检查证书 SAN 是否包含 Service DNS。
+
+### `remote error: tls: bad certificate`
+
+检查 TLS Secret 中的证书和私钥是否匹配：
+
+```bash
+kubectl -n kae-system get secret kae-admission-webhook-tls
+openssl x509 -in /path/to/tls.crt -noout -text
+```
+
+### Service 没有 Endpoint
+
+```bash
+kubectl -n kae-system get pod -l app=kunpeng-kae-plugin
+kubectl -n kae-system get endpoints kae-admission-webhook
+```
+
+确认 Pod Ready、9443 端口监听正常，并且 TLS Secret 已挂载。
+
+### Pod 创建被阻塞
+
+检查 Webhook Pod 日志、Service Endpoint、证书和 CA Bundle。紧急情况下可暂时将 `failurePolicy` 调整为 `Ignore`，恢复后再改回 `Fail`。
+
+## 卸载
+
+Kustomize：
+
+```bash
+kubectl delete -k config/kae-device-plugin/overlay/webhook
+```
+
+Helm：
+
+```bash
+helm uninstall kae-device-plugin --namespace kae-system
+```
+
+手动创建的 TLS Secret 和 namespace 不会由 Helm 自动删除。
