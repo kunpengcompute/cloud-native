@@ -71,6 +71,7 @@ ctr -n k8s.io images import /path/to/kunpeng-qos-controller.tar
 
 Prerequisites: The target node has the `resctrl` capability and `/sys/fs/resctrl` is mounted to the node. The container can access `/sys/fs/cgroup`.
 >NOTE: If `/sys/fs/resctrl` is not mounted to the node, mount it by running the `mount -t resctrl resctrl /sys/fs/resctrl` command. If the `resctrl` directory does not exist in the `/sys/fs` directory, the MPAM function is not enabled in the kernel. You can enable the function by adding `arm64.mpam` to the kernel startup parameters.
+>
 ## Deploying CRDs
 
 ```bash
@@ -92,7 +93,6 @@ kubectl -n qos-system logs -l app=qos-controller --tail=200
 
 The possible command output is as follows. The status of `qos-controller` is `Running`, and no error is reported in the log.
 ![Figure: Checking the running status](figures/docs_images_kunpeng_qos_controller_deploy.png)
-
 
 ## (Optional) Local Debugging and Running
 
@@ -125,7 +125,7 @@ export NODE_NAME=<Your_node_name>
 | `spec.l3.ways` | Number of allocated cache ways.| ≥ 1| The upper limit is determined by node hardware.|
 | `spec.cpu.qosLevel` | Pod CPU QoS level.| `-1`/`0`/`1`. The default value is `0`.| `cpu.qos_level` written to the pod in the group. The value <code>-1</code> indicates a low-priority service, <code>0</code> indicates the default priority, and <code>1</code> indicates a high-priority service.|
 
-### Example: Creating QoSPolicy.
+### Example: Creating QoSPolicy
 
 ```yaml
 apiVersion: qos.kunpeng.huawei.com/v1alpha1
@@ -159,7 +159,6 @@ kubectl apply -f qospolicy-offline-small.yaml
 
 The control group parameters are updated by modifying the `QoSPolicy` CR with the same name. The operator automatically synchronizes the updated configuration to the local `resctrl` control group.
 
-
 ```bash
 kubectl edit qospolicy offline-small
 ```
@@ -170,6 +169,7 @@ An example command output is as follows:
 ![Figure: Example of modifying QoSPolicy using kubectl edit](figures/docs_images_kunpeng_qos_controller_update_resctrl.png)
 In this example, `mb.max` is changed from `60` to `50`, and `l3.ways` is changed from `4` to `1`.
 > NOTE: `cpu.qos_level` can be modified only once. The default value is `0`. The value can be changed from `0` to `-1` or from `0` to `1`. However, the value cannot be changed after being set.
+>
 #### Verifying the Update
 
 ```bash
@@ -177,6 +177,7 @@ kubectl get qospolicy offline-small -o yaml
 POD=$(kubectl -n qos-system get pod -l app=qos-controller -o name | head -n1)
 kubectl -n qos-system exec -it "${POD#pod/}" -- cat /sys/fs/resctrl/offline-small/schemata
 ```
+
 The possible command output is as follows. You can see that `mb.max` and `l3.ways` in the CR have been updated to `50` and `1`, respectively, and the values in `schemata` of the `resctrl` control group have been updated accordingly.
 ![Figure: Verifying the update](figures/docs_images_kunpeng_qos_controller_update_ensure.png)
 
@@ -213,11 +214,14 @@ kubectl apply -f pod-offline-small.yaml
 ```
 
 ### Verification
+
 #### Checking Whether a Pod Is Added to a Specified Control Group
+
 ```bash
 POD=$(kubectl -n qos-system get pod -l app=qos-controller -o name | head -n1)
 kubectl -n qos-system exec -it "${POD#pod/}" -- cat /sys/fs/resctrl/offline-small/tasks
 ```
+
 The possible command output is as follows. If `pid` exists in `tasks` of the `offline-small` control group, `offline-small-nginx` has been added to the `offline-small` control group.
 ![Figure: Verification](figures/docs_images_kunpeng_qos_controller_pod_join_resctrl.png)
 
@@ -226,6 +230,7 @@ The possible command output is as follows. If `pid` exists in `tasks` of the `of
 ```bash
 kubectl exec -it offline-small-nginx -- cat /sys/fs/cgroup/cpu/cpu.qos_level
 ```
+
 The possible command output is as follows. `cpu.qos_level` of `offline-small-nginx` is `-1`, indicating that `offline-small-nginx` has been added to the `offline-small` control group.
 ![Figure: Verification](figures/docs_images_kunpeng_qos_controller_pod_qos_level.png)
 
@@ -248,6 +253,7 @@ kubectl -n qos-system exec -it "${POD#pod/}" -- ls /sys/fs/resctrl
 The possible command output is as follows. If no object is found in `qospolicy` and `offline-small` does not exist in the `resctrl` directory, the control group has been deleted.
 
 ![Figure: Clearance result after QoSPolicy deletion](figures/docs_images_kunpeng_qos_controller_delete.png)
+
 ## Common Path List
 
 - CRD:
@@ -265,7 +271,7 @@ The possible command output is as follows. If no object is found in `qospolicy` 
 
 You are advised to uninstall service resources and then control-plane resources to avoid residual objects.
 
-### 1. Clearing the QoSPolicy CRs.
+### 1. Clearing the QoSPolicy CRs
 
 ```bash
 kubectl delete qospolicy --all
@@ -305,6 +311,5 @@ kubectl -n qos-system get all
 
 The possible command output is as follows. If the corresponding resources cannot be found, the resources have been successfully cleared.
 ![Figure: Verification result](figures/docs_images_kunpeng_qos_controller_clean.png)
-
 
 NOTE: If CRDs have been deleted, `kubectl get qospolicy` may display a message indicating that the resource type does not exist, which is expected.
