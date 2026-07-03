@@ -8,7 +8,6 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
 本插件的主要功能是自动管理服务器上所有的KAE设备，并简化KAE设备的直通操作，让用户可以通过简单的声明将KAE设备直通到容器中来加速加解密和数据压缩场景。
 
-
 ## 环境要求<a name="ZH-CN_TOPIC_0000002518412470"></a>
 
 本文基于特定环境提供指导，在正式操作前请确保软硬件均满足要求。
@@ -22,7 +21,6 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 |项目|规格|
 |--|--|
 |CPU|鲲鹏920系列处理器、鲲鹏950处理器|
-
 
 **操作系统和软件要求<a name="section21631338357"></a>**
 
@@ -47,7 +45,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 1. 请确保已经获取[操作系统和软件要求](#已验证的操作系统和软件版本)中的软件和代码。
 2. 使用如下命令查看计算节点上是否有KAE设备。
 
-    ```
+    ```shell
     lspci | grep HPRE
     lspci | grep SEC
     lspci | grep ZIP
@@ -61,7 +59,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
 3. 使用如下命令查看计算节点是否已经安装KAE相关驱动。
 
-    ```
+    ```shell
     ls /sys/class/uacce
     ```
 
@@ -73,13 +71,13 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
 1. 获取插件源码。
 
-    ```
+    ```shell
     git clone https://gitcode.com/boostkit/cloud-native.git
     ```
 
 2. 编译插件代码获取镜像。
 
-    ```
+    ```shell
     cd /path/to/cloud-native
     make kae-device-plugin-docker
     ```
@@ -89,7 +87,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
 3. 查看镜像是否编译成功。
 
-    ```
+    ```shell
     docker images | grep kae-device-plugin
     ```
 
@@ -99,20 +97,20 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
 4. 将编译好的镜像导出为kae-device-plugin.tar。
 
-    ```
+    ```shell
     docker save kae-device-plugin:1.0 -o kae-device-plugin.tar
     ```
 
 5. 把导出的tar包复制到计算节点上后，执行如下命令导入镜像。
     - Kubernetes使用的容器运行时是Containerd时，使用如下命令导入镜像。
 
-        ```
+        ```shell
         ctr -n k8s.io images import /path/to/kae-device-plugin.tar
         ```
 
     - Kubernetes使用的容器运行时是Docker时，使用如下命令导入镜像。
 
-        ```
+        ```shell
         docker load -i /path/to/kae-device-plugin.tar
         ```
 
@@ -122,7 +120,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
 1. 使用如下命令创建VF。
 
-    ```
+    ```shell
     cd /path/to/cloud-native/Boostkit_CloudNative/K8S/deployments/kae-device-plugin
     python3 kae-init.py 4
     ```
@@ -133,14 +131,14 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
 2. 在控制节点上执行如下命令部署KAE Device Plugin。
 
-    ```
+    ```shell
     cd /path/to/cloud-native/Boostkit_CloudNative/K8S/deployments/
     kubectl apply -k kae-device-plugin/overlay/qos
     ```
 
 3. 查看插件是否部署成功。
 
-    ```
+    ```shell
     kubectl get pod
     ```
 
@@ -150,7 +148,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
 4. 查看是否已经纳管KAE相关设备。
 
-    ```
+    ```shell
     kubectl describe node <your compute node name>
     ```
 
@@ -176,7 +174,6 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 |SEC|kae.kunpeng.com/hisi_sec2|
 |ZIP|kae.kunpeng.com/hisi_zip|
 
-
 >![](public_sys-resources/icon-notice.gif) **须知：** 
 >KAE设备正常运行需要KAE相关的库，容器内一般并没有安装KAE相关的库。本例是通过把主机上的KAE库映射到容器中来完成的。实际使用过程中请根据需要自行选择在容器中安装KAE相关的库，或者把主机上的KAE库映射到容器中。
 
@@ -184,7 +181,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
     对需要使用的设备在**resources**中通过**requests**和**limits**来进行声明。在**resources**中的**requests**和**limits**添加**kae.kunpeng.com/hisi\_hpre: "1"** 即可。
 
-    ```
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -211,26 +208,26 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 
 2. 部署Pod。
 
-    ```
+    ```shell
     kubectl apply -f kae-pod/kae-test-pod.yaml
     ```
 
 3. 部署完成之后，查看Pod的运行状态。
 
-    ```
+    ```shell
     kubectl get pod
     ```
 
     回显如下所示，Pod是**Running**状态说明部署成功。
 
-    ```
+    ```txt
     NAME       READY   STATUS    RESTARTS   AGE
     kae-test   1/1     Running   0          3h20m
     ```
 
 4. 进入Pod内查看KAE设备是否已经挂载。
 
-    ```
+    ```shell
     kubectl exec -it kae-test bash
     ls /dev
     ```
@@ -247,7 +244,7 @@ KAE设备支持QoS（Quality of Service，服务质量）功能。通过设置Qo
 
 1. 在Pod的yaml文件中添加注解**qos.kae.kunpeng.com/hisi\_hpre: "500"** 声明KAE设备的QoS，如果要设置其他设备的QoS参考[KAE设备QoS注解对照表](#KAE设备QoS注解对照表)。
 
-    ```
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -282,11 +279,10 @@ KAE设备支持QoS（Quality of Service，服务质量）功能。通过设置Qo
    |SEC|qos.kae.kunpeng.com/hisi_sec2|
    |ZIP|qos.kae.kunpeng.com/hisi_zip|
 
-
 2. 按照[KAE设备直通](#KAE设备直通)的步骤部署Pod即可。
 3. 进入容器执行如下命令，检查KAE设备的QoS是否设置成功。
 
-    ```
+    ```shell
     kubectl exec -it kae-test-qos -- bash
     # 在容器中执行
     env
@@ -298,7 +294,7 @@ KAE设备支持QoS（Quality of Service，服务质量）功能。通过设置Qo
 
     根据得到的PCI地址读取如下文件查看QoS值是否与Annotation中声明的一致，**下面命令在物理机上执行**。
 
-    ```
+    ```shell
     cat /sys/kernel/debug/hisi_hpre/0000:3a:00.0/alg_qos
     ```
 
@@ -306,14 +302,10 @@ KAE设备支持QoS（Quality of Service，服务质量）功能。通过设置Qo
 
     ![](figures/zh-cn_image_0000002518252554.png)
 
-
-
 ## （可选）卸载插件<a name="ZH-CN_TOPIC_0000002549892315"></a>
 
 执行如下命令卸载插件。
 
-```
+```shell
 kubectl delete -k kae-device-plugin/overlay/qos
 ```
-
-

@@ -21,12 +21,12 @@ Kata Containers是一个开源的容器运行时项目，旨在将容器的轻�
 - **AI/代码沙箱**：结合Nydus镜像加速，适用于AI Agent代码执行沙箱等需要快速启动、强隔离的临时运行环境。
 
 ## 软件安装
+
 ### 环境要求
 
 本文基于特定环境提供指导，在正式操作前请确保软硬件均满足要求。
 
 **表1**  硬件要求
-
 
 <table><thead align="left"><tr id="row237mcpsimp"><th class="cellrowborder" valign="top" width="27%" id="mcps1.2.3.1.1"><p id="p239mcpsimp">项目</p>
 </th>
@@ -43,7 +43,6 @@ Kata Containers是一个开源的容器运行时项目，旨在将容器的轻�
 </table>
 
 **表2**  操作系统和软件要求
-
 
 <table><thead align="left"><tr id="row254mcpsimp"><th class="cellrowborder" valign="top" width="26.26262626262626%" id="mcps1.2.4.1.1"><p id="p256mcpsimp">项目</p>
 </th>
@@ -109,54 +108,54 @@ Kata Containers是一个开源的容器运行时项目，旨在将容器的轻�
 
 本章节主要提供Kata安装以及使能相关配置。在开始安装部署前，已完成底层环境Kubernetes集群+Containerd的部署配置，并且根据[环境要求](#环境要求)下载Kata安装包。
 
-1.  创建临时目录。
+1. 创建临时目录。
 
-    ```
+    ```shell
     mkdir ~/kata-temp
     ```
 
-2.  解压Kata安装包到临时目录。
+2. 解压Kata安装包到临时目录。
 
-    ```
+    ```shell
     tar -xvf kata-static-3.27.0-arm64.tar.zst -C ~/kata-temp
     ```
 
-3.  查看解压出来的内容，并拷贝到目标路径。
+3. 查看解压出来的内容，并拷贝到目标路径。
 
-    ```
+    ```shell
     ls -R ~/kata-temp | head -n 20 
     cp -ra ~/kata-temp/opt/kata /opt/
     ```
 
-4.  设置权限，确保有root执行权。
+4. 设置权限，确保有root执行权。
 
-    ```
+    ```shell
     chmod -R +x /opt/kata/bin/
     ```
 
-5.  创建软链接到系统路径。
+5. 创建软链接到系统路径。
 
-    ```
+    ```shell
     ln -sf /opt/kata/bin/kata-runtime /usr/local/bin/kata-runtime 
     ln -sf /opt/kata/bin/containerd-shim-kata-v2 /usr/local/bin/containerd-shim-kata-v2
     ```
 
-6.  验证是否安装成功，并删除临时文件。
+6. 验证是否安装成功，并删除临时目录。
 
-    ```
+    ```shell
     kata-runtime --version
     rm -rf ~/kata-temp
     ```
 
-7.  配置Containerd接入Kata，修改/etc/containerd/config.toml文件，在CRI插件中注册Kata运行时，使用如下命令：
+7. 配置Containerd接入Kata，修改/etc/containerd/config.toml文件，在CRI插件中注册Kata运行时，使用如下命令：
 
-    ```
+    ```shell
     sed -i '/\[plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes\]/a\        [plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.kata]\n          runtime_type = \"io.containerd.kata.v2\"\n           [plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.kata.options]\n             ConfigPath = \"/opt/kata/share/defaults/kata-containers/configuration-clh.toml\"' /etc/containerd/config.toml
     ```
 
-8.  重启containerd服务，使配置生效。
+8. 重启containerd服务，使配置生效。
 
-    ```
+    ```shell
     systemctl restart containerd
     ```
 
@@ -171,29 +170,28 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
 
 本章节主要提供Nydus组件的安装，以及各项服务配置的操作指导。
 
+1. 安装核心组件RPM包。
 
-1.  安装核心组件RPM包。
-
-    ```
+    ```shell
     rpm -ivh nydus-static-2.4.0-linux-arm64.rpm
     ```
 
-2.  解压Snapshotter，并拷贝到相关目录。
+2. 解压Snapshotter，并拷贝到相关目录。
 
-    ```
+    ```shell
     tar -zxvf nydus-snapshotter-v0.15.12-linux-arm64.tar.gz 
     cp bin/* /usr/local/bin/
     ```
 
-3.  检查Nydus是否安装成功。
+3. 检查Nydus是否安装成功。
 
-    ```
+    ```shell
     nydusctl -V
     ```
 
-4.  创建配置文件/etc/nydus/config.toml，配置内容如下：
+4. 创建配置文件/etc/nydus/config.toml，配置内容如下：
 
-    ```
+    ```toml
     version = 1 
      
     root = "/var/lib/containerd/io.containerd.snapshotter.v1.nydus" 
@@ -229,9 +227,9 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
     address = "/run/containerd-nydus/system.sock"
     ```
 
-5.  创建配置文件/etc/nydus/nydusd-config.json，配置内容如下：
+5. 创建配置文件/etc/nydus/nydusd-config.json，配置内容如下：
 
-    ```
+    ```json
     { 
       "device": { 
         "backend": { 
@@ -267,15 +265,15 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
 
 ### 创建Nydus Systemd服务
 
-1.  创建服务配置文件。
+1. 创建服务配置文件。
 
-    ```
+    ```shell
     vim /etc/systemd/system/containerd-nydus-grpc.service
     ```
 
-2.  增加以下内容并保存。
+2. 增加以下内容并保存。
 
-    ```
+    ```shell
     [Unit] 
     Description=Nydus containerd snapshotter 
     After=network.target 
@@ -296,24 +294,24 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
     WantedBy=multi-user.target
     ```
 
-3.  启动服务并设置开机自启动。
+3. 启动服务并设置开机自启动。
 
-    ```
+    ```shell
     systemctl daemon-reload 
     systemctl enable --now containerd-nydus-grpc.service
     ```
 
-4.  检查sock文件是否成功生成。
+4. 检查sock文件是否成功生成。
 
-    ```
+    ```shell
     ls -l /run/containerd-nydus/containerd-nydus-grpc.sock
     ```
 
 ### 配置Nydus接入Containerd
 
-1.  编辑/etc/containerd/config.toml文件，修改增加如下内容：
+1. 编辑/etc/containerd/config.toml文件，修改增加如下内容：
 
-    ```
+    ```toml
         [plugins."io.containerd.grpc.v1.cri".containerd] 
           snapshotter = "nydus" 
           disable_snapshot_annotations = false 
@@ -326,9 +324,9 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
         address = "/run/containerd-nydus/containerd-nydus-grpc.sock"
     ```
 
-2.  重启Containerd生效。
+2. 重启Containerd生效。
 
-    ```
+    ```shell
     systemctl restart containerd
     ```
 
@@ -336,7 +334,7 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
 
 修改Kata配置文件/opt/kata/share/defaults/kata-containers/configuration-clh.toml，修改参数如下：
 
-    ```
+    ```toml
     shared_fs = "virtio-fs-nydus" 
     virtio_fs_daemon = "/usr/bin/nydusd" 
     valid_virtio_fs_daemon_paths = ["/usr/bin/nydusd"] 
@@ -349,42 +347,42 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
 
 ### 准备镜像
 
-1.  下载sandbox-templates镜像并导入Containerd中。
+1. 下载sandbox-templates镜像并导入Containerd中。
 
-    ```
+    ```shell
     docker pull docker.io/docker/sandbox-templates:claude-code 
     docker save -o sandbox-template-claude-code.tar docker.io/docker/sandbox-templates:claude-code 
     ctr -n k8s.io images import sandbox-template-claude-code.tar
     ```
 
-2.  nerdctl登录远程仓库：
+2. nerdctl登录远程仓库：
 
-    ```
+    ```shell
     nerdctl login -u admin -p passw0rd sealos.hub:5000 --insecure-registry
     ```
 
-3.  转换sandbox-templates镜像。
+3. 转换sandbox-templates镜像。
 
-    ```
+    ```shell
     nerdctl -n k8s.io image convert --nydus --oci docker/sandbox-templates:claude-code sealos.hub:5000/sandbox-templates:claude-code-nydus
     ```
 
-4.  把镜像推送至sealos仓。
+4. 把镜像推送至sealos仓。
 
-    ```
+    ```shell
     ctr -n k8s.io images push --plain-http --user admin:passw0rd sealos.hub:5000/sandbox-templates:claude-code-nydus
     nerdctl -n k8s.io image push sealos.hub:5000/sandbox-templates:claude-code-nydus
     ```
 
-5.  推送完成后，删除本地镜像。
+5. 推送完成后，删除本地镜像。
 
-    ```
+    ```shell
     crictl rmi sealos.hub:5000/sandbox-templates:claude-code-nydus
     ```
 
-6.  查看仓库是否包含对应的镜像。
+6. 查看仓库是否包含对应的镜像。
 
-    ```
+    ```shell
     curl -u admin:passw0rd http://sealos.hub:5000/v2/_catalog
     ```
 
@@ -394,9 +392,9 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
 
 ### 在Kubernetes中使能Kata
 
-1.  在k8s中创建RuntimeClass资源。
+1. 在k8s中创建RuntimeClass资源。
 
-    ```
+    ```shell
     cat <<EOF | kubectl apply -f -  
     apiVersion: node.k8s.io/v1  
     kind: RuntimeClass  
@@ -407,20 +405,20 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
     ```
 
     >**说明：** 
-    >handler的名称必须对应Kata配置/etc/containerd/config.toml配置文件中\[plugins...runtimes.**kata**\]的后缀，本文档示例为:kata。
+    >handler的名称必须对应/etc/containerd/config.toml配置文件中\[plugins...runtimes.**kata**\]的后缀，本文档示例为:kata。
 
-2.  检查是否成功创建。
+2. 检查是否成功创建。
 
-    ```
+    ```txt
     # kubectl get runtimeclass 
 
      NAME           HANDLER   AGE
      kata-runtime   kata      16m
     ```
 
-3.  在Pod的YAML中加入runtimeClassName: kata-runtime，将Pod接入Kata。部署文件示例如下所示：
+3. 在Pod的YAML中加入runtimeClassName: kata-runtime，将Pod接入Kata。部署文件示例如下所示：
 
-    ```
+    ```yaml
     apiVersion: v1 
     kind: Pod 
     metadata: 
@@ -457,20 +455,19 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
             memory: "1Gi"
     ```
 
-4.  启动Pod，检查是否接入成功Kata。
+4. 启动Pod，检查是否接入成功Kata。
 
-    ```
+    ```shell
     ps aux | grep cloud-hypervisor
     ```
 
-
 ### （可选）验证使能启动Kata+Nydus
 
-以下验证依赖Nydus镜像加速组件，请先完成[（可选）Nydus镜像加速](#（可选）Nydus镜像加速)章节的全部配置。
+以下验证依赖Nydus镜像加速组件，请先完成[（可选）Nydus镜像加速](#可选nydus镜像加速)章节的全部配置。
 
-1.  配置nydus-sandbox.yaml。
+1. 配置nydus-sandbox.yaml。
 
-    ```
+    ```yaml
     metadata: 
       attempt: 1 
       name: nydus-sandbox-2 
@@ -485,9 +482,9 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
       "io.containerd.osfeature": "nydus.remoteimage.v1"
     ```
 
-2.  配置nydus-container.yaml。
+2. 配置nydus-container.yaml。
 
-    ```
+    ```yaml
     metadata: 
       name: nydus-container 
     image: 
@@ -499,9 +496,9 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
     log_path: container.1.log
     ```
 
-3.  部署测试。
+3. 部署测试。
 
-    ```
+    ```shell
     crictl run -r kata  nydus-container.yaml nydus-sandbox.yaml
     ```
 
@@ -511,17 +508,17 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
 
 ### 最大Pod数量限制配置
 
-1.  修改/var/lib/kubelet/config.yaml文件，把maxPods参数放宽到1000以上。
+1. 修改/var/lib/kubelet/config.yaml文件，把maxPods参数放宽到1000以上。
 
-    ```
+    ```yaml
     maxOpenFiles: 1000000
     maxPods: 2000
     memoryManagerPolicy: None
     ```
 
-2.  重启kubelet服务使之生效。
+2. 重启kubelet服务使之生效。
 
-    ```
+    ```shell
     systemctl daemon-reload
     systemctl restart kubelet
     ```
@@ -530,9 +527,9 @@ Nydus是一种容器镜像加速方案，可显著提升Kata容器的镜像拉�
 
 Kata Containers每个Pod都是一个cloud-hypervisor进程，这对宿主机的系统句柄、ARP缓存表、PID数量消耗极大，需要放大Linux内核的限制。
 
-1.  在/etc/sysctl.conf中增加如下配置：
+1. 在/etc/sysctl.conf中增加如下配置：
 
-    ```
+    ```conf
     # 1. 增加inotify限制（非常重要，每个虚拟机需要监控很多文件句柄）。
     fs.inotify.max_user_watches = 1048576
     fs.inotify.max_user_instances = 81920
@@ -550,9 +547,9 @@ Kata Containers每个Pod都是一个cloud-hypervisor进程，这对宿主机的�
     net.netfilter.nf_conntrack_max = 2097152
     ```
 
-2.  执行命令生效。
+2. 执行命令生效。
 
-    ```
+    ```shell
     sysctl -p
     ```
 
@@ -561,20 +558,21 @@ Kata Containers每个Pod都是一个cloud-hypervisor进程，这对宿主机的�
 完成上述Kata运行时配置、RuntimeClass创建和系统参数调优后，可通过Deployment在单节点上批量启动Kata容器。以下示例在`master`节点上创建1000个Kata Pod，用于验证千级Kata沙箱并发启动能力。
 
 >**说明：** 
+>
 >1. 示例中的`nodeName: master`、镜像地址、CPU和内存请求仅供参考，请根据实际节点名称、镜像仓库和宿主机资源规格调整。
 >2. 示例通过`hostNetwork: true`让Pod使用宿主机网络，减少CNI插件、Pod IP分配和ARP表规模对千级启动验证的影响。使用宿主机网络时Pod没有独立Pod网络，且监听端口会与宿主机端口共享，请勿在容器中启动固定监听端口相同的服务。
 >3. 如果节点存在Master或Control Plane污点，需要保留`tolerations`配置，否则Pod会因污点无法调度。
 >4. 千级Kata Pod会同时拉起大量`cloud-hypervisor`进程，建议先按100、300、600、1000逐步扩容，观察CPU、内存、PID、文件句柄和系统网络状态。
 
-1.  创建部署命名空间。
+1. 创建部署命名空间。
 
-    ```
+    ```shell
     kubectl create namespace kata-scale
     ```
 
-2.  创建千级Kata容器Deployment配置文件kata-sandbox-1000.yaml。
+2. 创建千级Kata容器Deployment配置文件kata-sandbox-1000.yaml。
 
-    ```
+    ```yaml
     apiVersion: apps/v1
     kind: Deployment
     metadata:
@@ -620,13 +618,13 @@ Kata Containers每个Pod都是一个cloud-hypervisor进程，这对宿主机的�
 
     如果需要验证Kata+Nydus镜像加速，可将`image`替换为前文转换后的Nydus镜像，例如：
 
-    ```
+    ```yaml
     image: sealos.hub:5000/sandbox-templates:claude-code-nydus
     ```
 
-3.  部署并分批扩容。
+3. 部署并分批扩容。
 
-    ```
+    ```shell
     kubectl apply -f kata-sandbox-1000.yaml
     kubectl -n kata-scale rollout status deployment/kata-sandbox-1000
 
@@ -640,32 +638,32 @@ Kata Containers每个Pod都是一个cloud-hypervisor进程，这对宿主机的�
     kubectl -n kata-scale rollout status deployment/kata-sandbox-1000
     ```
 
-4.  检查Pod运行状态。
+4. 检查Pod运行状态。
 
-    ```
+    ```shell
     kubectl -n kata-scale get pods -o wide
     kubectl -n kata-scale get pods --field-selector=status.phase=Running --no-headers | wc -l
     ```
 
     当Running状态Pod数量达到1000时，说明Kubernetes层面已完成千级Kata容器启动。
 
-5.  检查Kata虚拟机进程数量。
+5. 检查Kata虚拟机进程数量。
 
-    ```
+    ```shell
     ps -ef | grep cloud-hypervisor | grep -v grep | wc -l
     ```
 
     该数量应接近Running状态Pod数量。若数量明显偏少，请通过如下命令查看失败原因。
 
-    ```
+    ```shell
     kubectl -n kata-scale get events --sort-by=.lastTimestamp
     kubectl -n kata-scale describe pod <pod-name>
     journalctl -u kubelet -f
     journalctl -u containerd -f
     ```
 
-6.  验证完成后清理测试资源。
+6. 验证完成后清理测试资源。
 
-    ```
+    ```shell
     kubectl delete namespace kata-scale
     ```

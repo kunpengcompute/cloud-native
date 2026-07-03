@@ -1,4 +1,4 @@
-# 特性描述
+# 在离线混部插件 用户指南
 
 ## 简介
 
@@ -71,6 +71,7 @@ ctr -n k8s.io images import /path/to/kunpeng-qos-controller.tar
 
 前提：目标节点已具备 `resctrl` 能力并挂载了 `/sys/fs/resctrl`，容器可访问 `/sys/fs/cgroup`。
 >说明：如果节点未挂载 `/sys/fs/resctrl`，请先挂载。执行命令`mount -t resctrl resctrl /sys/fs/resctrl`。如果`/sys/fs`下面没有`resctrl`目录，说明内核没有开启MPAM功能。在内核启动参数中添加`arm64.mpam`即可开启。
+>
 ## 部署 CRD
 
 ```bash
@@ -92,7 +93,6 @@ kubectl -n qos-system logs -l app=qos-controller --tail=200
 
 可能的回显结果如下, qos-controller 运行状态为 `Running`，并且日志中没有报错。
 ![图：检查运行状态](../images/kunpeng-qos-controller-deploy.png)
-
 
 ## 本地调试运行（可选）
 
@@ -159,7 +159,6 @@ kubectl apply -f qospolicy-offline-small.yaml
 
 控制组参数更新通过修改同名 `QoSPolicy` CR 实现，Operator 会自动将更新后的配置同步到本地 `resctrl` 控制组。
 
-
 ```bash
 kubectl edit qospolicy offline-small
 ```
@@ -170,6 +169,7 @@ kubectl edit qospolicy offline-small
 ![图：kubectl edit 修改 QoSPolicy 示例](../images/kunpeng-qos-controller-update-resctrl.png)
 这里把`mb.max`从`60`改为`50`,`l3.ways`从`4`改为`1`
 > 注意：cpu.qos_level只能设置一次，默认值是`0`。可以从0设置到-1，也可以从0设置到1，但是设置之后就不能再更改。
+>
 #### 更新后验证
 
 ```bash
@@ -177,6 +177,7 @@ kubectl get qospolicy offline-small -o yaml
 POD=$(kubectl -n qos-system get pod -l app=qos-controller -o name | head -n1)
 kubectl -n qos-system exec -it "${POD#pod/}" -- cat /sys/fs/resctrl/offline-small/schemata
 ```
+
 可能的回显结果如下，可以看到CR中的`mb.max`和`l3.ways`已更新为`50`和`1`，同时resctrl的控制组中的schemata的值也进行了相应的更新。
 ![图：更新后验证](../images/kunpeng-qos-controller-update-ensure.png)
 
@@ -213,11 +214,14 @@ kubectl apply -f pod-offline-small.yaml
 ```
 
 ### 验证
+
 #### 验证 Pod 是否加入到指定控制组中
+
 ```bash
 POD=$(kubectl -n qos-system get pod -l app=qos-controller -o name | head -n1)
 kubectl -n qos-system exec -it "${POD#pod/}" -- cat /sys/fs/resctrl/offline-small/tasks
 ```
+
 可能的回显结果如下，可以看到在`offline-small`控制组中的`tasks`中有相应的`pid`,说明`offline-small-nginx`已加入到`offline-small`控制组中。
 ![图：验证](../images/kunpeng-qos-controller-pod-join-resctrl.png)
 
@@ -226,6 +230,7 @@ kubectl -n qos-system exec -it "${POD#pod/}" -- cat /sys/fs/resctrl/offline-smal
 ```bash
 kubectl exec -it offline-small-nginx -- cat /sys/fs/cgroup/cpu/cpu.qos_level
 ```
+
 可能的回显结果如下，可以看到`offline-small-nginx`的`cpu.qos_level`为`-1`,说明`offline-small-nginx`已加入到`offline-small`控制组中，且`cpu.qos_level`为`-1`
 ![图：验证](../images/kunpeng-qos-controller-pod-qos-level.png)
 
@@ -248,6 +253,7 @@ kubectl -n qos-system exec -it "${POD#pod/}" -- ls /sys/fs/resctrl
 可能的回显结果如下，`qospolicy` 查询不到对象，且 `resctrl` 目录中不存在 `offline-small`，说明控制组已删除。
 
 ![图：删除 QoSPolicy 后控制组清理结果](../images/kunpeng-qos-controller-delete.png)
+
 ## 常用清单路径
 
 - CRD：
@@ -305,6 +311,5 @@ kubectl -n qos-system get all
 
 可能的回显结果如下，可以看到查询不到相应的资源，说明已成功清理。
 ![图：验证结果](../images/kunpeng-qos-controller-clean.png)
-
 
 说明：如果已删除 CRD，`kubectl get qospolicy` 可能提示资源类型不存在，这是预期行为。

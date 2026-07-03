@@ -365,11 +365,11 @@ Nomad中的`template-manager-system`任务在Job Definition中对CPU、内存等
 
 2. 进入`Jobs`页面。
 
-3. 找到`template-manager-system`。
+3. 单击`template-manager-system`。
 
     ![Jobs 页面定位 template-manager-system](figures/jobs-template-manager.png)
 
-4. 进入任务详情，打开`Definition`页签。
+4. 进入任务详情，单击`Definition`页签。
 
     ![Job Definition 配置界面](figures/job-definition.png)
 
@@ -428,7 +428,7 @@ bash build.sh --start
 | `ls -l /opt/e2b-infra` | 查看E2B安装目录。 |
 | `grep NOMAD_ACL_TOKEN /opt/e2b-infra/.env` | 查看Nomad登录Token。 |
 | `docker ps` | 查看E2B相关容器是否运行。 |
-| `ss -lntp | grep -E ':2900|:4646|:8500|:5432'` | 查看关键服务端口监听情况。 |
+| `ss -lntp \| grep -E ':2900\|:4646\|:8500\|:5432'` | 查看关键服务端口监听情况。 |
 | `docker logs <container_name>` | 查看指定容器日志。 |
 
 ## 故障处理
