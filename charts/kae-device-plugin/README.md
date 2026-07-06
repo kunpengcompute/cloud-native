@@ -111,7 +111,7 @@ helm upgrade --install kae-device-plugin charts/kae-device-plugin \
 | `admissionWebhook.defaultKaeResource` | `hisi_hpre` | 默认 KAE 资源 |
 | `admissionWebhook.defaultKaeCount` | `1` | 默认设备数量 |
 | `admissionWebhook.targetContainerIndex` | `0` | 目标普通容器下标 |
-| `admissionWebhook.injectEnvs` | `""` | `KEY=VALUE` 环境变量列表 |
+| `admissionWebhook.injectEnvs` | `OPENSSL_ENGINES=/usr/local/lib/engines-1.1` | `KEY=VALUE` 环境变量列表 |
 | `admissionWebhook.includedNamespaces` | `[]` | 允许注入的 namespace |
 | `admissionWebhook.excludedNamespaces` | Kubernetes 系统 namespace | 排除的 namespace |
 | `admissionWebhook.failurePolicy` | `Fail` | Webhook 调用失败策略 |

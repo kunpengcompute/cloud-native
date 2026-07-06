@@ -49,7 +49,7 @@ Kubernetes 1.16 部署使用 `admissionregistration.k8s.io/v1` 的 `MutatingWebh
 | `--webhook-default-kae-resource` | `hisi_hpre` | 默认注入的 KAE 资源 |
 | `--webhook-default-kae-count` | `1` | 默认注入数量 |
 | `--webhook-target-container-index` | `0` | 目标普通容器下标 |
-| `--webhook-inject-envs` | 空 | 注入的 `KEY=VALUE` 列表 |
+| `--webhook-inject-envs` | `OPENSSL_ENGINES=/usr/local/lib/engines-1.1` | 注入的 `KEY=VALUE` 列表 |
 | `--webhook-included-namespaces` | 空 | 允许注入的 namespace 列表 |
 | `--webhook-excluded-namespaces` | Kubernetes 系统 namespace | 排除的 namespace 列表 |
 

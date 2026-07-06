@@ -22,6 +22,14 @@ import (
 	"testing"
 )
 
+func TestNewOptionsDefaultInjectEnvs(t *testing.T) {
+	options := NewOptions()
+	const want = "OPENSSL_ENGINES=/usr/local/lib/engines-1.1"
+	if options.InjectEnvs != want {
+		t.Fatalf("InjectEnvs = %q, want %q", options.InjectEnvs, want)
+	}
+}
+
 func TestOptionsAddFlags(t *testing.T) {
 	options := NewOptions()
 	flags := flag.NewFlagSet("webhook", flag.ContinueOnError)

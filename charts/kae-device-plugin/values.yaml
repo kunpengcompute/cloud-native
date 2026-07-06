@@ -30,7 +30,7 @@ admissionWebhook:
   defaultKaeResource: hisi_hpre
   defaultKaeCount: 1
   targetContainerIndex: 0
-  injectEnvs: ""
+  injectEnvs: "OPENSSL_ENGINES=/usr/local/lib/engines-1.1"
   includedNamespaces: []
   excludedNamespaces:
     - kube-system

@@ -28,7 +28,10 @@ import (
 	controllerwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-const defaultExcludedNamespaces = "kube-system,kube-public,kube-node-lease"
+const (
+	defaultInjectEnvs         = "OPENSSL_ENGINES=/usr/local/lib/engines-1.1"
+	defaultExcludedNamespaces = "kube-system,kube-public,kube-node-lease"
+)
 
 // Options contains command-line configuration for the KAE admission webhook.
 type Options struct {
@@ -52,6 +55,7 @@ func NewOptions() Options {
 		TLSKeyFile:         "/tls/tls.key",
 		DefaultResource:    "hisi_hpre",
 		DefaultCount:       1,
+		InjectEnvs:         defaultInjectEnvs,
 		ExcludedNamespaces: defaultExcludedNamespaces,
 	}
 }
