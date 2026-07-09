@@ -3,9 +3,9 @@
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
 cliVersion: 4.11.0
-domain: kunpend.huawei.com
+domain: kunpeng.huawei.com
 layout:
 - go.kubebuilder.io/v4
 projectName: cloud-native
-repo: kunpeng.huawei.com/cloud-native
+repo: kunpeng.huawei.com/kunpeng-cloud-computing
 version: "3"

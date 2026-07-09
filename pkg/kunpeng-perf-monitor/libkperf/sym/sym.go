@@ -1,3 +1,5 @@
+//go:build linux
+
 /******************************************************************************
  * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * libkperf licensed under the Mulan PSL v2.

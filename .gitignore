@@ -116,3 +116,10 @@ venv.bak/
 # Agent File
 .codex
 .marscode/
+
+# AI
+.wolf
+openspec
+.claude
+CLAUDE.md
+
