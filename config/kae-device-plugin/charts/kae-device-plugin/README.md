@@ -1,6 +1,6 @@
 # KAE Device Plugin Helm Chart
 
-该 Chart 用于部署 Kunpeng KAE Device Plugin，并可选在同一个 DaemonSet 进程中启用 KAE Admission Webhook。完整证书和排障说明请参见 [KAE Admission Webhook 使用指南](../../docs/zh/kae_admission_webhook_user_guide.md)。
+该 Chart 用于部署 Kunpeng KAE Device Plugin，并可选在同一个 DaemonSet 进程中启用 KAE Admission Webhook。完整证书和排障说明请参见 [KAE Admission Webhook 使用指南](../../../../docs/zh/kae_admission_webhook_user_guide.md)。
 
 ## 环境要求
 
@@ -15,7 +15,7 @@ Chart 不创建 Namespace。可以通过 `--create-namespace` 创建 release nam
 Webhook 默认关闭：
 
 ```bash
-helm install kae-device-plugin charts/kae-device-plugin \
+helm install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system \
   --create-namespace
 ```
@@ -23,7 +23,7 @@ helm install kae-device-plugin charts/kae-device-plugin \
 namespace 已存在时：
 
 ```bash
-helm install kae-device-plugin charts/kae-device-plugin \
+helm install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system
 ```
 
@@ -56,11 +56,13 @@ kubectl -n kae-system create secret tls kae-admission-webhook-tls \
 
 CA_BUNDLE=$(base64 -w0 /path/to/ca.crt)
 
-helm install kae-device-plugin charts/kae-device-plugin \
+helm install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system \
   --set admissionWebhook.enabled=true \
   --set admissionWebhook.cert.mode=manual \
-  --set-string admissionWebhook.cert.caBundle="${CA_BUNDLE}"
+  --set-string admissionWebhook.cert.caBundle="${CA_BUNDLE}" \
+  --set 'admissionWebhook.includedNamespaces={tenant-a,tenant-b}' \
+  --set-string admissionWebhook.injectEnvs='OPENSSL_ENGINES=/usr/local/lib/engines-1.1\,KAE_LOG_LEVEL=info'
 ```
 
 手动模式下，`admissionWebhook.cert.caBundle` 不能为空。
@@ -68,11 +70,13 @@ helm install kae-device-plugin charts/kae-device-plugin \
 ## 使用 cert-manager 启用 Webhook
 
 ```bash
-helm install kae-device-plugin charts/kae-device-plugin \
+helm install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system \
   --create-namespace \
   --set admissionWebhook.enabled=true \
-  --set admissionWebhook.cert.mode=certManager
+  --set admissionWebhook.cert.mode=certManager \
+  --set 'admissionWebhook.includedNamespaces={tenant-a,tenant-b}' \
+  --set-string admissionWebhook.injectEnvs='OPENSSL_ENGINES=/usr/local/lib/engines-1.1\,KAE_LOG_LEVEL=info'
 ```
 
 Chart 会创建 Issuer、CA Certificate 和服务端 Certificate。cainjector 会自动更新 `MutatingWebhookConfiguration` 的 CA Bundle。
@@ -80,7 +84,7 @@ Chart 会创建 Issuer、CA Certificate 和服务端 Certificate。cainjector �
 ## 注入环境变量
 
 ```bash
-helm upgrade --install kae-device-plugin charts/kae-device-plugin \
+helm upgrade --install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system \
   --set admissionWebhook.enabled=true \
   --set admissionWebhook.cert.mode=certManager \
@@ -90,7 +94,7 @@ helm upgrade --install kae-device-plugin charts/kae-device-plugin \
 ## 限制注入 namespace
 
 ```bash
-helm upgrade --install kae-device-plugin charts/kae-device-plugin \
+helm upgrade --install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system \
   --reuse-values \
   --set 'admissionWebhook.includedNamespaces={tenant-a,tenant-b}'
@@ -114,7 +118,7 @@ helm upgrade --install kae-device-plugin charts/kae-device-plugin \
 | `admissionWebhook.injectEnvs` | `OPENSSL_ENGINES=/usr/local/lib/engines-1.1` | `KEY=VALUE` 环境变量列表 |
 | `admissionWebhook.includedNamespaces` | `[]` | 允许注入的 namespace |
 | `admissionWebhook.excludedNamespaces` | Kubernetes 系统 namespace | 排除的 namespace |
-| `admissionWebhook.failurePolicy` | `Fail` | Webhook 调用失败策略 |
+| `admissionWebhook.failurePolicy` | `Ignore` | Webhook 调用失败策略 |
 | `admissionWebhook.cert.mode` | `manual` | `manual` 或 `certManager` |
 | `admissionWebhook.cert.caBundle` | `""` | 手动模式下的 CA Bundle |
 
@@ -123,7 +127,7 @@ helm upgrade --install kae-device-plugin charts/kae-device-plugin \
 ## 升级和卸载
 
 ```bash
-helm upgrade kae-device-plugin charts/kae-device-plugin \
+helm upgrade kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system \
   --reuse-values
 

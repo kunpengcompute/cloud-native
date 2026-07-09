@@ -7,7 +7,7 @@ webhooks:
     admissionReviewVersions:
       - v1beta1
     sideEffects: None
-    failurePolicy: Fail
+    failurePolicy: Ignore
     clientConfig:
       service:
         name: kae-admission-webhook

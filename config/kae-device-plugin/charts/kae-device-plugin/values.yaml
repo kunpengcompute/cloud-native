@@ -36,7 +36,7 @@ admissionWebhook:
     - kube-system
     - kube-public
     - kube-node-lease
-  failurePolicy: Fail
+  failurePolicy: Ignore
   cert:
     mode: manual
     caBundle: ""

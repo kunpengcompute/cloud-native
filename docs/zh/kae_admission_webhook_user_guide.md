@@ -26,7 +26,7 @@ resources:
 - 默认修改第 0 个普通容器。
 - Pod 已声明任意 `kae.kunpeng.com/*` resource 时，不再注入 resource。
 - 只添加缺失的环境变量，不覆盖同名变量。
-- Kustomize 和 Helm 默认使用 `failurePolicy: Fail`，可根据集群可用性要求调整为 `Ignore`。
+- Kustomize 和 Helm 默认使用 `failurePolicy: Ignore`，可根据集群可用性要求调整为 `Fail`。
 
 ## 环境要求
 
@@ -218,13 +218,33 @@ Kubernetes 1.16 使用 `certificates.k8s.io/v1beta1`。该版本可以不填写 
       --key=/tmp/kae-admission-webhook.key
     ```
 
-6. 使用 Kustomize 部署 Device Plugin 和 Webhook。
+6. 选择部署方式。
+
+    TLS Secret 创建完成后，可以使用 Kustomize 或 Helm 部署。两种方式都会创建 Device Plugin、Webhook Service 和 `MutatingWebhookConfiguration`，不要在同一个集群中同时使用，避免同名资源冲突。
+
+    使用 Kustomize 部署：
 
     ```bash
     kubectl apply -k config/kae-device-plugin/overlay/webhook
     ```
 
-7. 将签发 CA 写入 `MutatingWebhookConfiguration`。
+    使用 Helm 部署：
+    传入的参数可以根据实际需要进行修改。
+
+    ```bash
+    CLUSTER_SIGNING_CA_FILE=/path/to/your-cluster-signing-ca.crt
+    CA_BUNDLE=$(base64 -w0 "${CLUSTER_SIGNING_CA_FILE}")
+
+    helm install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
+      --namespace kae-system \
+      --set admissionWebhook.enabled=true \
+      --set admissionWebhook.cert.mode=manual \
+      --set-string admissionWebhook.cert.caBundle="${CA_BUNDLE}" \
+      --set 'admissionWebhook.includedNamespaces={tenant-a,tenant-b}' \
+      --set-string admissionWebhook.injectEnvs='OPENSSL_ENGINES=/usr/local/lib/engines-1.1\,KAE_LOG_LEVEL=info'
+    ```
+
+7. 如果第 6 步使用 Kustomize，将签发 CA 写入 `MutatingWebhookConfiguration`。如果第 6 步已经使用 Helm 并传入 `admissionWebhook.cert.caBundle`，则不需要再执行本步骤。
 
     `CLUSTER_SIGNING_CA_FILE` 应指向 kube-controller-manager 的 `--cluster-signing-cert-file`。
 
@@ -322,7 +342,7 @@ Kubernetes 1.16 使用 `certificates.k8s.io/v1beta1`。该版本可以不填写 
       -p="[{'op':'replace','path':'/webhooks/0/clientConfig/caBundle','value':'${CA_BUNDLE}'}]"
     ```
 
-    Kustomize 清单中的 `caBundle` 默认为空。默认 `failurePolicy` 为 `Fail`，因此应在 `apply -k` 后立即完成 CA patch，避免其他 Pod 创建请求在此期间失败。
+    Kustomize 清单中的 `caBundle` 默认为空。默认 `failurePolicy` 为 `Ignore`，因此 CA patch 完成前 Webhook 不会阻塞 Pod 创建，但也不会完成 KAE 注入，应尽快写入正确的 CA Bundle。
 
 ## 使用 Helm 部署
 
@@ -331,7 +351,7 @@ Kubernetes 1.16 使用 `certificates.k8s.io/v1beta1`。该版本可以不填写 
 Webhook 默认关闭：
 
 ```bash
-helm install kae-device-plugin charts/kae-device-plugin \
+helm install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system \
   --create-namespace
 ```
@@ -351,11 +371,13 @@ kubectl -n kae-system create secret tls kae-admission-webhook-tls \
 
 CA_BUNDLE=$(base64 -w0 /path/to/ca.crt)
 
-helm install kae-device-plugin charts/kae-device-plugin \
+helm install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system \
   --set admissionWebhook.enabled=true \
   --set admissionWebhook.cert.mode=manual \
-  --set-string admissionWebhook.cert.caBundle="${CA_BUNDLE}"
+  --set-string admissionWebhook.cert.caBundle="${CA_BUNDLE}" \
+  --set 'admissionWebhook.includedNamespaces={tenant-a,tenant-b}' \
+  --set-string admissionWebhook.injectEnvs='OPENSSL_ENGINES=/usr/local/lib/engines-1.1\,KAE_LOG_LEVEL=info'
 ```
 
 手动证书模式下，Chart 会在 `caBundle` 为空时拒绝渲染。
@@ -365,11 +387,13 @@ helm install kae-device-plugin charts/kae-device-plugin \
 集群必须已经安装 cert-manager、cert-manager webhook 和 cainjector。Chart 会创建 Issuer、CA Certificate 和服务端 Certificate，并由 cainjector 写入 CA Bundle。
 
 ```bash
-helm install kae-device-plugin charts/kae-device-plugin \
+helm install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system \
   --create-namespace \
   --set admissionWebhook.enabled=true \
-  --set admissionWebhook.cert.mode=certManager
+  --set admissionWebhook.cert.mode=certManager \
+  --set 'admissionWebhook.includedNamespaces={tenant-a,tenant-b}' \
+  --set-string admissionWebhook.injectEnvs='OPENSSL_ENGINES=/usr/local/lib/engines-1.1\,KAE_LOG_LEVEL=info'
 ```
 
 如果 namespace 已存在，省略 `--create-namespace`。
@@ -394,11 +418,11 @@ config/kae-device-plugin/overlay/webhook/daemonset_patch.yaml
 Helm 可以通过 values 或命令行设置：
 
 ```bash
-helm upgrade --install kae-device-plugin charts/kae-device-plugin \
+helm upgrade --install kae-device-plugin config/kae-device-plugin/charts/kae-device-plugin \
   --namespace kae-system \
   --set admissionWebhook.enabled=true \
   --set admissionWebhook.cert.mode=certManager \
-  --set admissionWebhook.defaultKaeResource=hisi_zip \
+  --set admissionWebhook.defaultKaeResource=hisi_hpre \
   --set 'admissionWebhook.includedNamespaces={tenant-a,tenant-b}' \
   --set-string admissionWebhook.injectEnvs='KAE_MODE=auto\,KAE_LOG_LEVEL=info'
 ```
@@ -466,7 +490,7 @@ kubectl -n kae-system get endpoints kae-admission-webhook
 
 ### Pod 创建被阻塞
 
-检查 Webhook Pod 日志、Service Endpoint、证书和 CA Bundle。紧急情况下可暂时将 `failurePolicy` 调整为 `Ignore`，恢复后再改回 `Fail`。
+检查 Webhook Pod 日志、Service Endpoint、证书和 CA Bundle。如果需要强制阻止未完成注入的 Pod 创建，可将 `failurePolicy` 调整为 `Fail`。
 
 ## 卸载
 

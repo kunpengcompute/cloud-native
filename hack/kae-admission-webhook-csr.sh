@@ -9,7 +9,7 @@ repo_root=$(cd "${script_dir}/.." && pwd)
 
 NAMESPACE=${NAMESPACE:-kae-system}
 RELEASE_NAME=${RELEASE_NAME:-kae-device-plugin}
-CHART_PATH=${CHART_PATH:-${repo_root}/charts/kae-device-plugin}
+CHART_PATH=${CHART_PATH:-${repo_root}/config/kae-device-plugin/charts/kae-device-plugin}
 CSR_NAME=${CSR_NAME:-kae-admission-webhook}
 SERVICE_NAME=${SERVICE_NAME:-kae-admission-webhook}
 TLS_SECRET_NAME=${TLS_SECRET_NAME:-kae-admission-webhook-tls}

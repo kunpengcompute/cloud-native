@@ -36,7 +36,7 @@ func SetupKaePodWithManager(mgr ctrl.Manager, config InjectionConfig) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:path=/mutate--v1-pod,mutating=true,failurePolicy=fail,sideEffects=None,groups="",resources=pods,verbs=create;update,versions=v1,name=kae-injection.kunpeng.com,admissionReviewVersions=v1beta1
+// +kubebuilder:webhook:path=/mutate--v1-pod,mutating=true,failurePolicy=ignore,sideEffects=None,groups="",resources=pods,verbs=create;update,versions=v1,name=kae-injection.kunpeng.com,admissionReviewVersions=v1beta1
 
 type PodCustomDefaulter struct {
 	Config InjectionConfig
