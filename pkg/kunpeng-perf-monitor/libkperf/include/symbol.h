@@ -15,7 +15,22 @@
 #ifndef SYMBOL_H
 #define SYMBOL_H
 #include <stdbool.h>
+#ifdef __linux__
 #include <linux/types.h>
+#else
+/* Non-Linux platforms (e.g. macOS) lack <linux/types.h>; provide the
+ * subset of kernel integer types actually used by this header so that
+ * cgo can compile it without changing any logic. */
+#include <stdint.h>
+typedef uint64_t __u64;
+typedef int64_t  __s64;
+typedef uint32_t __u32;
+typedef int32_t  __s32;
+typedef uint16_t __u16;
+typedef int16_t  __s16;
+typedef uint8_t  __u8;
+typedef int8_t   __s8;
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif

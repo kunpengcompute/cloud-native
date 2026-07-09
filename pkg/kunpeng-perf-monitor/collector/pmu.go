@@ -1,3 +1,5 @@
+//go:build linux
+
 // Copyright 2017 The Prometheus Authors
 // Copyright (c) 2025 Huawei Technology corp.
 // Licensed under the Apache License, Version 2.0 (the "License");
