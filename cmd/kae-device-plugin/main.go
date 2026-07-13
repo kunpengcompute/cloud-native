@@ -27,7 +27,8 @@ import (
 	kaeqos "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kae-device-plugin/kae-qos"
 	kaePodWebhook "kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kae-device-plugin/webhook"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	controllerwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"k8s.io/klog/v2"
 )
@@ -43,20 +44,10 @@ func main() {
 	ctrl.SetLogger(klog.NewKlogr())
 
 	var enableQos bool
-	var webhookEnable bool
-	var webhookPort int
-	var webhookCertPath, webhookCertName, webhookCertKey string
-
 	kernelVfDrivers := flag.String("kernel-vf-drivers", "hisi_hpre", "Comma separated VF Device Driver of the KAE Devices in the system. Devices supported: hisi_hpre,hisi_zip,hisi_sec2")
-
 	flag.BoolVar(&enableQos, "enable-qos", false, "Enable KAE QoS")
-	flag.BoolVar(&webhookEnable, "webhook-enable", false, "Enable webhook server. If enabled, the KAE Device Plugin will start a webhook server to handle admission requests for pods that request KAE devices. If disabled, users will need to manually specify the resources and environment variables in their pod specs.")
-	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port that the webhook server will listen on.")
-	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
-	flag.StringVar(&webhookCertName, "webhook-cert-name", "tls.crt", "The name of the webhook certificate file.")
-	flag.StringVar(&webhookCertKey, "webhook-cert-key", "tls.key", "The name of the webhook key file.")
-
-	// TODO(cuiyanxiang): add flag to config how webhook injects env and resources.
+	webhookOptions := kaePodWebhook.NewOptions()
+	webhookOptions.AddFlags(flag.CommandLine)
 
 	flag.Parse()
 
@@ -66,68 +57,77 @@ func main() {
 		os.Exit(1)
 	}
 
-	if enableQos || webhookEnable {
-		startControllers(enableQos, webhookEnable, webhook.Options{
-			Port:     webhookPort,
-			CertDir:  webhookCertPath,
-			CertName: webhookCertName,
-			KeyName:  webhookCertKey,
-		})
+	if enableQos || webhookOptions.Enabled {
+		controllerManager, err := newControllerManager(enableQos, webhookOptions)
+		if err != nil {
+			klog.Errorf("Failed to create KAE controller manager: %v", err)
+			klog.Flush()
+			os.Exit(1)
+		}
+		startControllerManager(controllerManager)
 	}
 
 	kaeDevicePluginManager := deviceplugin.NewManager(namespace, plugin)
 	klog.V(1).Infof("KAE device plugin started")
-
 	kaeDevicePluginManager.Run()
 }
 
-func startControllers(enableQos bool, webhookEnable bool, webhookOption webhook.Options) {
-
-	// daemonset deployment，no need to set leader election.
-	options := ctrl.Options{}
-
-	if webhookEnable {
-		options.WebhookServer = webhook.NewServer(webhookOption)
+func newControllerManager(enableQos bool, webhookOptions kaePodWebhook.Options) (manager.Manager, error) {
+	managerOptions := ctrl.Options{}
+	var injectionConfig kaePodWebhook.InjectionConfig
+	if webhookOptions.Enabled {
+		serverOptions, config, err := webhookOptions.Build(os.Getenv("POD_NAMESPACE"))
+		if err != nil {
+			return nil, err
+		}
+		managerOptions.WebhookServer = controllerwebhook.NewServer(serverOptions)
+		managerOptions.HealthProbeBindAddress = ":8081"
+		injectionConfig = config
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), managerOptions)
 	if err != nil {
-		klog.Errorf("Failed to create manager: %v", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("create controller-runtime manager: %w", err)
 	}
 
 	if enableQos {
 		qosManager, err := kaeqos.NewQosManager(timeout)
 		if err != nil {
-			klog.Errorf("Failed to create qos manager: %v", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("create QoS manager: %w", err)
 		}
-
 		nodeName := os.Getenv("NODE_NAME")
 		if nodeName == "" {
-			klog.Errorf("NODE_NAME is empty")
-			os.Exit(1)
+			return nil, fmt.Errorf("NODE_NAME must not be empty when KAE QoS is enabled")
 		}
 		if err := (&kaeqos.KaeQosReconciler{
 			QosManager: qosManager,
 			Client:     mgr.GetClient(),
 		}).SetupWithManager(mgr, nodeName); err != nil {
-			klog.Errorf("Failed to setup reconciler: %v", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("setup KAE QoS reconciler: %w", err)
 		}
+		klog.Infof("KAE QoS manager enabled")
 	}
 
-	if webhookEnable {
-		if err := kaePodWebhook.SetupKaePodWithManager(mgr); err != nil {
-			klog.Errorf("Unable to create kae pod webhook: %v", err)
-			os.Exit(1)
+	if webhookOptions.Enabled {
+		if err := kaePodWebhook.SetupKaePodWithManager(mgr, injectionConfig); err != nil {
+			return nil, fmt.Errorf("setup KAE pod webhook: %w", err)
 		}
+		if err := mgr.AddReadyzCheck("webhook-server", mgr.GetWebhookServer().StartedChecker()); err != nil {
+			return nil, fmt.Errorf("register KAE webhook readiness check: %w", err)
+		}
+		klog.Infof("KAE admission webhook enabled on %s", webhookOptions.ListenAddr)
 	}
+	return mgr, nil
+}
 
-	klog.Infof("KAE QoS manager started")
+func startControllerManager(mgr manager.Manager) {
 	go func() {
 		if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-			klog.Fatalf("Failed to start manager: %v", err)
+			klog.Errorf("KAE controller manager failed: %v", err)
+			klog.Flush()
+			os.Exit(1)
 		}
+		klog.Flush()
+		os.Exit(0)
 	}()
 }

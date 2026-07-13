@@ -1,0 +1,7 @@
+apiVersion: v2
+name: kae-device-plugin
+description: Helm chart for Kunpeng KAE Device Plugin and its optional admission webhook
+type: application
+version: 0.1.0
+appVersion: "1.0"
+kubeVersion: ">=1.16.0-0"

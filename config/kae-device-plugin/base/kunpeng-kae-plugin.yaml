@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kunpeng-kae-plugin
+  namespace: kae-system
   labels:
     app: kunpeng-kae-plugin
 spec:

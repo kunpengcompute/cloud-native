@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -99,7 +100,15 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = SetupKaePodWithManager(mgr)
+	err = SetupKaePodWithManager(mgr, InjectionConfig{
+		Enabled:            true,
+		DefaultResource:    "hisi_hpre",
+		DefaultCount:       1,
+		ExcludedNamespaces: []string{"kube-system"},
+		EnvVars: []corev1.EnvVar{
+			{Name: "KAE_MODE", Value: "auto"},
+		},
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:webhook

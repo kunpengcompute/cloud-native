@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -29,21 +30,43 @@ import (
 var kaePodLog = logf.Log.WithName("kaepod-resource-webhook")
 
 // SetupKaePodWithManager registers the webhook for Pod in the manager.
-func SetupKaePodWithManager(mgr ctrl.Manager) error {
+func SetupKaePodWithManager(mgr ctrl.Manager, config InjectionConfig) error {
 	return ctrl.NewWebhookManagedBy(mgr, &corev1.Pod{}).
-		WithDefaulter(&PodCustomDefaulter{}).
+		WithDefaulter(&PodCustomDefaulter{Config: config}).
 		Complete()
 }
 
-// +kubebuilder:webhook:path=/mutate--v1-pod,mutating=true,failurePolicy=fail,sideEffects=None,groups="",resources=pods,verbs=create;update,versions=v1,name=mpod-v1.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate--v1-pod,mutating=true,failurePolicy=ignore,sideEffects=None,groups="",resources=pods,verbs=create;update,versions=v1,name=kae-injection.kunpeng.com,admissionReviewVersions=v1beta1
 
 type PodCustomDefaulter struct {
-	// TODO(user): Add more fields as needed for defaulting
+	Config InjectionConfig
 }
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Pod.
-func (d *PodCustomDefaulter) Default(_ context.Context, obj *corev1.Pod) error {
-	kaePodLog.Info("Defaulting for pod to use kae", "name", obj.GetName())
-	//todo(cuiyanxiang): add logic to default the pod spec to use kae device plugin resources and env vars.
+func (d *PodCustomDefaulter) Default(ctx context.Context, obj *corev1.Pod) error {
+	requestNamespace := ""
+	if request, err := admission.RequestFromContext(ctx); err == nil {
+		requestNamespace = request.Namespace
+	}
+	effectiveNamespace := obj.GetNamespace()
+	if effectiveNamespace == "" {
+		effectiveNamespace = requestNamespace
+	}
+	logValues := []any{
+		"name", obj.GetName(),
+		"objectNamespace", obj.GetNamespace(),
+		"requestNamespace", requestNamespace,
+		"effectiveNamespace", effectiveNamespace,
+		"includedNamespaces", d.Config.IncludedNamespaces,
+		"excludedNamespaces", d.Config.ExcludedNamespaces,
+		"namespaceAllowed", shouldInjectNamespace(effectiveNamespace, d.Config.IncludedNamespaces, d.Config.ExcludedNamespaces),
+	}
+
+	changed, err := mutatePodForKAEInjection(obj, effectiveNamespace, d.Config)
+	if err != nil {
+		kaePodLog.Error(err, "Failed to evaluate KAE pod injection", logValues...)
+		return err
+	}
+	kaePodLog.Info("Evaluated KAE pod injection", append(logValues, "changed", changed)...)
 	return nil
 }

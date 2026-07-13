@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kunpeng-kae-plugin
+  namespace: kae-system
+spec:
+  template:
+    spec:
+      containers:
+        - name: kunpeng-kae-plugin
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          args:
+            - -kernel-vf-drivers=hisi_hpre,hisi_zip,hisi_sec2
+            - -enable-admission-webhook=true
+            - -webhook-listen-addr=:9443
+            - -webhook-tls-cert-file=/tls/tls.crt
+            - -webhook-tls-key-file=/tls/tls.key
+            - -webhook-default-kae-resource=hisi_hpre
+            - -webhook-default-kae-count=1
+            - -webhook-target-container-index=0
+            - -webhook-inject-envs=OPENSSL_ENGINES=/usr/local/lib/engines-1.1
+            - -webhook-included-namespaces=
+            - -webhook-excluded-namespaces=kube-system,kube-public,kube-node-lease
+          ports:
+            - name: https
+              containerPort: 9443
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+              scheme: HTTP
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+      volumes:
+        - name: tls
+          secret:
+            secretName: kae-admission-webhook-tls # pragma: allowlist secret
