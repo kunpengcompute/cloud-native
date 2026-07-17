@@ -36,6 +36,46 @@ log_section() {
     echo -e "${YELLOW}========================================${NC}"
 }
 
+prepare_envtest_assets() {
+    local source_dir="${PIPELINE_ENVTEST_DIR:-/opt/envtest}"
+    local target_dir="${SCRIPT_DIR}/bin"
+    local source_setup_envtest=""
+
+    log_section "Preparing Envtest Assets"
+
+    if [ ! -d "$source_dir" ]; then
+        log_warn "Prebuilt envtest directory not found: $source_dir"
+        log_warn "Skipping envtest asset copy; make setup-envtest may download missing assets"
+        return 0
+    fi
+
+    mkdir -p "$target_dir"
+
+    if [ -x "${source_dir}/bin/setup-envtest" ]; then
+        source_setup_envtest="${source_dir}/bin/setup-envtest"
+    elif [ -x "${source_dir}/setup-envtest" ]; then
+        source_setup_envtest="${source_dir}/setup-envtest"
+    fi
+
+    if [ -n "$source_setup_envtest" ]; then
+        cp -a "$source_setup_envtest" "${target_dir}/setup-envtest"
+        chmod +x "${target_dir}/setup-envtest"
+        log_info "Copied setup-envtest from $source_setup_envtest"
+    else
+        log_warn "setup-envtest not found under $source_dir"
+    fi
+
+    if [ -d "${source_dir}/k8s" ]; then
+        mkdir -p "${target_dir}/k8s"
+        cp -a "${source_dir}/k8s/." "${target_dir}/k8s/"
+        export ENVTEST_INSTALLED_ONLY=true
+        log_info "Copied envtest Kubernetes binaries from ${source_dir}/k8s"
+        log_info "ENVTEST_INSTALLED_ONLY=true; make setup-envtest will only use local envtest assets"
+    else
+        log_warn "envtest Kubernetes binaries not found under ${source_dir}/k8s"
+    fi
+}
+
 # Check Go environment
 check_go_env() {
     log_section "Checking Go Environment"
@@ -123,6 +163,8 @@ main() {
     # Get the directory where the script is located
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR"
+
+    prepare_envtest_assets
     
     # Run checks for each project
     local failed_projects=()
@@ -150,4 +192,3 @@ main() {
 }
 
 main "$@"
-
