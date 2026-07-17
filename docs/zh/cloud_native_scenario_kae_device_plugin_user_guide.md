@@ -139,7 +139,7 @@ KAE（Kunpeng Accelerator Engine，鲲鹏加速引擎）是基于鲲鹏处理器
 3. 查看插件是否部署成功。
 
     ```shell
-    kubectl get pod
+    kubectl get pod -n kae-system
     ```
 
     可能的回显结果如下。
