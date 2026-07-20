@@ -62,6 +62,9 @@ func parseConfig() plugin.Config {
 	flag.StringVar(&runtimeClasses, "runtimeclass-whitelist", runtimeClasses, "comma-separated runtimeClass whitelist")
 	flag.BoolVar(&cfg.DryRun, "dry-run", cfg.DryRun, "log cpuset updates without writing cgroup files")
 	flag.Parse()
+	if cfg.ScanInterval <= 0 {
+		klog.Exitf("scan interval must be greater than zero, got %s", cfg.ScanInterval)
+	}
 
 	cfg.Namespaces = splitCSV(namespaces)
 	cfg.RuntimeClasses = splitCSV(runtimeClasses)
