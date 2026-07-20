@@ -5,6 +5,7 @@
 用户部署与验证步骤见 [Kata Cpuset NRI 插件用户指南](kata-cpuset-nri-user-guide.md)。
 
 当前骨架能力：
+
 - 白名单过滤（namespace/runtimeClass）。
 - 扫描所有 Pod 的 `cpuset.cpus` 并收敛。
 - 固定目标：将 Pod 绑定到同物理核心的 2 个逻辑 CPU。
@@ -12,6 +13,7 @@
 - 通过 `/proc/self/mountinfo` 自动发现 cpuset cgroup 根路径，也支持参数覆盖。
 
 运行参数：
+
 - `--nri-socket-path`：NRI socket 路径，默认 `/var/run/nri/nri.sock`。
 - `--scan-interval`：周期扫描间隔，默认 `10s`。
 - `--cgroup-root`：cpuset cgroup 根路径，默认自动发现。
@@ -20,6 +22,7 @@
 - `--dry-run`：只打印计划，不写 cgroup。
 
 目录结构：
+
 - `cmd/kata-cpuset-nri/`：启动入口。
 - `pkg/kata-cpuset-nri/plugin/`：NRI 事件、Pod 快照、过滤和 cpuset 收敛。
 - `pkg/kata-cpuset-nri/topology/`：SMT sibling 拓扑发现。
@@ -35,12 +38,14 @@ rm -f kata-cpuset-nri
 ```
 
 Kubernetes 部署清单：
+
 - `config/kata-cpuset-nri/daemonset.yaml`
 - 默认启用 `--dry-run=true`，用于先验证 DaemonSet 形态启动和 NRI 注册。
 - 默认 runtimeClass 白名单包含 `kata,kata-clh`，便于分别测试 QEMU 和 cloud-hypervisor 后端。
 - DaemonSet 默认不使用 `privileged`，只读挂载 NRI socket 目录和 CPU topology，仅对 `/sys/fs/cgroup/cpuset` 保留写权限。
 
 测试 Pod 清单：
+
 - `config/kata-cpuset-nri/test-pods.yaml`
 - 创建两个 `runtimeClassName: kata`、CPU request/limit 均为 `2` 的 Pod，用于验证 dry-run 模式下目标 sibling 规划不会重复。
 - 如果测试环境的 kata 配置不支持 CPU hotplug，Pod 可能进入 `StartError`；此时仍可通过插件日志确认 NRI 事件和 dry-run 目标规划是否生效。
@@ -49,5 +54,6 @@ Kubernetes 部署清单：
 - `config/kata-cpuset-nri/test-deployment-cloud-hypervisor-scale.yaml` 创建 100 副本 `kata-clh` Deployment，用于验证 100 Pod 规模下 sibling pair 不重复。
 
 当前不包含：
+
 - 完整 e2e 测试。
 - 与 kubelet CPUManager 冲突检测。

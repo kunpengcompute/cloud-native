@@ -54,6 +54,7 @@
 该缓存只用于周期扫描时定位需要处理的 Pod，不保存绑定结果，也不承担资源分配状态持久化。
 
 缓存来源：
+
 - 插件启动或重连时通过 NRI `Synchronize` 接收当前 Pod 列表。
 - Pod 创建时通过 `RunPodSandbox` 增量加入。
 - Pod 删除时通过 `RemovePodSandbox` 从内存中移除。
@@ -73,6 +74,7 @@
 插件默认从 `/proc/self/mountinfo` 自动发现 cpuset 控制器挂载点，并将 NRI 提供的 Pod cgroup parent 解析为实际 `cpuset.cpus` 所在目录。
 
 解析顺序：
+
 1. 如果 NRI 提供的是完整路径，且路径下存在 `cpuset.cpus`，直接使用。
 2. 将 `cgroup-root` 与 NRI 提供的 cgroup parent 拼接，适配 `/kubepods.slice/...` 形态。
 3. 对 `kubepods-*.slice:cri-containerd:<id>` 形态尝试转换为 systemd scope 路径。
@@ -91,6 +93,7 @@ coreID -> [cpuA, cpuB]
 ```
 
 过滤规则：
+
 - 仅保留恰好 2 个逻辑 CPU 的 sibling 对。
 - v0.1 读取 sysfs 拓扑结果，不额外维护复杂 CPU 状态。
 
@@ -100,6 +103,7 @@ coreID -> [cpuA, cpuB]
 输出：目标 `cpuset.cpus` 字符串（示例：`4,68`）。
 
 选择策略（v0.1）：
+
 1. 按 namespace、Pod 名称、Pod ID 排序，保证单次扫描顺序稳定。
 2. 若当前 cpuset 已是某个 sibling 对，且本轮尚未被其他 Pod 占用，则保持不变。
 3. 若当前 cpuset 不是有效 sibling 对，或该 sibling 对已被占用，则选择第一个未占用 sibling 对作为目标。
@@ -120,6 +124,7 @@ kata-cpuset-nri \
 ```
 
 字段说明：
+
 - `nri-socket-path`：NRI socket 路径。
 - `scan-interval`：周期扫描间隔。
 - `cgroup-root`：cpuset cgroup 根路径；为空时插件通过 `/proc/self/mountinfo` 自动发现 cpuset 控制器挂载点。
@@ -132,12 +137,14 @@ kata-cpuset-nri \
 插件最终以 Kubernetes DaemonSet 形式部署，每个节点运行一个插件容器。
 
 容器运行约束：
+
 - 需要访问 NRI socket，挂载 `/var/run/nri`。
 - 需要读取 CPU 拓扑，挂载 `/sys`。
 - 需要读写 Pod cgroup cpuset，挂载 cgroup 文件系统（通常为 `/sys/fs/cgroup`）。
 - 容器默认以非特权模式运行，禁止权限提升并丢弃全部 Linux capabilities；只读挂载 NRI socket 目录和 CPU 拓扑，仅对 `/sys/fs/cgroup/cpuset` 保留写权限。
 
 部署边界：
+
 - DaemonSet 只负责节点本地收敛，不做跨节点协调。
 - 插件重启后通过 NRI `Synchronize` 恢复 Pod 元数据缓存，并重新扫描 cgroup 当前状态。
 
@@ -152,18 +159,20 @@ kata-cpuset-nri \
 ## 9. 测试计划
 
 1. 单元测试
-- 白名单过滤正确性。
-- sibling 对解析正确性。
-- cpuset 比对与格式化正确性。
-- sibling 去重选择正确性。
-- 收敛流程在写入失败或可用 sibling 不足时不中断。
+
+   - 白名单过滤正确性。
+   - sibling 对解析正确性。
+   - cpuset 比对与格式化正确性。
+   - sibling 去重选择正确性。
+   - 收敛流程在写入失败或可用 sibling 不足时不中断。
 
 2. 集成测试
-- containerd v2.1 + kata 环境下，验证目标 Pod cpuset 被收敛为同核双线程。
-- 验证多个符合条件的 Pod 不会收敛到同一对 sibling。
-- 验证非白名单 Pod 不受影响。
-- 验证 dry-run 模式不落盘。
-- 验证 DaemonSet 容器重启后可通过 NRI 同步重新收敛。
+
+   - containerd v2.1 + kata 环境下，验证目标 Pod cpuset 被收敛为同核双线程。
+   - 验证多个符合条件的 Pod 不会收敛到同一对 sibling。
+   - 验证非白名单 Pod 不受影响。
+   - 验证 dry-run 模式不落盘。
+   - 验证 DaemonSet 容器重启后可通过 NRI 同步重新收敛。
 
 ## 10. 里程碑
 
