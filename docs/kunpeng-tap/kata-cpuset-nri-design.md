@@ -135,7 +135,7 @@ kata-cpuset-nri \
 - 需要访问 NRI socket，挂载 `/var/run/nri`。
 - 需要读取 CPU 拓扑，挂载 `/sys`。
 - 需要读写 Pod cgroup cpuset，挂载 cgroup 文件系统（通常为 `/sys/fs/cgroup`）。
-- 需要具备写 cgroup 文件的权限，初始版本建议使用 privileged 容器，后续再收敛为最小 capability。
+- 容器默认以非特权模式运行，禁止权限提升并丢弃全部 Linux capabilities；只读挂载 NRI socket 目录和 CPU 拓扑，仅对 `/sys/fs/cgroup/cpuset` 保留写权限。
 
 部署边界：
 - DaemonSet 只负责节点本地收敛，不做跨节点协调。
