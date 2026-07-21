@@ -31,11 +31,11 @@ import (
 	"github.com/containerd/nri/pkg/stub"
 	"k8s.io/klog/v2"
 
-	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kata-cpuset-nri/topology"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap-pcore-biding/topology"
 )
 
 const (
-	PluginName = "kata-cpuset-nri"
+	PluginName = "kunpeng-tap-pcore-biding"
 	PluginIdx  = "01"
 )
 

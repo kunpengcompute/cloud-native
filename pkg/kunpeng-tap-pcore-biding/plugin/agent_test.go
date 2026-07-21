@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kata-cpuset-nri/topology"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap-pcore-biding/topology"
 )
 
 func TestResolveCgroupPathRootJoin(t *testing.T) {

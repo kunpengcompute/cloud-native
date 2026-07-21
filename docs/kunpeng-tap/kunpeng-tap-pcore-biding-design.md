@@ -1,16 +1,16 @@
-# Kunpeng-TAP Confidential Plugin 功能设计说明
+# Kunpeng-TAP Pcore Biding 功能设计说明
 
-| 标题 | Kunpeng-TAP Confidential Plugin 功能设计说明 |
+| 标题 | Kunpeng-TAP Pcore Biding 功能设计说明 |
 | --- | --- |
 | 状态 | Draft |
 | 作者 | Kunpeng Boostkit Team |
 | 创建日期 | 2026-07-16 |
-| 实现载体 | `kata-cpuset-nri` |
+| 项目名称 | `kunpeng-tap-pcore-biding` |
 | 目标场景 | Kata / Confidential Containers Pod 级 cpuset 收敛 |
 
 ## 1. 功能概述
 
-`kunpeng-tap-confidential-plugin` 面向基于 Kata 的机密容器运行场景，当前实现载体为 `kata-cpuset-nri`。插件通过 NRI 接入 containerd，在 Pod sandbox 生命周期事件和周期扫描中，对符合白名单条件的 Kata Pod 执行 Pod 级 cpuset 收敛，将 Pod 的 2 个逻辑 CPU 绑定到同一个物理核心的 SMT sibling pair。
+`kunpeng-tap-pcore-biding` 面向基于 Kata 的机密容器运行场景。插件通过 NRI 接入 containerd，在 Pod sandbox 生命周期事件和周期扫描中，对符合白名单条件的 Kata Pod 执行 Pod 级 cpuset 收敛，将 Pod 的 2 个逻辑 CPU 绑定到同一个物理核心的 SMT sibling pair。
 
 该能力用于解决机密容器场景中 Pod 运行在轻量虚拟机内时，CPU 亲和关系不稳定或默认 cpuset 过宽的问题。插件不替代 Kubernetes 调度器和 kubelet CPUManager，只在节点本地对已经创建的 Kata Pod cgroup 进行约束，使目标 Pod 获得更稳定的同核双线程 CPU 绑定结果。
 
@@ -58,7 +58,7 @@ flowchart TB
         Kubelet["kubelet"]
         Containerd["containerd<br/>NRI enabled"]
         Kata["Kata / Confidential<br/>Pod Sandbox"]
-        Plugin["kunpeng-tap-confidential-plugin<br/>(kata-cpuset-nri)"]
+        Plugin["kunpeng-tap-pcore-biding"]
         Sysfs["CPU topology sysfs<br/>thread_siblings_list"]
         Cgroup["cpuset cgroup<br/>cpuset.cpus"]
 
@@ -77,9 +77,9 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    Main["cmd/kata-cpuset-nri<br/>main.go"]
-    Agent["pkg/kata-cpuset-nri/plugin<br/>Agent"]
-    Topology["pkg/kata-cpuset-nri/topology<br/>SiblingPair discovery"]
+    Main["cmd/kunpeng-tap-pcore-biding<br/>main.go"]
+    Agent["pkg/kunpeng-tap-pcore-biding/plugin<br/>Agent"]
+    Topology["pkg/kunpeng-tap-pcore-biding/topology<br/>SiblingPair discovery"]
     Runtime["containerd NRI"]
     Files["cpuset cgroup files"]
 
@@ -94,10 +94,10 @@ flowchart LR
 
 | 模块 | 路径 | 职责 |
 | --- | --- | --- |
-| 进程入口 | `cmd/kata-cpuset-nri/main.go` | 解析 CLI 参数、发现 sibling pair、创建 Agent、处理退出信号。 |
-| NRI Agent | `pkg/kata-cpuset-nri/plugin/agent.go` | 实现 NRI 回调、维护 Pod 元数据缓存、调度调和循环、解析 cgroup 并写入 cpuset。 |
-| 拓扑发现 | `pkg/kata-cpuset-nri/topology/siblings.go` | 读取 CPU sysfs sibling 信息，生成稳定排序的 sibling pair 列表。 |
-| 部署清单 | `config/kata-cpuset-nri/daemonset.yaml` | 定义 DaemonSet、挂载、启动参数和安全上下文。 |
+| 进程入口 | `cmd/kunpeng-tap-pcore-biding/main.go` | 解析 CLI 参数、发现 sibling pair、创建 Agent、处理退出信号。 |
+| NRI Agent | `pkg/kunpeng-tap-pcore-biding/plugin/agent.go` | 实现 NRI 回调、维护 Pod 元数据缓存、调度调和循环、解析 cgroup 并写入 cpuset。 |
+| 拓扑发现 | `pkg/kunpeng-tap-pcore-biding/topology/siblings.go` | 读取 CPU sysfs sibling 信息，生成稳定排序的 sibling pair 列表。 |
+| 部署清单 | `config/kunpeng-tap-pcore-biding/daemonset.yaml` | 定义 DaemonSet、挂载、启动参数和安全上下文。 |
 
 ### 3.3 调和流程
 
@@ -164,7 +164,7 @@ Kata 场景下 Pod parent cgroup 与 sandbox cgroup 可能不是简单父子关�
 
 ### 4.1 命令行接口
 
-插件通过二进制 `kata-cpuset-nri` 启动，主要参数如下：
+插件通过二进制 `kunpeng-tap-pcore-biding` 启动，主要参数如下：
 
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -192,7 +192,7 @@ args:
 
 | 项目 | 值 |
 | --- | --- |
-| PluginName | `kata-cpuset-nri` |
+| PluginName | `kunpeng-tap-pcore-biding` |
 | PluginIdx | `01` |
 | EventMask | `RunPodSandbox,StopPodSandbox,RemovePodSandbox` |
 
@@ -292,7 +292,7 @@ type SiblingPair struct {
 可通过以下方式确认插件可用性：
 
 - 查看 DaemonSet rollout 和 Pod 状态。
-- 查看插件日志中是否出现 `Using kata cpuset nri config`、`Pod cpuset updated` 或 `Dry-run pod cpuset update`。
+- 查看插件日志中是否出现 `Using kunpeng tap pcore biding config`、`Pod cpuset updated` 或 `Dry-run pod cpuset update`。
 - 检查日志中是否存在 `Resolve pod cgroup path failed`、`Write pod cpuset failed`、`No free sibling pair for pod` 等异常。
 - 在节点上读取目标 Pod 对应 parent cgroup 和 sandbox cgroup 的 `cpuset.cpus`，确认二者一致且没有重复 sibling pair。
 

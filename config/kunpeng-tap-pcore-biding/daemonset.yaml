@@ -1,31 +1,31 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: kata-cpuset-nri
+  name: kunpeng-tap-pcore-biding
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: kata-cpuset-nri
-  namespace: kata-cpuset-nri
+  name: kunpeng-tap-pcore-biding
+  namespace: kunpeng-tap-pcore-biding
   labels:
-    app: kata-cpuset-nri
+    app: kunpeng-tap-pcore-biding
 spec:
   selector:
     matchLabels:
-      app: kata-cpuset-nri
+      app: kunpeng-tap-pcore-biding
   template:
     metadata:
       labels:
-        app: kata-cpuset-nri
+        app: kunpeng-tap-pcore-biding
     spec:
       automountServiceAccountToken: false
       priorityClassName: system-node-critical
       tolerations:
       - operator: Exists
       containers:
-      - name: kata-cpuset-nri
-        image: kata-cpuset-nri:latest
+      - name: kunpeng-tap-pcore-biding
+        image: xdlyqdocker/kunpeng-tap-pcore-biding:latest
         imagePullPolicy: IfNotPresent
         args:
         - --nri-socket-path=/var/run/nri/nri.sock

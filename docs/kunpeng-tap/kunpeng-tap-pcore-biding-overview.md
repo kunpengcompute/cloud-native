@@ -1,8 +1,8 @@
-# kata-cpuset-nri
+# kunpeng-tap-pcore-biding
 
-`kata-cpuset-nri` 是一个基于 NRI 的 Pod 级 cpuset 收敛插件骨架。
+`kunpeng-tap-pcore-biding` 是一个基于 NRI 的 Pod 级 cpuset 收敛插件骨架。
 
-用户部署与验证步骤见 [Kata Cpuset NRI 插件用户指南](kata-cpuset-nri-user-guide.md)。
+用户部署与验证步骤见 [Kunpeng-TAP Pcore Biding 插件用户指南](kunpeng-tap-pcore-biding-user-guide.md)。
 
 当前骨架能力：
 
@@ -23,35 +23,35 @@
 
 目录结构：
 
-- `cmd/kata-cpuset-nri/`：启动入口。
-- `pkg/kata-cpuset-nri/plugin/`：NRI 事件、Pod 快照、过滤和 cpuset 收敛。
-- `pkg/kata-cpuset-nri/topology/`：SMT sibling 拓扑发现。
-- `config/kata-cpuset-nri/`：DaemonSet、RuntimeClass 和测试 Pod 清单。
+- `cmd/kunpeng-tap-pcore-biding/`：启动入口。
+- `pkg/kunpeng-tap-pcore-biding/plugin/`：NRI 事件、Pod 快照、过滤和 cpuset 收敛。
+- `pkg/kunpeng-tap-pcore-biding/topology/`：SMT sibling 拓扑发现。
+- `config/kunpeng-tap-pcore-biding/`：DaemonSet、RuntimeClass 和测试 Pod 清单。
 - `docs/kunpeng-tap/`：设计文档和用户指南。
 
 镜像构建：
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kata-cpuset-nri ./cmd/kata-cpuset-nri
-docker build --platform=linux/arm64 -f Dockerfile.kata-cpuset-nri -t kata-cpuset-nri:latest .
-rm -f kata-cpuset-nri
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kunpeng-tap-pcore-biding ./cmd/kunpeng-tap-pcore-biding
+docker build --platform=linux/arm64 -f Dockerfile.kunpeng-tap-pcore-biding -t kunpeng-tap-pcore-biding:latest .
+rm -f kunpeng-tap-pcore-biding
 ```
 
 Kubernetes 部署清单：
 
-- `config/kata-cpuset-nri/daemonset.yaml`
+- `config/kunpeng-tap-pcore-biding/daemonset.yaml`
 - 默认启用 `--dry-run=true`，用于先验证 DaemonSet 形态启动和 NRI 注册。
 - 默认 runtimeClass 白名单包含 `kata,kata-clh`，便于分别测试 QEMU 和 cloud-hypervisor 后端。
 - DaemonSet 默认不使用 `privileged`，只读挂载 NRI socket 目录和 CPU topology，仅对 `/sys/fs/cgroup/cpuset` 保留写权限。
 
 测试 Pod 清单：
 
-- `config/kata-cpuset-nri/test-pods.yaml`
+- `config/kunpeng-tap-pcore-biding/test-pods.yaml`
 - 创建两个 `runtimeClassName: kata`、CPU request/limit 均为 `2` 的 Pod，用于验证 dry-run 模式下目标 sibling 规划不会重复。
 - 如果测试环境的 kata 配置不支持 CPU hotplug，Pod 可能进入 `StartError`；此时仍可通过插件日志确认 NRI 事件和 dry-run 目标规划是否生效。
-- `config/kata-cpuset-nri/runtimeclass-cloud-hypervisor.yaml` 定义 `kata-clh` RuntimeClass。
-- `config/kata-cpuset-nri/test-pods-cloud-hypervisor.yaml` 创建两个 `runtimeClassName: kata-clh` 的测试 Pod，用于 cloud-hypervisor 后端验证。
-- `config/kata-cpuset-nri/test-deployment-cloud-hypervisor-scale.yaml` 创建 100 副本 `kata-clh` Deployment，用于验证 100 Pod 规模下 sibling pair 不重复。
+- `config/kunpeng-tap-pcore-biding/runtimeclass-cloud-hypervisor.yaml` 定义 `kata-clh` RuntimeClass。
+- `config/kunpeng-tap-pcore-biding/test-pods-cloud-hypervisor.yaml` 创建两个 `runtimeClassName: kata-clh` 的测试 Pod，用于 cloud-hypervisor 后端验证。
+- `config/kunpeng-tap-pcore-biding/test-deployment-cloud-hypervisor-scale.yaml` 创建 100 副本 `kata-clh` Deployment，用于验证 100 Pod 规模下 sibling pair 不重复。
 
 当前不包含：
 

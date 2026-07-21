@@ -1,6 +1,6 @@
-# Kata Cpuset NRI 插件用户指南
+# Kunpeng-TAP Pcore Biding 插件用户指南
 
-本文说明如何以 DaemonSet 方式部署和使用 `kata-cpuset-nri`。插件通过 NRI 接入 containerd，对符合白名单条件的 Kata Pod 执行 Pod 级 cpuset 收敛，将 Pod 的 2 个逻辑 CPU 绑定到同一个物理核心的 SMT sibling pair。
+本文说明如何以 DaemonSet 方式部署和使用 `kunpeng-tap-pcore-biding`。插件通过 NRI 接入 containerd，对符合白名单条件的 Kata Pod 执行 Pod 级 cpuset 收敛，将 Pod 的 2 个逻辑 CPU 绑定到同一个物理核心的 SMT sibling pair。
 
 本文中的 containerd、Kata、cloud-hypervisor 和 arm64 节点信息是当前已验证的测试条件。用户可在相同或等价条件下按本文步骤完成部署、参数配置和绑定结果检查。
 
@@ -81,7 +81,7 @@ containerd config dump | grep -n -A8 "io.containerd.nri.v1.nri"
 如果测试环境的 QEMU 后端存在 CPU hotplug 限制，可以使用 cloud-hypervisor 后端。仓库提供 `kata-clh` RuntimeClass 清单：
 
 ```bash
-kubectl apply -f config/kata-cpuset-nri/runtimeclass-cloud-hypervisor.yaml
+kubectl apply -f config/kunpeng-tap-pcore-biding/runtimeclass-cloud-hypervisor.yaml
 kubectl get runtimeclass kata-clh
 ```
 
@@ -108,18 +108,18 @@ crictl info | grep -A20 kata-clh
 在仓库根目录执行：
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kata-cpuset-nri ./cmd/kata-cpuset-nri
-docker build --platform=linux/arm64 -f Dockerfile.kata-cpuset-nri -t kata-cpuset-nri:latest .
-rm -f kata-cpuset-nri
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kunpeng-tap-pcore-biding ./cmd/kunpeng-tap-pcore-biding
+docker build --platform=linux/arm64 -f Dockerfile.kunpeng-tap-pcore-biding -t kunpeng-tap-pcore-biding:latest .
+rm -f kunpeng-tap-pcore-biding
 ```
 
 如果测试节点无法从镜像仓库拉取镜像，可以直接导入到目标节点 containerd 的 `k8s.io` namespace。以下命令以当前已验证节点为例：
 
 ```bash
-docker save kata-cpuset-nri:latest | ssh root@192.168.25.61 'ctr -n k8s.io images import -'
+docker save kunpeng-tap-pcore-biding:latest | ssh root@192.168.25.61 'ctr -n k8s.io images import -'
 ```
 
-如果使用镜像仓库，将 `config/kata-cpuset-nri/daemonset.yaml` 中的镜像地址改为仓库地址，并确认 kubelet 可以拉取该镜像。
+如果使用镜像仓库，将 `config/kunpeng-tap-pcore-biding/daemonset.yaml` 中的镜像地址改为仓库地址，并确认 kubelet 可以拉取该镜像。
 
 ## 6. DaemonSet 部署
 
@@ -128,15 +128,15 @@ DaemonSet 是默认部署形式。每个节点运行一个插件 Pod，只对本
 部署插件：
 
 ```bash
-kubectl apply -f config/kata-cpuset-nri/daemonset.yaml
-kubectl rollout status daemonset/kata-cpuset-nri -n kata-cpuset-nri --timeout=180s
+kubectl apply -f config/kunpeng-tap-pcore-biding/daemonset.yaml
+kubectl rollout status daemonset/kunpeng-tap-pcore-biding -n kunpeng-tap-pcore-biding --timeout=180s
 ```
 
 查看插件状态：
 
 ```bash
-kubectl get pod -n kata-cpuset-nri -l app=kata-cpuset-nri
-kubectl logs -n kata-cpuset-nri -l app=kata-cpuset-nri --since=10m
+kubectl get pod -n kunpeng-tap-pcore-biding -l app=kunpeng-tap-pcore-biding
+kubectl logs -n kunpeng-tap-pcore-biding -l app=kunpeng-tap-pcore-biding --since=10m
 ```
 
 默认清单使用较小权限面：
@@ -151,7 +151,7 @@ kubectl logs -n kata-cpuset-nri -l app=kata-cpuset-nri --since=10m
 
 ## 7. DaemonSet 参数设置
 
-主要参数位于 `config/kata-cpuset-nri/daemonset.yaml` 的 container `args`：
+主要参数位于 `config/kunpeng-tap-pcore-biding/daemonset.yaml` 的 container `args`：
 
 ```yaml
 args:
@@ -176,15 +176,15 @@ args:
 首次部署建议保持 `--dry-run=true`，确认插件能正常注册 NRI 后再切换为实际写入：
 
 ```bash
-kubectl patch ds kata-cpuset-nri -n kata-cpuset-nri --type=json \
+kubectl patch ds kunpeng-tap-pcore-biding -n kunpeng-tap-pcore-biding --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args/4","value":"--dry-run=false"}]'
-kubectl rollout status daemonset/kata-cpuset-nri -n kata-cpuset-nri --timeout=180s
+kubectl rollout status daemonset/kunpeng-tap-pcore-biding -n kunpeng-tap-pcore-biding --timeout=180s
 ```
 
 如果只处理 `kata-clh`，可以修改 runtimeClass 白名单：
 
 ```bash
-kubectl patch ds kata-cpuset-nri -n kata-cpuset-nri --type=json \
+kubectl patch ds kunpeng-tap-pcore-biding -n kunpeng-tap-pcore-biding --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args/3","value":"--runtimeclass-whitelist=kata-clh"}]'
 ```
 
@@ -193,21 +193,21 @@ kubectl patch ds kata-cpuset-nri -n kata-cpuset-nri --type=json \
 创建 2 个 cloud-hypervisor 测试 Pod：
 
 ```bash
-kubectl apply -f config/kata-cpuset-nri/test-pods-cloud-hypervisor.yaml
+kubectl apply -f config/kunpeng-tap-pcore-biding/test-pods-cloud-hypervisor.yaml
 kubectl wait --for=condition=Ready pod -l app=kata-clh-cpuset-test -n default --timeout=300s
 ```
 
 创建 100 副本规模测试：
 
 ```bash
-kubectl apply -f config/kata-cpuset-nri/test-deployment-cloud-hypervisor-scale.yaml
+kubectl apply -f config/kunpeng-tap-pcore-biding/test-deployment-cloud-hypervisor-scale.yaml
 kubectl rollout status deployment/kata-clh-cpuset-scale -n default --timeout=900s
 ```
 
 确认插件日志没有写入失败：
 
 ```bash
-kubectl logs -n kata-cpuset-nri -l app=kata-cpuset-nri --since=10m | \
+kubectl logs -n kunpeng-tap-pcore-biding -l app=kunpeng-tap-pcore-biding --since=10m | \
   grep -E 'Write pod cpuset failed|Resolve pod cgroup path failed|No free sibling|broken pipe|failed sending|panic|Error' || true
 ```
 
@@ -311,12 +311,12 @@ bad_records 0
 清理测试 workload：
 
 ```bash
-kubectl delete -f config/kata-cpuset-nri/test-deployment-cloud-hypervisor-scale.yaml --ignore-not-found
-kubectl delete -f config/kata-cpuset-nri/test-pods-cloud-hypervisor.yaml --ignore-not-found
+kubectl delete -f config/kunpeng-tap-pcore-biding/test-deployment-cloud-hypervisor-scale.yaml --ignore-not-found
+kubectl delete -f config/kunpeng-tap-pcore-biding/test-pods-cloud-hypervisor.yaml --ignore-not-found
 ```
 
 卸载插件：
 
 ```bash
-kubectl delete -f config/kata-cpuset-nri/daemonset.yaml
+kubectl delete -f config/kunpeng-tap-pcore-biding/daemonset.yaml
 ```

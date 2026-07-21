@@ -26,8 +26,8 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kata-cpuset-nri/plugin"
-	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kata-cpuset-nri/topology"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap-pcore-biding/plugin"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap-pcore-biding/topology"
 )
 
 func main() {
@@ -75,7 +75,7 @@ func parseConfig() plugin.Config {
 		}
 		cfg.CgroupRoot = root
 	}
-	klog.InfoS("Using kata cpuset nri config", "nriSocketPath", cfg.SocketPath,
+	klog.InfoS("Using kunpeng tap pcore biding config", "nriSocketPath", cfg.SocketPath,
 		"scanInterval", cfg.ScanInterval, "cgroupRoot", cfg.CgroupRoot,
 		"namespaces", cfg.Namespaces, "runtimeClasses", cfg.RuntimeClasses, "dryRun", cfg.DryRun)
 	return cfg
