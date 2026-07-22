@@ -140,6 +140,29 @@ func TestHTTPAgentClientGetInterference(t *testing.T) {
 	}
 }
 
+func TestHTTPAgentClientGetInterferenceNone(t *testing.T) {
+	c := &HTTPAgentClient{
+		BaseURL: "http://127.0.0.1:18080",
+		HTTPClient: newMockHTTPClient(func(r *http.Request) (*http.Response, error) {
+			return httpResp(http.StatusOK, `{
+				"version":"v1",
+				"node_name":"node-a",
+				"reason":"NONE",
+				"ttl_seconds":0,
+				"items":[]
+			}`), nil
+		}),
+	}
+
+	got, err := c.GetInterference(context.Background(), "node-a")
+	if err != nil {
+		t.Fatalf("GetInterference() unexpected error: %v", err)
+	}
+	if got.Reason != InterferenceReasonNone {
+		t.Fatalf("expected none reason, got %q", got.Reason)
+	}
+}
+
 func TestHTTPAgentClientGetInterferenceHTTPError(t *testing.T) {
 	c := &HTTPAgentClient{
 		BaseURL: "http://127.0.0.1:18080",

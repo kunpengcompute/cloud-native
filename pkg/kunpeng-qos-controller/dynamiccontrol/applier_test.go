@@ -59,6 +59,17 @@ func TestReasonDispatchTuningEngineHandleInterference(t *testing.T) {
 		}
 	})
 
+	t.Run("none reason noop", func(t *testing.T) {
+		updater := &fakeDynamicPolicyUpdater{}
+		engine := NewReasonDispatchTuningEngine(updater)
+		if err := engine.HandleInterference(context.Background(), "node-a", AgentAnalyzeResult{Reason: InterferenceReasonNone}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if updater.calls != 0 {
+			t.Fatalf("updater should not be called")
+		}
+	})
+
 	t.Run("nil updater", func(t *testing.T) {
 		engine := &ReasonDispatchTuningEngine{}
 		if err := engine.HandleInterference(context.Background(), "node-a", AgentAnalyzeResult{Reason: InterferenceReasonL3}); err == nil {

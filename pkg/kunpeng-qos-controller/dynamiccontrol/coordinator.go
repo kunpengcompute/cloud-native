@@ -56,6 +56,7 @@ type InterferenceReason string
 
 const (
 	InterferenceReasonUnknown InterferenceReason = "unknown"
+	InterferenceReasonNone    InterferenceReason = "none"
 	InterferenceReasonL3      InterferenceReason = "l3"
 	InterferenceReasonMB      InterferenceReason = "mb"
 	InterferenceReasonCPU     InterferenceReason = "cpu"

@@ -249,6 +249,8 @@ func decodeAgentHTTPError(resp *http.Response) error {
 
 func normalizeInterferenceReason(reason InterferenceReason) InterferenceReason {
 	switch InterferenceReason(strings.ToLower(string(reason))) {
+	case InterferenceReasonNone:
+		return InterferenceReasonNone
 	case InterferenceReasonL3:
 		return InterferenceReasonL3
 	case InterferenceReasonMB:

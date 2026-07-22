@@ -54,6 +54,8 @@ func (e *ReasonDispatchTuningEngine) HandleInterference(
 	switch reason {
 	case InterferenceReasonL3, InterferenceReasonMB, InterferenceReasonCPU:
 		return e.Updater.ApplyReason(ctx, nodeName, reason)
+	case InterferenceReasonNone:
+		return nil
 	default:
 		// Unknown reason means no tuning action.
 		return nil
