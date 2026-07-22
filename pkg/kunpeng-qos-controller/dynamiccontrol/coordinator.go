@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -133,6 +135,10 @@ func (c *Coordinator) ApplyInterferenceOnce(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	klog.Infof(
+		"dynamic-control received interference result: node=%s reason=%s ttlSeconds=%d items=%d",
+		nodeName, result.Reason, result.TTLSeconds, len(result.Items),
+	)
 
 	return c.Engine.HandleInterference(ctx, nodeName, result)
 }

@@ -17,10 +17,15 @@ limitations under the License.
 package dynamiccontrol
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"os"
+	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 type fakeNodeIdentity struct {
@@ -130,6 +135,40 @@ func TestCoordinator_ApplyInterferenceOnce(t *testing.T) {
 	}
 	if engine.calls != 1 || engine.node != "node-a" || engine.result.Reason != InterferenceReasonL3 {
 		t.Fatalf("unexpected engine call: %+v", engine)
+	}
+}
+
+func TestCoordinator_ApplyInterferenceOnceLogsResult(t *testing.T) {
+	var logOutput bytes.Buffer
+	klog.LogToStderr(false)
+	klog.SetOutput(&logOutput)
+	t.Cleanup(func() {
+		klog.Flush()
+		klog.SetOutput(os.Stderr)
+		klog.LogToStderr(true)
+	})
+
+	result := AgentAnalyzeResult{
+		Reason:     InterferenceReasonL3,
+		TTLSeconds: 15,
+		Items:      []InterferenceItem{{PodUID: "pod-uid-a", Score: 0.8}},
+	}
+	c := &Coordinator{
+		NodeIdentity: fakeNodeIdentity{name: "node-a"},
+		OnlineSource: fakeOnlineSource{},
+		Agent:        &fakeAgentClient{resp: result},
+		Engine:       &fakeEngine{},
+	}
+
+	if err := c.ApplyInterferenceOnce(context.Background()); err != nil {
+		t.Fatalf("ApplyInterferenceOnce() unexpected error: %v", err)
+	}
+	klog.Flush()
+
+	for _, want := range []string{"node=node-a", "reason=l3", "ttlSeconds=15", "items=1"} {
+		if !strings.Contains(logOutput.String(), want) {
+			t.Fatalf("expected log to contain %q, got %q", want, logOutput.String())
+		}
 	}
 }
 
