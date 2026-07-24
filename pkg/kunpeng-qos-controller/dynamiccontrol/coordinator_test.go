@@ -126,14 +126,20 @@ func TestCoordinator_ApplyInterferenceOnce(t *testing.T) {
 	c := &Coordinator{
 		NodeIdentity: fakeNodeIdentity{name: "node-a"},
 		OnlineSource: fakeOnlineSource{},
-		Agent:        &fakeAgentClient{resp: AgentAnalyzeResult{Reason: InterferenceReasonL3}},
-		Engine:       engine,
+		Agent: &fakeAgentClient{resp: AgentAnalyzeResult{Reasons: []InterferenceReason{
+			InterferenceReasonCPU,
+			InterferenceReasonL3,
+		}}},
+		Engine: engine,
 	}
 
 	if err := c.ApplyInterferenceOnce(context.Background()); err != nil {
 		t.Fatalf("ApplyInterferenceOnce() unexpected error: %v", err)
 	}
-	if engine.calls != 1 || engine.node != "node-a" || engine.result.Reason != InterferenceReasonL3 {
+	if engine.calls != 1 || engine.node != "node-a" ||
+		len(engine.result.Reasons) != 2 ||
+		engine.result.Reasons[0] != InterferenceReasonCPU ||
+		engine.result.Reasons[1] != InterferenceReasonL3 {
 		t.Fatalf("unexpected engine call: %+v", engine)
 	}
 }
@@ -149,9 +155,11 @@ func TestCoordinator_ApplyInterferenceOnceLogsResult(t *testing.T) {
 	})
 
 	result := AgentAnalyzeResult{
-		Reason:     InterferenceReasonL3,
-		TTLSeconds: 15,
-		Items:      []InterferenceItem{{PodUID: "pod-uid-a", Score: 0.8}},
+		Reasons: []InterferenceReason{
+			InterferenceReasonNone,
+			InterferenceReasonCPU,
+			InterferenceReasonL3,
+		},
 	}
 	c := &Coordinator{
 		NodeIdentity: fakeNodeIdentity{name: "node-a"},
@@ -165,7 +173,7 @@ func TestCoordinator_ApplyInterferenceOnceLogsResult(t *testing.T) {
 	}
 	klog.Flush()
 
-	for _, want := range []string{"node=node-a", "reason=l3", "ttlSeconds=15", "items=1"} {
+	for _, want := range []string{"node=node-a", "reasons=[none cpu l3]"} {
 		if !strings.Contains(logOutput.String(), want) {
 			t.Fatalf("expected log to contain %q, got %q", want, logOutput.String())
 		}

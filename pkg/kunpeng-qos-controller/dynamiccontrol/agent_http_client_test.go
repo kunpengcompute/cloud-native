@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -124,9 +125,7 @@ func TestHTTPAgentClientGetInterference(t *testing.T) {
 			return httpResp(http.StatusOK, `{
 				"version":"v1",
 				"node_name":"node-a",
-				"reason":"L3",
-				"ttl_seconds":15,
-				"items":[{"pod_uid":"pod-uid-a","score":0.8}]
+				"reasons":["L3"," mb ","cpu","l3","NONE","unsupported"]
 			}`), nil
 		}),
 	}
@@ -135,31 +134,75 @@ func TestHTTPAgentClientGetInterference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetInterference() unexpected error: %v", err)
 	}
-	if got.Reason != InterferenceReasonL3 || got.TTLSeconds != 15 || len(got.Items) != 1 {
-		t.Fatalf("unexpected interference result: %+v", got)
+	want := []InterferenceReason{
+		InterferenceReasonNone,
+		InterferenceReasonCPU,
+		InterferenceReasonMB,
+		InterferenceReasonL3,
+	}
+	if !reflect.DeepEqual(got.Reasons, want) {
+		t.Fatalf("unexpected interference reasons: got %v, want %v", got.Reasons, want)
 	}
 }
 
-func TestHTTPAgentClientGetInterferenceNone(t *testing.T) {
-	c := &HTTPAgentClient{
-		BaseURL: "http://127.0.0.1:18080",
-		HTTPClient: newMockHTTPClient(func(r *http.Request) (*http.Response, error) {
-			return httpResp(http.StatusOK, `{
-				"version":"v1",
-				"node_name":"node-a",
-				"reason":"NONE",
-				"ttl_seconds":0,
-				"items":[]
-			}`), nil
-		}),
+func TestHTTPAgentClientGetInterferenceEmptyReasons(t *testing.T) {
+	for _, body := range []string{
+		`{"version":"v1","node_name":"node-a","reasons":[]}`,
+		`{"version":"v1","node_name":"node-a","reasons":null}`,
+	} {
+		c := &HTTPAgentClient{
+			BaseURL: "http://127.0.0.1:18080",
+			HTTPClient: newMockHTTPClient(func(r *http.Request) (*http.Response, error) {
+				return httpResp(http.StatusOK, body), nil
+			}),
+		}
+
+		got, err := c.GetInterference(context.Background(), "node-a")
+		if err != nil {
+			t.Fatalf("GetInterference() unexpected error: %v", err)
+		}
+		if len(got.Reasons) != 0 {
+			t.Fatalf("expected empty reasons, got %v", got.Reasons)
+		}
+	}
+}
+
+func TestHTTPAgentClientGetInterferenceValidatesMetadata(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "version mismatch",
+			body: `{"version":"v2","node_name":"node-a","reasons":[]}`,
+			want: "version",
+		},
+		{
+			name: "node mismatch",
+			body: `{"version":"v1","node_name":"node-b","reasons":[]}`,
+			want: "node",
+		},
+		{
+			name: "missing reasons",
+			body: `{"version":"v1","node_name":"node-a","reason":"l3"}`,
+			want: "reasons",
+		},
 	}
 
-	got, err := c.GetInterference(context.Background(), "node-a")
-	if err != nil {
-		t.Fatalf("GetInterference() unexpected error: %v", err)
-	}
-	if got.Reason != InterferenceReasonNone {
-		t.Fatalf("expected none reason, got %q", got.Reason)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &HTTPAgentClient{
+				BaseURL: "http://127.0.0.1:18080",
+				HTTPClient: newMockHTTPClient(func(r *http.Request) (*http.Response, error) {
+					return httpResp(http.StatusOK, tt.body), nil
+				}),
+			}
+			_, err := c.GetInterference(context.Background(), "node-a")
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected %s validation error, got %v", tt.want, err)
+			}
+		})
 	}
 }
 

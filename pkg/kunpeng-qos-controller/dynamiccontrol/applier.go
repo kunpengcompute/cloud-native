@@ -50,14 +50,9 @@ func (e *ReasonDispatchTuningEngine) HandleInterference(
 		return fmt.Errorf("node name must not be empty")
 	}
 
-	reason := normalizeInterferenceReason(result.Reason)
-	switch reason {
-	case InterferenceReasonL3, InterferenceReasonMB, InterferenceReasonCPU:
-		return e.Updater.ApplyReason(ctx, nodeName, reason)
-	case InterferenceReasonNone:
-		return nil
-	default:
-		// Unknown reason means no tuning action.
+	reasons, _ := normalizeInterferenceReasons(result.Reasons, false)
+	if len(reasons) == 0 {
 		return nil
 	}
+	return e.Updater.ApplyReasons(ctx, nodeName, reasons)
 }
