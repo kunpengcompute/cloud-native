@@ -1,0 +1,20 @@
+# when node-policy added or deployed
+# you'd better delete the current sriov-device-plugin  
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: policy-1822-2
+  namespace: sriov-network-operator
+spec:
+  deviceType: netdevice 
+  mtu: 1500
+  externallyManaged: true
+  nicSelector:
+    deviceID: "375e"
+    vendor: "19e5"
+    pciAddresses: ["0000:08:00.0"]
+  nodeSelector:
+    feature.node.kubernetes.io/network-sriov.capable: "true"
+  numVfs: 0
+  priority: 90
+  resourceName: huawei1822 # it is ok to use the same resourceName in different node policies.

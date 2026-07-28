@@ -1,0 +1,15 @@
+contents: |
+  [Unit]
+  Description=Configures SRIOV NIC - post network configuration
+  After=systemd-networkd-wait-online.service NetworkManager-wait-online.service openvswitch-switch.service sriov-config.service
+  Before=kubelet.service
+
+  [Service]
+  Type=oneshot
+  ExecStart=/var/lib/sriov/sriov-network-config-daemon service --phase post
+  StandardOutput=journal+console
+
+  [Install]
+  WantedBy=multi-user.target
+enabled: true
+name: sriov-config-post-network.service

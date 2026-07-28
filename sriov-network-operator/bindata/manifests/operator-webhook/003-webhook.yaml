@@ -1,0 +1,71 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{.SRIOVMutatingWebhookName}}
+  annotations:
+    {{- if eq .ClusterType "openshift" }}
+    service.beta.openshift.io/inject-cabundle: "true"
+    {{- else if and (.CertManagerEnabled) (eq .ClusterType "kubernetes") }}
+    # Limitation: Certificate must be named as the secret it produces to avoid overcomplicating the logic with
+    # more variables.
+    cert-manager.io/inject-ca-from: {{.Namespace}}/{{.OperatorWebhookSecretName}}
+    {{- end }}
+webhooks:
+  - name: operator-webhook.sriovnetwork.openshift.io
+    sideEffects: None
+    admissionReviewVersions: ["v1", "v1beta1"]
+    failurePolicy: Fail
+    clientConfig:
+      service:
+        name: operator-webhook-service
+        namespace: {{.Namespace}}
+        path: "/mutating-custom-resource"
+      {{- if and (not .CertManagerEnabled) (eq .ClusterType "kubernetes") }}
+      caBundle: "{{.OperatorWebhookCA}}"
+      {{- end }}
+    rules:
+      - operations: [ "CREATE", "UPDATE" ]
+        apiGroups: ["sriovnetwork.openshift.io"]
+        apiVersions: ["v1"]
+        resources: ["sriovnetworknodepolicies"]
+
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{.SRIOVMutatingWebhookName}}
+  annotations:
+    {{- if eq .ClusterType "openshift" }}
+    service.beta.openshift.io/inject-cabundle: "true"
+    {{- else if and (.CertManagerEnabled) (eq .ClusterType "kubernetes") }}
+    # Limitation: Certificate must be named as the secret it produces to avoid overcomplicating the logic with
+    # more variables.
+    cert-manager.io/inject-ca-from: {{.Namespace}}/{{.OperatorWebhookSecretName}}
+    {{- end }}
+webhooks:
+  - name: operator-webhook.sriovnetwork.openshift.io
+    sideEffects: None
+    admissionReviewVersions: ["v1", "v1beta1"]
+    failurePolicy: Fail
+    clientConfig:
+      service:
+        name: operator-webhook-service
+        namespace: {{.Namespace}}
+        path: "/validating-custom-resource"
+      {{- if and (not .CertManagerEnabled) (eq .ClusterType "kubernetes") }}
+      caBundle: "{{.OperatorWebhookCA}}"
+      {{- end }}
+    rules:
+      - operations: [ "CREATE", "UPDATE", "DELETE" ]
+        apiGroups: ["sriovnetwork.openshift.io"]
+        apiVersions: ["v1"]
+        resources: ["sriovnetworknodepolicies"]
+      - operations: [ "CREATE", "UPDATE", "DELETE" ]
+        apiGroups: [ "sriovnetwork.openshift.io" ]
+        apiVersions: [ "v1" ]
+        resources: [ "sriovoperatorconfigs" ]
+      - operations: [ "CREATE", "UPDATE", "DELETE" ]
+        apiGroups: [ "sriovnetwork.openshift.io" ]
+        apiVersions: [ "v1" ]
+        resources: [ "sriovnetworkpoolconfigs" ]

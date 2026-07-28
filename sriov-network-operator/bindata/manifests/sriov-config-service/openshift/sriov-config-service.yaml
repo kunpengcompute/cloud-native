@@ -1,0 +1,47 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: sriov-config-service
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    systemd:
+      units:
+        - contents: |
+            [Unit]
+            # Removal of this file signals firstboot completion
+            ConditionPathExists=!/etc/ignition-machine-config-encapsulated.json
+            Description=Configures SRIOV NIC - pre network configuration
+            DefaultDependencies=no
+            After=network-pre.target systemd-udev-settle.service systemd-sysusers.service systemd-sysctl.service
+            Before=network.target NetworkManager.service systemd-networkd.service ovs-vswitchd.service ovsdb-server.service
+
+            [Service]
+            Type=oneshot
+            ExecStart=/var/lib/sriov/sriov-network-config-daemon service --phase pre
+            StandardOutput=journal+console
+
+            [Install]
+            WantedBy=multi-user.target
+          enabled: true
+          name: "sriov-config.service"
+        - contents: |
+            [Unit]
+            # Removal of this file signals firstboot completion
+            ConditionPathExists=!/etc/ignition-machine-config-encapsulated.json
+            Description=Configures SRIOV NIC - post network configuration
+            After=systemd-networkd-wait-online.service NetworkManager-wait-online.service openvswitch-switch.service sriov-config.service
+            Before=kubelet.service
+
+            [Service]
+            Type=oneshot
+            ExecStart=/var/lib/sriov/sriov-network-config-daemon service --phase post
+            StandardOutput=journal+console
+
+            [Install]
+            WantedBy=multi-user.target
+          enabled: true
+          name: "sriov-config-post-network.service"

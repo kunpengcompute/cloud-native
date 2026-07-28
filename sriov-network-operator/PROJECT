@@ -1,0 +1,64 @@
+domain: openshift.io
+layout:
+- go.kubebuilder.io/v3
+projectName: sriov-network-operator
+repo: github.com/k8snetworkplumbingwg/sriov-network-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openshift.io
+  group: sriovnetwork
+  kind: SriovNetwork
+  path: github.com/k8snetworkplumbingwg/sriov-network-operator/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: false
+  domain: openshift.io
+  group: sriovnetwork
+  kind: SriovNetworkNodeState
+  path: github.com/k8snetworkplumbingwg/sriov-network-operator/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openshift.io
+  group: sriovnetwork
+  kind: SriovIBNetwork
+  path: github.com/k8snetworkplumbingwg/sriov-network-operator/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openshift.io
+  group: sriovnetwork
+  kind: SriovNetworkNodePolicy
+  path: github.com/k8snetworkplumbingwg/sriov-network-operator/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openshift.io
+  group: sriovnetwork
+  kind: SriovOperatorConfig
+  path: github.com/k8snetworkplumbingwg/sriov-network-operator/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openshift.io
+  group: sriovnetwork
+  kind: OVSNetwork
+  path: github.com/k8snetworkplumbingwg/sriov-network-operator/api/v1
+  version: v1
+version: "3"
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}

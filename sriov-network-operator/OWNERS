@@ -1,0 +1,15 @@
+reviewers:
+  - pliurh
+  - zshi-redhat
+  - dougbtv
+  - fepan
+  - s1061123
+approvers:
+  - pliurh
+  - zshi-redhat
+  - dougbtv
+  - squeed
+  - fepan
+  - s1061123
+component: "Networking"
+subcomponent: "SR-IOV"

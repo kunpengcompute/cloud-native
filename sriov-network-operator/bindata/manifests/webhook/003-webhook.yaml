@@ -1,0 +1,38 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{.SRIOVMutatingWebhookName}}
+  annotations:
+    {{- if eq .ClusterType "openshift" }}
+    service.beta.openshift.io/inject-cabundle: "true"
+    {{- else if and (.CertManagerEnabled) (eq .ClusterType "kubernetes") }}
+    # Limitation: Certificate must be named as the secret it produces to avoid overcomplicating the logic with
+    # more variables.
+    cert-manager.io/inject-ca-from: {{.Namespace}}/{{.InjectorWebhookSecretName}}
+    {{- end }}
+webhooks:
+  - name: network-resources-injector-config.k8s.io
+    sideEffects: None
+    admissionReviewVersions: ["v1", "v1beta1"]
+    {{- if .resourceInjectorMatchCondition}}
+    failurePolicy: Fail
+    matchConditions:
+      - name: 'include-networks-annotation'
+        expression: 'has(object.metadata.annotations) && "k8s.v1.cni.cncf.io/networks" in object.metadata.annotations'
+    {{- else }}
+    failurePolicy: Ignore
+    {{- end}}
+    clientConfig:
+      service:
+        name: network-resources-injector-service
+        namespace: {{.Namespace}}
+        path: "/mutate"
+      {{- if and (not .CertManagerEnabled) (eq .ClusterType "kubernetes") }}
+      caBundle: "{{.InjectorWebhookCA}}"
+      {{- end }}
+    rules:
+      - operations: [ "CREATE" ]
+        apiGroups: ["apps", ""]
+        apiVersions: ["v1"]
+        resources: ["pods"]

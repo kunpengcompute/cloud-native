@@ -1,0 +1,16 @@
+contents: |
+  [Unit]
+  Description=Configures SRIOV NIC - pre network configuration
+  DefaultDependencies=no
+  After=network-pre.target systemd-udev-settle.service systemd-sysusers.service systemd-sysctl.service
+  Before=network.target NetworkManager.service systemd-networkd.service ovs-vswitchd.service ovsdb-server.service
+
+  [Service]
+  Type=oneshot
+  ExecStart=/var/lib/sriov/sriov-network-config-daemon service --phase pre
+  StandardOutput=journal+console
+
+  [Install]
+  WantedBy=multi-user.target
+enabled: true
+name: sriov-config.service
