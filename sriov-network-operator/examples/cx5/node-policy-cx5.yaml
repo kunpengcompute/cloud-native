@@ -1,0 +1,20 @@
+# when node-policy added or updated
+# you'd better delete the current sriov-device-plugin
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: policy-cx5
+  namespace: sriov-network-operator
+spec:
+  deviceType: netdevice 
+  mtu: 1500
+  externallyManaged: true
+  nicSelector:
+    deviceID: "1018"
+    vendor: "15b3"
+    pciAddresses: ["0000:07:00.0"]
+  nodeSelector:
+    feature.node.kubernetes.io/network-sriov.capable: "true"
+  numVfs: 0
+  priority: 90
+  resourceName: mlxcx5

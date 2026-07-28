@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: device-info-blacklist
+  namespace: sriov-network-operator
+data:
+  default: |
+    {
+      "devices": [
+        {
+          "address": "0000:01:00.0",
+          "mac": "52:54:00:a4:4f:97"
+        },
+        {
+          "address": "0000:06:00.0",
+          "mac": "46:77:d7:59:73:6f"
+        }
+      ]
+    }
