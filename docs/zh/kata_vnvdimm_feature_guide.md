@@ -217,8 +217,17 @@ virtio_fs_daemon = "/opt/kata/libexec/virtiofsd"
 # virtio-fs缓存模式。
 virtio_fs_cache = "auto"
 
-# false 表示启用 Kata Guest image 作为 NVDIMM设备提供给Guest。
+# false 表示允许 Kata Guest image 作为 NVDIMM设备提供给Guest。
 disable_image_nvdimm = false
+```
+如使用runtime-rs， 需配置：
+```toml
+[hypervisor.qemu]
+
+# runtime-rs 中将 VM rootfs driver 配置为 virtio-pmem。
+# QEMU 底层仍通过 NVDIMM 设备向 Guest 提供 Kata Guest image。
+vm_rootfs_driver = "virtio-pmem"
+
 ```
 
 #### containerd runtime 配置
