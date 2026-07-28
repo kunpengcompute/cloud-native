@@ -1,0 +1,96 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: operator-webhook
+  namespace: {{.Namespace}}
+  labels:
+    app: operator-webhook
+  annotations:
+    kubernetes.io/description: |
+      This deployment launches the sriov network operator admission control webhook component.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: operator-webhook
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 33%
+  template:
+    metadata:
+      labels:
+        app: operator-webhook
+      annotations:
+        openshift.io/required-scc: restricted-v2
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: operator-webhook-sa
+      priorityClassName: "system-cluster-critical"
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+        {{ if not .ExternalControlPlane }}
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: Exists
+            - matchExpressions:
+                - key: node-role.kubernetes.io/control-plane
+                  operator: Exists
+        {{ end }}
+      tolerations:
+      {{ if not .ExternalControlPlane }}
+      - key: "node-role.kubernetes.io/master"
+        operator: Exists
+        effect: NoSchedule
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: Exists
+        effect: NoSchedule
+      - key: "node.kubernetes.io/not-ready"
+        operator: Exists
+        effect: NoSchedule
+      {{ end }}
+      {{- if .ImagePullSecrets }}
+      imagePullSecrets:
+      {{- range .ImagePullSecrets }}
+      - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - name: webhook-server
+        image: {{.SriovNetworkWebhookImage}}
+        command:
+        - webhook
+        args:
+        - "start"
+        - "--port=6443"
+        - "--tls-private-key-file=/etc/tls/tls.key"
+        - "--tls-cert-file=/etc/tls/tls.crt"
+        - "--alsologtostderr=true"
+        - "--v=3"
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: DEV_MODE
+          value: "{{.DevMode}}"
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        volumeMounts:
+        - mountPath: /etc/tls
+          name: tls
+      volumes:
+      - name: tls
+        secret:
+          secretName: {{.OperatorWebhookSecretName}}

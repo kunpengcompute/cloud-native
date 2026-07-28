@@ -1,0 +1,26 @@
+# used after sriov-network.yaml and sriov-network-2.yaml deployed.
+# to deploy a pod with two VFs
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-vf2
+  namespace: sriov-network-operator
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |
+      [
+        { "name": "sriov-network-1822", "interface": "net1" },
+        { "name": "sriov-network-1822-2", "interface": "net2" }
+      ]
+spec:
+  nodeName: compute01
+  containers:
+  - name: netperf 
+    image: nicolaka/netshoot
+    imagePullPolicy: IfNotPresent
+    command: [ "/bin/bash", "-c", "--" ]
+    args: [ "while true; do sleep 300000; done;" ]
+    resources:
+      requests:
+        openshift.io/huawei1822: '2'
+      limits:
+        openshift.io/huawei1822: '2'
