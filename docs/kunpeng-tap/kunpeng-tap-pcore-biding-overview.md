@@ -2,7 +2,7 @@
 
 `kunpeng-tap-pcore-biding` 是一个基于 NRI 的 Pod 级 cpuset 收敛插件骨架。
 
-用户部署与验证步骤见 [Kunpeng-TAP Pcore Biding 插件用户指南](kunpeng-tap-pcore-biding-user-guide.md)。
+用户部署与验证步骤见[Kunpeng-TAP Pcore Biding插件 用户指南](kunpeng_tap_pcore_biding_user_guide.md)。
 
 当前骨架能力：
 
