@@ -1,0 +1,13 @@
+# Runtime image for kunpeng-tap-pcore-biding.
+#
+# Build the binary first, then build this image:
+#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kunpeng-tap-pcore-biding ./cmd/kunpeng-tap-pcore-biding
+#   docker build -f Dockerfile.kunpeng-tap-pcore-biding -t kunpeng-tap-pcore-biding:latest .
+FROM scratch
+
+COPY kunpeng-tap-pcore-biding /usr/local/bin/kunpeng-tap-pcore-biding
+
+ENTRYPOINT ["/usr/local/bin/kunpeng-tap-pcore-biding"]
+
+LABEL maintainer="Kunpeng Boostkit Team"
+LABEL description="NRI plugin for binding kata pod cpuset to physical-core sibling CPUs"

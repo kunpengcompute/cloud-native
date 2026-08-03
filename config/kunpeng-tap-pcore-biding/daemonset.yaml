@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kunpeng-tap-pcore-biding
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kunpeng-tap-pcore-biding
+  namespace: kunpeng-tap-pcore-biding
+  labels:
+    app: kunpeng-tap-pcore-biding
+spec:
+  selector:
+    matchLabels:
+      app: kunpeng-tap-pcore-biding
+  template:
+    metadata:
+      labels:
+        app: kunpeng-tap-pcore-biding
+    spec:
+      automountServiceAccountToken: false
+      priorityClassName: system-node-critical
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: kunpeng-tap-pcore-biding
+        image: xdlyqdocker/kunpeng-tap-pcore-biding:latest
+        imagePullPolicy: IfNotPresent
+        args:
+        - --nri-socket-path=/var/run/nri/nri.sock
+        - --scan-interval=10s
+        - --namespace-whitelist=default
+        - --runtimeclass-whitelist=kata,kata-clh
+        - --dry-run=true
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsUser: 0
+          runAsGroup: 0
+          runAsNonRoot: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        volumeMounts:
+        - name: nri-socket
+          mountPath: /var/run/nri
+          readOnly: true
+        - name: sys-cpu
+          mountPath: /sys/devices/system/cpu
+          readOnly: true
+        - name: cpuset-cgroup
+          mountPath: /sys/fs/cgroup/cpuset
+      volumes:
+      - name: nri-socket
+        hostPath:
+          path: /var/run/nri
+          type: Directory
+      - name: sys-cpu
+        hostPath:
+          path: /sys/devices/system/cpu
+          type: Directory
+      - name: cpuset-cgroup
+        hostPath:
+          path: /sys/fs/cgroup/cpuset
+          type: Directory
