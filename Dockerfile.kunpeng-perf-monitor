@@ -5,7 +5,7 @@
 # You may obtain a copy of the License at
 #
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -13,8 +13,11 @@
 # limitations under the License.
 
 FROM golang:1.25 AS builder
+
+ARG DEVKIT_TUNER_URL="https://kunpeng-repo.obs.cn-north-4.myhuaweicloud.com/Kunpeng%20DevKit/Kunpeng%20DevKit%2026.0.RC1/DevKit-Tuner-CLI-26.0.RC1-Linux-aarch64.tar.gz"
+ARG DEVKIT_TUNER_SHA256="022948405ec1aef33bfa377cbd9176f30fee1fdc212d13d24d5cd2e51dbf4cac"
+
 WORKDIR /go/src/kunpeng.huawei.com/kunpeng-cloud-computing/
-COPY . .
 
 # set proxy if needed.
 # replace the $http_proxy and $https_proxy below with your own proxy if needed. 
@@ -26,34 +29,71 @@ RUN go env -w GO111MODULE=on && \
     go env -w GOPROXY=https://mirrors.huaweicloud.com/repository/goproxy/,https://goproxy.cn,https://mirrors.aliyun.com/goproxy/ && \
     go env -w GONOSUMDB=*
 
-# download dependencies manually, instead of using libkperf.sh
-RUN sed -i 's|get_dependencies=true|get_dependencies=false|g' hack/kunpeng-perf-monitor/libkperf.sh
-RUN apt remove -y g++ && apt autoremove -y
-RUN apt-get update -y \
-    && DEBIAN_FRONTEND=noninteractive \
-    apt-get install --no-install-recommends -y make cmake python3 libnuma-dev libc6 gcc g++-12 \
-    && cp /usr/bin/g++-12 /usr/bin/g++ \
-    && apt-get clean && apt-get autoremove -y \
+# libkperf v2.0.0 requires a native C/C++ toolchain, CMake, Python, and
+# NUMA headers. Select G++ 12 explicitly because newer versions are unsupported.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+        make \
+        cmake \
+        python3 \
+        libnuma-dev \
+        libc6-dev \
+        gcc \
+        g++-12 \
+        ca-certificates \
+        curl \
+        git \
+    && ln -sf /usr/bin/g++-12 /usr/local/bin/g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# build kunpeng-perf-monitor
-RUN make -f Makefile.kunpeng-perf-monitor build
+# Keep the complete Tuner directory because its launcher resolves execute.ini
+# and private libraries relative to the devkit executable.
+RUN curl -fsSL "$DEVKIT_TUNER_URL" -o /tmp/devkit-tuner.tar.gz \
+    && printf '%s  %s\n' "$DEVKIT_TUNER_SHA256" /tmp/devkit-tuner.tar.gz | sha256sum -c - \
+    && mkdir -p /opt/devkit \
+    && tar -xzf /tmp/devkit-tuner.tar.gz \
+        --strip-components=1 \
+        -C /opt/devkit \
+    && test -x /opt/devkit/devkit \
+    && test -f /opt/devkit/execute.ini \
+    && test -f /opt/devkit/tuner/lib/libkperf.so \
+    && rm -f /tmp/devkit-tuner.tar.gz
+
+COPY . .
+
+# Dependencies are installed above. The existing build script downloads and
+# compiles public libkperf v2.0.0, then builds every Linux Collector with CGo.
+RUN sed -i 's|get_dependencies=true|get_dependencies=false|g' hack/kunpeng-perf-monitor/libkperf.sh \
+    && make -f Makefile.kunpeng-perf-monitor build
 
 
-FROM quay.io/prometheus/busybox-linux-arm64:latest
-# copy binary and libraries from builder
+FROM quay.io/openeuler/openeuler:24.03-lts-sp3
+
 COPY --from=builder /go/src/kunpeng.huawei.com/kunpeng-cloud-computing/bin/kunpeng-perf-monitor /bin/kunpeng-perf-monitor
-COPY --from=builder /go/src/kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-perf-monitor/libkperf/lib/* /lib/
 
-RUN mkdir -p /lib/aarch64-linux-gnu
-COPY --from=builder /lib/aarch64-linux-gnu/libc.so.6 /lib/aarch64-linux-gnu/
-COPY --from=builder /lib/aarch64-linux-gnu/libstdc++.so.6 /lib/aarch64-linux-gnu/
-COPY --from=builder /lib/aarch64-linux-gnu/libgcc_s.so.1 /lib/aarch64-linux-gnu/
-COPY --from=builder /lib/aarch64-linux-gnu/libm.so.6 /lib/aarch64-linux-gnu/
-COPY --from=builder /lib/ld-linux-aarch64.so.1 /lib/
+# Keep the public libkperf used by PMU separate from Tuner's private build.
+COPY --from=builder /go/src/kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-perf-monitor/libkperf/lib/ /usr/local/lib/kunpeng-perf-monitor/
+COPY --from=builder /opt/devkit /opt/devkit
 
-# set LD_LIBRARY_PATH
-ENV LD_LIBRARY_PATH=/lib:$LD_LIBRARY_PATH
+RUN printf '%s\n' /usr/local/lib/kunpeng-perf-monitor > /etc/ld.so.conf.d/kunpeng-perf-monitor.conf \
+    && ldconfig \
+    && test -x /bin/kunpeng-perf-monitor \
+    && test -x /opt/devkit/devkit
 
-EXPOSE      9100
-ENTRYPOINT  [ "/bin/kunpeng-perf-monitor" ]
+ENV DEVKIT_BINARY_PATH=/opt/devkit/devkit
+
+# set proxy if needed.
+# replace the $http_proxy and $https_proxy below with your own proxy if needed. 
+# ENV http_proxy $http_proxy
+# ENV https_proxy $https_proxy
+
+RUN dnf install -y util-linux \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+# unset the proxy if you have set it above. This is to avoid the proxy being used by the application.
+# ENV http_proxy=
+# ENV https_proxy=
+
+EXPOSE 9100
+ENTRYPOINT ["/bin/kunpeng-perf-monitor"]
