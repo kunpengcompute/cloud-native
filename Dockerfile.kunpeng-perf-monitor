@@ -15,6 +15,8 @@
 FROM golang:1.25 AS builder
 
 ARG DEVKIT_TUNER_URL="https://kunpeng-repo.obs.cn-north-4.myhuaweicloud.com/Kunpeng%20DevKit/Kunpeng%20DevKit%2026.0.RC1/DevKit-Tuner-CLI-26.0.RC1-Linux-aarch64.tar.gz"
+# Public archive checksum used for integrity verification, not a credential.
+# pragma: allowlist nextline secret
 ARG DEVKIT_TUNER_SHA256="022948405ec1aef33bfa377cbd9176f30fee1fdc212d13d24d5cd2e51dbf4cac"
 
 WORKDIR /go/src/kunpeng.huawei.com/kunpeng-cloud-computing/
