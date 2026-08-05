@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,6 +59,9 @@ const (
 
 // cpuRangePattern 校验 CPU 范围，如 "0" "0,1,2" "0-31" "10,80,89-99"。
 var cpuRangePattern = regexp.MustCompile(`^\d+(-\d+)?(,\d+(-\d+)?)*$`)
+
+// devkitCollectIntervalPattern restricts the environment value to ASCII digits.
+var devkitCollectIntervalPattern = regexp.MustCompile(`^[0-9]+$`)
 
 // pidListPattern 校验 PID 列表，仅接受纯数字或逗号分隔的数字列表，拒绝 "ALL"。
 var pidListPattern = regexp.MustCompile(`^\d+(,\d+)*$`)
@@ -253,21 +257,51 @@ func devkitBinaryPath() string {
 	return defaultDevkitBinaryPath
 }
 
-// devkitCollectInterval 返回异步采集 ticker 周期。
-func devkitCollectInterval() time.Duration {
-	if raw := os.Getenv(devkitCollectIntervalEnv); raw != "" {
-		if secs, err := time.ParseDuration(raw + "s"); err == nil && secs > 0 {
-			return secs
-		}
+// parseDevkitCollectInterval parses the environment value as a positive integer
+// number of seconds and rejects unit suffixes, fractions and overflow.
+func parseDevkitCollectInterval(raw string) (time.Duration, error) {
+	if raw == "" {
+		return defaultDevkitInterval, nil
 	}
-	return defaultDevkitInterval
+
+	if !devkitCollectIntervalPattern.MatchString(raw) {
+		return 0, fmt.Errorf("must be a positive integer number of seconds")
+	}
+	secs, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || secs <= 0 {
+		return 0, fmt.Errorf("must be a positive integer number of seconds")
+	}
+	const maxDurationSeconds = int64((1<<63 - 1) / int64(time.Second))
+	if secs > maxDurationSeconds {
+		return 0, fmt.Errorf("exceeds the maximum supported duration")
+	}
+	return time.Duration(secs) * time.Second, nil
+}
+
+// devkitCollectInterval returns the async collection ticker period.
+func devkitCollectInterval() time.Duration {
+	interval, err := parseDevkitCollectInterval(os.Getenv(devkitCollectIntervalEnv))
+	if err != nil {
+		return defaultDevkitInterval
+	}
+	return interval
 }
 
 // newDevkitConfigWatcher 构造并启动 ConfigMap Watcher。
 // 若集群内配置不可用（如本地运行、无 ServiceAccount），返回的 watcher 仍可用，
 // 只是始终提供默认配置，保证采集器不因缺少 ConfigMap 而无法启动。
 func newDevkitConfigWatcher(logger *slog.Logger) *DevkitConfigWatcher {
-	warnDevkitCapacity(logger, devkitCollectInterval())
+	interval, err := parseDevkitCollectInterval(os.Getenv(devkitCollectIntervalEnv))
+	if err != nil {
+		logger.Warn("devkit_collect_interval_invalid",
+			"env", devkitCollectIntervalEnv,
+			"value", os.Getenv(devkitCollectIntervalEnv),
+			"reason", err,
+			"fallback_seconds", defaultDevkitInterval/time.Second,
+		)
+		interval = defaultDevkitInterval
+	}
+	warnDevkitCapacity(logger, interval)
 
 	namespace := os.Getenv(devkitConfigNamespaceEnv)
 	if namespace == "" {
