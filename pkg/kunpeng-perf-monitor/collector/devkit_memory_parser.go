@@ -205,7 +205,7 @@ func parseMemoryCacheMiss(reportText string) ([]memoryCacheMiss, error) {
 	}
 	for _, component := range []string{"l1d", "l1i", "l2d", "l2i"} {
 		if _, ok := seen[component]; !ok {
-			return nil, fmt.Errorf("Cache Miss is missing required component: %s", component)
+			return nil, fmt.Errorf("required Cache Miss component is missing: %s", component)
 		}
 	}
 	return result, nil
@@ -269,7 +269,7 @@ func parseMemoryAccess(reportText string) ([]memoryAccessCell, error) {
 		cpu := prefix[1]
 		matches := memAccessCell.FindAllStringSubmatch(prefix[2], -1)
 		if len(matches) != len(components) {
-			return nil, fmt.Errorf("Access row has %d cells, expected %d: %q", len(matches), len(components), rawLine)
+			return nil, fmt.Errorf("invalid Access row: got %d cells, expected %d: %q", len(matches), len(components), rawLine)
 		}
 		for i, component := range components {
 			key := cpu + "|" + component
@@ -298,7 +298,7 @@ func parseMemoryAccess(reportText string) ([]memoryAccessCell, error) {
 		}
 	}
 	if len(cells) == 0 {
-		return nil, fmt.Errorf("Access table has no valid data rows")
+		return nil, fmt.Errorf("no valid data rows in Access table")
 	}
 	return cells, nil
 }
@@ -310,7 +310,7 @@ func memoryAccessHeader(lines []string) (int, []string, error) {
 		if strings.HasPrefix(stripped, "CPU") {
 			columns := strings.Fields(stripped)
 			if len(columns) < 2 {
-				return 0, nil, fmt.Errorf("Access header is missing component columns")
+				return 0, nil, fmt.Errorf("component columns are missing from Access header")
 			}
 			components := make([]string, 0, len(columns)-1)
 			for _, col := range columns[1:] {
@@ -319,7 +319,7 @@ func memoryAccessHeader(lines []string) (int, []string, error) {
 			return index, components, nil
 		}
 	}
-	return 0, nil, fmt.Errorf("Access table is missing CPU header")
+	return 0, nil, fmt.Errorf("missing CPU header in Access table")
 }
 
 // parseMemoryL3 解析 L3 表：NODE + CCL（-- 规范为 all）。

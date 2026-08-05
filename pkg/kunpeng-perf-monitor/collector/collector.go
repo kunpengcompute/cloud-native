@@ -120,6 +120,12 @@ func NewNodeCollector(logger *slog.Logger, filters ...string) (*NodeCollector, e
 		f[filter] = true
 	}
 	collectors := make(map[string]Collector)
+	devkitSelected := len(f) == 0 || f["devkit-topdown"] || f["devkit-memory"]
+	devkitEnabled := (collectorState["devkit-topdown"] != nil && *collectorState["devkit-topdown"]) ||
+		(collectorState["devkit-memory"] != nil && *collectorState["devkit-memory"])
+	if devkitSelected && devkitEnabled {
+		initializeSharedDevkitConfigWatcher(logger)
+	}
 	initiatedCollectorsMtx.Lock()
 	defer initiatedCollectorsMtx.Unlock()
 	for key, enabled := range collectorState {

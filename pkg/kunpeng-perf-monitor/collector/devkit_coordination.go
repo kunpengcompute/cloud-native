@@ -93,15 +93,15 @@ func parseDevkitAttemptMetadata(args []string) (devkitAttemptMetadata, error) {
 	case "memory":
 		for flag := range values {
 			if flag != "-d" && flag != "-m" && flag != "-P" && flag != "-c" {
-				return devkitAttemptMetadata{}, fmt.Errorf("Memory argv contains unsupported argument: %s", flag)
+				return devkitAttemptMetadata{}, fmt.Errorf("unsupported argument in Memory argv: %s", flag)
 			}
 		}
 		if values["-m"] != "1" {
-			return devkitAttemptMetadata{}, fmt.Errorf("Memory metric must be 1")
+			return devkitAttemptMetadata{}, fmt.Errorf("invalid Memory metric: must be 1")
 		}
 		period, parseErr := strconv.Atoi(values["-P"])
 		if parseErr != nil || (period != 100 && period != 1000) {
-			return devkitAttemptMetadata{}, fmt.Errorf("Memory period is invalid: %q", values["-P"])
+			return devkitAttemptMetadata{}, fmt.Errorf("invalid Memory period: %q", values["-P"])
 		}
 		metadata.periodMilliseconds = period
 		if cpu := values["-c"]; cpu != "" {

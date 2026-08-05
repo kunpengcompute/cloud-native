@@ -353,7 +353,7 @@ func validateTopdownTree(nodes []topdownNode) error {
 	}
 	for _, required := range []string{"backend_bound.core_bound", "backend_bound.memory_bound"} {
 		if _, ok := paths[required]; !ok {
-			return fmt.Errorf("Backend Bound subtree is incomplete; missing: %s", required)
+			return fmt.Errorf("incomplete Backend Bound subtree; missing: %s", required)
 		}
 	}
 	return nil
