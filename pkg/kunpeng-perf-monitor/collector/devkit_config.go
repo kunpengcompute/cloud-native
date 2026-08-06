@@ -45,7 +45,7 @@ const (
 	// devkitCollectIntervalEnv 是异步采集 ticker 周期（秒），建议等于 scrape_interval。
 	devkitCollectIntervalEnv = "DEVKIT_COLLECT_INTERVAL"
 
-	defaultDevkitBinaryPath   = "/usr/local/devkit/devkit"
+	defaultDevkitBinaryPath   = "/opt/devkit/devkit"
 	defaultDevkitConfigName   = "kunpeng-perf-monitor-devkit-config"
 	defaultDevkitDuration     = 3
 	defaultDevkitMemoryPeriod = 1000
