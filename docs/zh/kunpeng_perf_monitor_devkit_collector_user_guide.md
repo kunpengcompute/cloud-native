@@ -347,7 +347,7 @@ spec:
     http://<node-ip>:<grafana-node-port>/
     ```
 
-2. 登录 Grafana。默认用户名密码为 `admin/admin`。
+2. 登录 Grafana。默认用户名密码为 `admin/admin`，登录后会要求修改密码，建议修改为复杂密码。
 3. 查询相关指标。
    如下图所示，在左侧导航栏选择 **Explore**，然后点击 **Metric**，输入 `devkit`便会自动列出所有相关指标，选择其中一个，最后点击 **Run query** 即可查看指标趋势图。
 
