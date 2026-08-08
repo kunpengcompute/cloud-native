@@ -81,9 +81,21 @@ spec:
         - --collector.devkit-topdown
         - --collector.devkit-memory
         - --web.listen-address=:9100
+        env:
+        - name: DEVKIT_BINARY_PATH
+          value: /opt/devkit/devkit
         ports:
         - name: metrics
           containerPort: 9100
+        # 初始资源边界：保留 2 个 CPU 核，避免 PMU/Tuner 采集过程被过度 throttling；
+        # 内存上限覆盖 exporter、单个串行 Tuner 子进程和报告缓冲区。
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: "2"
+            memory: 512Mi
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false
