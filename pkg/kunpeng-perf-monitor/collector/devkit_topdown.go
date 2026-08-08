@@ -19,7 +19,6 @@ package collector
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strconv"
 	"sync/atomic"
@@ -48,6 +47,7 @@ type devkitTopdownCollector struct {
 	collecting atomic.Bool
 	runCommand devkitCommandRunner
 	logger     *slog.Logger
+	logState   *devkitCollectionLogState
 }
 
 func init() {
@@ -104,7 +104,9 @@ func NewDevkitTopdownCollector(logger *slog.Logger) (Collector, error) {
 		interval:   devkitCollectInterval(),
 		runCommand: runDevkitCommand,
 		logger:     logger,
+		logState:   newDevkitCollectionLogState(logger, "devkit-topdown"),
 	}
+	logger.Info("devkit_collector_started", "collector", "devkit-topdown", "binary_path", c.binaryPath, "interval_seconds", c.interval.Seconds())
 	go c.collectLoop()
 	return c, nil
 }
@@ -164,26 +166,29 @@ func (c *devkitTopdownCollector) collectOnce() {
 
 	cfg := c.watcher.load().Topdown
 	args := topdownCommandArgs(cfg)
+	logState := c.collectionLogState()
 	attempt, metadataErr := parseDevkitAttemptMetadata(args)
 	if metadataErr != nil {
-		c.logger.Error("devkit-topdown: current argv metadata is invalid", "err", metadataErr, "cli_args", args)
+		logAttempt := logState.start(0, c.binaryPath, args)
+		logState.finish(logAttempt, newDevkitCollectionFailure("argv_metadata", metadataErr))
 		return
 	}
 	var cache *topdownMetricCache
-	roundID, err := sharedDevkitCollectionCoordinator.run(
-		c.logger,
-		"devkit-topdown",
+	_, err := sharedDevkitCollectionCoordinator.run(
+		logState,
 		c.binaryPath,
 		args,
-		func(_ uint64) error {
+		func(roundID uint64) error {
 			output, runErr := c.runCLI(cfg, args)
 			if runErr != nil {
-				return fmt.Errorf("CLI execution failed: %w", runErr)
+				return newDevkitCollectionFailure("cli_execution", runErr)
 			}
+			logState.debugCLIOutput(roundID, "stdout", output)
 			parsed, parseErr := parseTopdownOutput(output, attempt, c.logger)
 			if parseErr != nil {
-				return fmt.Errorf("parse failed: %w", parseErr)
+				return newDevkitCollectionFailure("parse", parseErr)
 			}
+			logState.debugParseSummary(roundID, "nodes", len(parsed.nodes), "pmu_events", len(parsed.pmuEvents))
 			cache = parsed
 			return nil
 		},
@@ -195,12 +200,19 @@ func (c *devkitTopdownCollector) collectOnce() {
 		"level", 0,
 	)
 	if err != nil {
-		c.logger.Error("devkit-topdown: current collection failed", "round_id", roundID, "err", err)
 		c.storeFailure(attempt)
 		return
 	}
 	cache.lastSuccessTime = float64(time.Now().Unix())
 	c.cache.Store(cache)
+}
+
+func (c *devkitTopdownCollector) collectionLogState() *devkitCollectionLogState {
+	// 测试或特殊构造可能未注入 logState；懒初始化保持与生产 factory 相同的日志合同。
+	if c.logState == nil {
+		c.logState = newDevkitCollectionLogState(c.logger, "devkit-topdown")
+	}
+	return c.logState
 }
 
 // runCLI 组装并执行 top-down 命令，超时 = duration + 5s，防止 CLI hang。

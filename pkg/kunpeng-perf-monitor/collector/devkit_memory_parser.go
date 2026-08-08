@@ -533,6 +533,7 @@ func crossCheckMemory(cache *memoryMetricCache, logger *slog.Logger) {
 }
 
 func warnMemoryAggregateMismatch(logger *slog.Logger, table, node, metric string, total, sum float64) {
+	// 汇总值只是明细一致性诊断；超差记录 Warning，但不丢弃仍可用的明细指标。
 	if logger == nil {
 		return
 	}
@@ -548,6 +549,7 @@ func warnMemoryAggregateMismatch(logger *slog.Logger, table, node, metric string
 }
 
 func absFloat(v float64) float64 {
+	// 交叉校验只需要绝对差值，避免引入会改变 NaN/Inf 语义的额外转换。
 	if v < 0 {
 		return -v
 	}

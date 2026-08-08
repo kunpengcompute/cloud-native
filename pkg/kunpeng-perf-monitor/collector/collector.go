@@ -119,11 +119,33 @@ func NewNodeCollector(logger *slog.Logger, filters ...string) (*NodeCollector, e
 		}
 		f[filter] = true
 	}
+	isEnabled := func(name string) bool {
+		enabled := collectorState[name]
+		return enabled != nil && *enabled && (len(f) == 0 || f[name])
+	}
+	pmuEnabled := isEnabled("pmu")
+	topdownEnabled := isEnabled("devkit-topdown")
+	memoryEnabled := isEnabled("devkit-memory")
+	// DevKit 的环境错误是静态启动错误，应在创建 watcher 和后台 goroutine 前失败。
+	if topdownEnabled || memoryEnabled {
+		if err := validateDevkitEnvironment(); err != nil {
+			return nil, fmt.Errorf("invalid DevKit environment: %w", err)
+		}
+	}
+	// PMU 与 DevKit 共享硬件计数器，但用户显式选择优先于精度建议：这里只告警，
+	// 不静默关闭 Collector，也不把可运行组合强制判为初始化失败。
+	if pmuEnabled && (topdownEnabled || memoryEnabled) {
+		logger.Warn(
+			"pmu_devkit_accuracy_warning",
+			"risk", "PMU and DevKit collectors share hardware PMU resources; collected data may be inaccurate",
+			"action", "continuing with the requested collector set",
+			"pmu_enabled", pmuEnabled,
+			"devkit_topdown_enabled", topdownEnabled,
+			"devkit_memory_enabled", memoryEnabled,
+		)
+	}
 	collectors := make(map[string]Collector)
-	devkitSelected := len(f) == 0 || f["devkit-topdown"] || f["devkit-memory"]
-	devkitEnabled := (collectorState["devkit-topdown"] != nil && *collectorState["devkit-topdown"]) ||
-		(collectorState["devkit-memory"] != nil && *collectorState["devkit-memory"])
-	if devkitSelected && devkitEnabled {
+	if topdownEnabled || memoryEnabled {
 		initializeSharedDevkitConfigWatcher(logger)
 	}
 	initiatedCollectorsMtx.Lock()

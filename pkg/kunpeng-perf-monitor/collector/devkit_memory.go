@@ -19,7 +19,6 @@ package collector
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strconv"
 	"sync/atomic"
@@ -50,6 +49,8 @@ type devkitMemoryCollector struct {
 	collecting    atomic.Bool
 	runCommand    devkitCommandRunner
 	logger        *slog.Logger
+	interval      time.Duration
+	logState      *devkitCollectionLogState
 }
 
 func init() {
@@ -125,7 +126,10 @@ func NewDevkitMemoryCollector(logger *slog.Logger) (Collector, error) {
 		binaryPath:    devkitBinaryPath(),
 		runCommand:    runDevkitCommand,
 		logger:        logger,
+		interval:      devkitCollectInterval(),
+		logState:      newDevkitCollectionLogState(logger, "devkit-memory"),
 	}
+	logger.Info("devkit_collector_started", "collector", "devkit-memory", "binary_path", c.binaryPath, "interval_seconds", c.interval.Seconds())
 	go c.collectLoop()
 	return c, nil
 }
@@ -133,7 +137,7 @@ func NewDevkitMemoryCollector(logger *slog.Logger) (Collector, error) {
 // collectLoop 是后台异步采集循环：立即采一次，随后按 ticker 周期采集。
 func (c *devkitMemoryCollector) collectLoop() {
 	c.collectOnce()
-	ticker := time.NewTicker(devkitCollectInterval())
+	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
 	for range ticker.C {
 		c.collectOnce()
@@ -150,27 +154,34 @@ func (c *devkitMemoryCollector) collectOnce() {
 
 	cfg := c.configWatcher.load().Memory
 	args := memoryCommandArgs(cfg)
+	logState := c.collectionLogState()
 	attempt, metadataErr := parseDevkitAttemptMetadata(args)
 	if metadataErr != nil {
-		c.logger.Error("devkit-memory: current argv metadata is invalid", "err", metadataErr, "cli_args", args)
+		logAttempt := logState.start(0, c.binaryPath, args)
+		logState.finish(logAttempt, newDevkitCollectionFailure("argv_metadata", metadataErr))
 		return
 	}
 	var parsed *memoryMetricCache
-	roundID, err := sharedDevkitCollectionCoordinator.run(
-		c.logger,
-		"devkit-memory",
+	_, err := sharedDevkitCollectionCoordinator.run(
+		logState,
 		c.binaryPath,
 		args,
-		func(_ uint64) error {
+		func(roundID uint64) error {
 			output, runErr := c.runCLI(cfg, args)
 			if runErr != nil {
-				return fmt.Errorf("CLI execution failed: %w", runErr)
+				return newDevkitCollectionFailure("cli_execution", runErr)
 			}
+			logState.debugCLIOutput(roundID, "stdout", output)
 			parsedOutput, parseErr := parseMemoryOutput(output, attempt, c.logger)
 			if parseErr != nil {
-				return fmt.Errorf("parse failed: %w", parseErr)
+				return newDevkitCollectionFailure("parse", parseErr)
 			}
 			crossCheckMemory(parsedOutput, c.logger)
+			logState.debugParseSummary(roundID,
+				"cache_miss", len(parsedOutput.cacheMiss),
+				"l3_rows", len(parsedOutput.l3),
+				"ddrc_cells", len(parsedOutput.ddrc),
+			)
 			parsed = parsedOutput
 			return nil
 		},
@@ -182,14 +193,19 @@ func (c *devkitMemoryCollector) collectOnce() {
 		"period_milliseconds", cfg.Period,
 	)
 	if err != nil {
-		c.logger.Error("devkit-memory: current collection failed; stored lightweight failure state", "round_id", roundID, "err", err)
 		c.markFailure(attempt)
 		return
 	}
 	parsed.lastSuccessTime = float64(time.Now().Unix())
 	c.cache.Store(parsed)
-	c.logger.Debug("devkit-memory: collection succeeded", "target_type", attempt.targetType, "target", attempt.target,
-		"cache_miss", len(parsed.cacheMiss), "l3_rows", len(parsed.l3), "ddrc_cells", len(parsed.ddrc))
+}
+
+func (c *devkitMemoryCollector) collectionLogState() *devkitCollectionLogState {
+	// 测试或特殊构造可能未注入 logState；懒初始化保持与生产 factory 相同的日志合同。
+	if c.logState == nil {
+		c.logState = newDevkitCollectionLogState(c.logger, "devkit-memory")
+	}
+	return c.logState
 }
 
 // runCLI 执行 memory 命令，超时 = duration + 5s，防止 CLI hang。

@@ -17,8 +17,12 @@
 package collector
 
 import (
+	"bytes"
 	"errors"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/alecthomas/kingpin/v2"
 	. "github.com/onsi/ginkgo/v2"
@@ -116,6 +120,43 @@ var _ = Describe("NodeCollector Internal", func() {
 			Expect(parse([]string{"--no-collector.good"})).To(Succeed())
 			_, err := NewNodeCollector(logger, "good")
 			Expect(err).To(MatchError(ContainSubstring("disabled collector: good")))
+		})
+
+		It("warns without rejecting when PMU and DevKit collectors are both enabled", func() {
+			RegisterCollector("pmu", true, factoryOK)
+			RegisterCollector("devkit-topdown", false, factoryOK)
+			RegisterCollector("devkit-memory", false, factoryOK)
+			Expect(parse([]string{"--collector.devkit-topdown"})).To(Succeed())
+
+			DeferCleanup(func() {
+				sharedDevkitConfigWatcherProvider = devkitConfigWatcherProvider{newWatcher: newDevkitConfigWatcher}
+			})
+			sharedDevkitConfigWatcherProvider = devkitConfigWatcherProvider{
+				newWatcher: func(*slog.Logger) *DevkitConfigWatcher { return &DevkitConfigWatcher{} },
+			}
+			binaryPath := filepath.Join(GinkgoT().TempDir(), "devkit")
+			Expect(os.WriteFile(binaryPath, []byte("#!/bin/sh\n"), 0o755)).To(Succeed())
+			GinkgoT().Setenv(devkitBinaryPathEnv, binaryPath)
+			var logs bytes.Buffer
+			testLogger := slog.New(slog.NewTextHandler(&logs, nil))
+
+			nc, err := NewNodeCollector(testLogger, "pmu", "devkit-topdown")
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nc.Collectors).To(HaveKey("pmu"))
+			Expect(nc.Collectors).To(HaveKey("devkit-topdown"))
+			Expect(logs.String()).To(ContainSubstring("pmu_devkit_accuracy_warning"))
+			Expect(strings.ToLower(logs.String())).To(ContainSubstring("inaccurate"))
+		})
+
+		It("rejects an invalid DevKit environment before creating collectors", func() {
+			RegisterCollector("devkit-topdown", false, factoryOK)
+			Expect(parse([]string{"--collector.devkit-topdown"})).To(Succeed())
+			GinkgoT().Setenv(devkitBinaryPathEnv, filepath.Join(GinkgoT().TempDir(), "missing"))
+
+			_, err := NewNodeCollector(logger, "devkit-topdown")
+
+			Expect(err).To(MatchError(ContainSubstring("invalid DevKit environment")))
 		})
 	})
 

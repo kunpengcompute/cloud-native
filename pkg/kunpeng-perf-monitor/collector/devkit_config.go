@@ -18,17 +18,23 @@ package collector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -57,14 +63,13 @@ const (
 	devkitNominalCapacityBudget = 11 * time.Second
 )
 
-// cpuRangePattern 校验 CPU 范围，如 "0" "0,1,2" "0-31" "10,80,89-99"。
-var cpuRangePattern = regexp.MustCompile(`^\d+(-\d+)?(,\d+(-\d+)?)*$`)
-
 // devkitCollectIntervalPattern restricts the environment value to ASCII digits.
 var devkitCollectIntervalPattern = regexp.MustCompile(`^[0-9]+$`)
 
-// pidListPattern 校验 PID 列表，仅接受纯数字或逗号分隔的数字列表，拒绝 "ALL"。
-var pidListPattern = regexp.MustCompile(`^\d+(,\d+)*$`)
+// maxDevkitCollectIntervalSeconds 是业务 freshness 上限，不是 time.Duration
+// 的表示上限。超过该值回退默认周期，避免错误配置让数据长时间不刷新。
+// 保留为包级变量，便于测试精确覆盖业务边界。
+var maxDevkitCollectIntervalSeconds int64 = 3600
 
 // DevkitTopdownConfig 是 top-down 采集器的配置合同。
 // 采集范围只支持 cpu/pid（互斥），-L 恒为 0，不提供 cgroup、profileLevel 字段。
@@ -111,14 +116,23 @@ func (c *DevkitConfig) validate() error {
 	if c.Topdown.CPU != "" && c.Topdown.PID != "" {
 		return fmt.Errorf("topdown CPU and PID are mutually exclusive")
 	}
-	if c.Topdown.CPU != "" && !cpuRangePattern.MatchString(c.Topdown.CPU) {
-		return fmt.Errorf("topdown CPU range has invalid format: %q", c.Topdown.CPU)
+	// 同一次整份配置校验复用宿主机 CPU 上限，避免 TopDown 与 Memory
+	// 因两次读取 possible 文件得到不一致的判定。
+	maxCPU := devkitMaxCPU()
+	if c.Topdown.CPU != "" {
+		if _, err := canonicalizeDevkitCPUSelector(c.Topdown.CPU, maxCPU); err != nil {
+			return fmt.Errorf("topdown CPU selector is invalid: %w", err)
+		}
 	}
-	if c.Topdown.PID != "" && !pidListPattern.MatchString(c.Topdown.PID) {
-		return fmt.Errorf("topdown PID accepts only a number or a comma-separated number list: %q", c.Topdown.PID)
+	if c.Topdown.PID != "" {
+		if _, err := canonicalizeDevkitPIDSelector(c.Topdown.PID, devkitMaxPID()); err != nil {
+			return fmt.Errorf("topdown PID selector is invalid: %w", err)
+		}
 	}
-	if c.Memory.CPU != "" && !cpuRangePattern.MatchString(c.Memory.CPU) {
-		return fmt.Errorf("memory CPU range has invalid format: %q", c.Memory.CPU)
+	if c.Memory.CPU != "" {
+		if _, err := canonicalizeDevkitCPUSelector(c.Memory.CPU, maxCPU); err != nil {
+			return fmt.Errorf("memory CPU selector is invalid: %w", err)
+		}
 	}
 	if c.Memory.Period != 100 && c.Memory.Period != 1000 {
 		return fmt.Errorf("memory period must be 100 or 1000: %d", c.Memory.Period)
@@ -147,6 +161,9 @@ func (c DevkitConfig) withDefaults() DevkitConfig {
 	return c
 }
 
+// parseDevkitConfig 先严格解码 YAML，再按“缺失字段使用默认值、显式非法值拒绝”
+// 的顺序归一化 duration/period，最后校验 selector 和字段组合；任何一步失败都
+// 返回空配置，由 Watcher 保留上一份 last-known-good。
 func parseDevkitConfig(raw []byte) (DevkitConfig, error) {
 	var decoded rawDevkitConfig
 	if err := yaml.UnmarshalStrict(raw, &decoded); err != nil {
@@ -183,6 +200,8 @@ func parseDevkitConfig(raw []byte) (DevkitConfig, error) {
 	return cfg.withDefaults(), nil
 }
 
+// normalizeDevkitMemoryPeriod 用指针区分 period 缺失和显式 0，避免把用户的
+// 非法显式值误当成默认值；duration=1 时只有缺失或 100 合法。
 func normalizeDevkitMemoryPeriod(duration int, value *int) (int, error) {
 	if value == nil {
 		if duration == 1 {
@@ -199,6 +218,8 @@ func normalizeDevkitMemoryPeriod(duration int, value *int) (int, error) {
 	return *value, nil
 }
 
+// normalizeDevkitDuration 只处理字段缺失和 1..5 的显式整数，默认值填充后
+// 仍会由 DevkitConfig.validate 做 selector/组合校验。
 func normalizeDevkitDuration(section string, value *int) (int, error) {
 	if value == nil {
 		return defaultDevkitDuration, nil
@@ -217,6 +238,10 @@ type DevkitConfigWatcher struct {
 	name      string
 	config    atomic.Pointer[DevkitConfig]
 	logger    *slog.Logger
+
+	configLogMu      sync.Mutex
+	hasLoggedConfig  bool
+	lastLoggedConfig DevkitConfig
 }
 
 // devkitConfigWatcherProvider ensures TopDown and Memory share one informer,
@@ -228,6 +253,8 @@ type devkitConfigWatcherProvider struct {
 }
 
 func (p *devkitConfigWatcherProvider) get(logger *slog.Logger) *DevkitConfigWatcher {
+	// sync.Once 保证 TopDown 与 Memory 共享同一 clientset、Informer 和初始同步，
+	// 避免两个 watcher 对同一个 ConfigMap 产生竞态或重复 API 流量。
 	p.once.Do(func() {
 		p.watcher = p.newWatcher(logger)
 	})
@@ -239,6 +266,7 @@ var sharedDevkitConfigWatcherProvider = devkitConfigWatcherProvider{
 }
 
 func getSharedDevkitConfigWatcher(logger *slog.Logger) *DevkitConfigWatcher {
+	// 统一入口便于 Collector factory 复用进程级 watcher；调用方不应自行 new watcher。
 	return sharedDevkitConfigWatcherProvider.get(logger)
 }
 
@@ -257,8 +285,78 @@ func devkitBinaryPath() string {
 	return defaultDevkitBinaryPath
 }
 
-// parseDevkitCollectInterval parses the environment value as a positive integer
-// number of seconds and rejects unit suffixes, fractions and overflow.
+func devkitConfigNamespace() string {
+	// namespace/name 是部署环境选择，不是 ConfigMap 内容；未设置时使用设计默认位置。
+	if namespace := os.Getenv(devkitConfigNamespaceEnv); namespace != "" {
+		return namespace
+	}
+	return "default"
+}
+
+func devkitConfigName() string {
+	if name := os.Getenv(devkitConfigNameEnv); name != "" {
+		return name
+	}
+	return defaultDevkitConfigName
+}
+
+// validateDevkitEnvironment 在后台采集循环和 Kubernetes Informer 启动前
+// 拒绝静态环境错误。API/RBAC 暂不可用不属于这里的静态错误，由 watcher
+// 保留默认配置并按既有重试策略处理。
+func validateDevkitEnvironment() error {
+	var validationErrors []error
+	if err := validateDevkitBinaryPath(devkitBinaryPath()); err != nil {
+		validationErrors = append(validationErrors, fmt.Errorf("%s: %w", devkitBinaryPathEnv, err))
+	}
+	if err := validateDevkitConfigLocation(devkitConfigNamespace(), devkitConfigName()); err != nil {
+		validationErrors = append(validationErrors, err)
+	}
+	return errors.Join(validationErrors...)
+}
+
+// validateDevkitBinaryPath 在启动边界检查可执行文件的路径、类型和执行位，
+// 让静态部署错误直接失败，而不是延迟到每一轮 CLI 执行才暴露。
+func validateDevkitBinaryPath(path string) error {
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("binary path must be absolute: %q", path)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("stat binary path %q: %w", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("binary path must be a regular file: %q", path)
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		return fmt.Errorf("binary path must be executable: %q", path)
+	}
+	return nil
+}
+
+// validateDevkitConfigLocation 使用 Kubernetes DNS 规则校验 namespace/name；
+// 它不检查 API/RBAC 可用性，后者由 watcher 的默认配置 fallback 负责。
+func validateDevkitConfigLocation(namespace, name string) error {
+	var validationErrors []error
+	if reasons := utilvalidation.IsDNS1123Label(namespace); len(reasons) > 0 {
+		validationErrors = append(validationErrors, fmt.Errorf(
+			"%s namespace %q is invalid: %s", devkitConfigNamespaceEnv, namespace, strings.Join(reasons, "; "),
+		))
+	}
+	if reasons := utilvalidation.IsDNS1123Subdomain(name); len(reasons) > 0 {
+		validationErrors = append(validationErrors, fmt.Errorf(
+			"%s ConfigMap name %q is invalid: %s", devkitConfigNameEnv, name, strings.Join(reasons, "; "),
+		))
+	}
+	return errors.Join(validationErrors...)
+}
+
+func devkitConfigFieldSelector(name string) string {
+	// 使用 Kubernetes 的结构化 selector 构造器，避免手工拼接对象名改变语义。
+	return fields.OneTermEqualSelector("metadata.name", name).String()
+}
+
+// parseDevkitCollectInterval 只解析以秒为单位的 ASCII 正整数，明确拒绝
+// "15s"、"5m"、小数、符号和溢出值，避免出现多种单位解释。
 func parseDevkitCollectInterval(raw string) (time.Duration, error) {
 	if raw == "" {
 		return defaultDevkitInterval, nil
@@ -270,6 +368,9 @@ func parseDevkitCollectInterval(raw string) (time.Duration, error) {
 	secs, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || secs <= 0 {
 		return 0, fmt.Errorf("must be a positive integer number of seconds")
+	}
+	if secs > maxDevkitCollectIntervalSeconds {
+		return 0, fmt.Errorf("business_limit: must not exceed %d seconds", maxDevkitCollectIntervalSeconds)
 	}
 	const maxDurationSeconds = int64((1<<63 - 1) / int64(time.Second))
 	if secs > maxDurationSeconds {
@@ -303,14 +404,8 @@ func newDevkitConfigWatcher(logger *slog.Logger) *DevkitConfigWatcher {
 	}
 	warnDevkitCapacity(logger, interval)
 
-	namespace := os.Getenv(devkitConfigNamespaceEnv)
-	if namespace == "" {
-		namespace = "default"
-	}
-	name := os.Getenv(devkitConfigNameEnv)
-	if name == "" {
-		name = defaultDevkitConfigName
-	}
+	namespace := devkitConfigNamespace()
+	name := devkitConfigName()
 
 	w := &DevkitConfigWatcher{
 		namespace: namespace,
@@ -343,7 +438,7 @@ func (w *DevkitConfigWatcher) start(ctx context.Context) {
 		0,
 		informers.WithNamespace(w.namespace),
 		informers.WithTweakListOptions(func(opts *metav1.ListOptions) {
-			opts.FieldSelector = fmt.Sprintf("metadata.name=%s", w.name)
+			opts.FieldSelector = devkitConfigFieldSelector(w.name)
 		}),
 	)
 	informer := factory.Core().V1().ConfigMaps().Informer()
@@ -374,6 +469,8 @@ func (w *DevkitConfigWatcher) start(ctx context.Context) {
 }
 
 func warnDevkitCapacity(logger *slog.Logger, interval time.Duration) {
+	// 11 秒是 duration 上界（两个 5 秒 CLI 加 1 秒余量）的健康路径预算；
+	// interval 较小时只提示容量风险，不阻止短周期采集启动。
 	if logger == nil || interval >= devkitNominalCapacityBudget {
 		return
 	}
@@ -405,10 +502,32 @@ func (w *DevkitConfigWatcher) onUpdate(obj interface{}) {
 		return
 	}
 	w.config.Store(&cfg)
-	w.logger.Info("devkit: collection configuration reloaded",
+	w.logAppliedConfig(cfg)
+}
+
+func (w *DevkitConfigWatcher) logAppliedConfig(cfg DevkitConfig) {
+	// 只在首次加载或实际值变化时记录 INFO；周期性重复通知降为 DEBUG，避免
+	// ConfigMap informer 重放事件淹没运行日志。
+	w.configLogMu.Lock()
+	defer w.configLogMu.Unlock()
+
+	fields := []any{
 		"topdown_cpu", cfg.Topdown.CPU, "topdown_pid", cfg.Topdown.PID, "topdown_duration", cfg.Topdown.Duration,
 		"memory_cpu", cfg.Memory.CPU, "memory_duration", cfg.Memory.Duration,
-		"memory_metric", 1, "memory_period", cfg.Memory.Period)
+		"memory_metric", 1, "memory_period", cfg.Memory.Period,
+	}
+	if !w.hasLoggedConfig {
+		w.hasLoggedConfig = true
+		w.lastLoggedConfig = cfg
+		w.logger.Info("devkit_config_loaded", fields...)
+		return
+	}
+	if reflect.DeepEqual(w.lastLoggedConfig, cfg) {
+		w.logger.Debug("devkit_config_unchanged", fields...)
+		return
+	}
+	w.lastLoggedConfig = cfg
+	w.logger.Info("devkit_config_changed", fields...)
 }
 
 // onDelete 保留最后一份有效配置。自动回退 system 默认值可能扩大采集范围，

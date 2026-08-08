@@ -20,12 +20,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log/slog"
 	"os/exec"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 )
+
+// devkitCommandWaitDelay 限制 context 取消后等待进程和管道回收的时间，
+// 防止子进程继承 stdout/stderr 后让 cmd.Wait() 无限阻塞。
+var devkitCommandWaitDelay = time.Second
 
 // devkitCommandRunner 是 DevKit CLI 的可替换执行边界。正式环境使用
 // runDevkitCommand，测试可注入确定性的 runner 而不启动外部进程。
@@ -119,14 +123,31 @@ func parseDevkitAttemptMetadata(args []string) (devkitAttemptMetadata, error) {
 // runDevkitCommand 执行 DevKit CLI，并在失败信息中保留 stderr 便于远程诊断。
 func runDevkitCommand(ctx context.Context, binaryPath string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, binaryPath, args...)
+	// DevKit 可能派生 perf 等子进程。为命令创建独立进程组，并覆盖 Cancel，
+	// 确保超时时终止整组进程，而不是只杀掉最外层 launcher。
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		if err == syscall.ESRCH {
+			return nil
+		}
+		return err
+	}
+	cmd.WaitDelay = devkitCommandWaitDelay
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		// stderr 只进入有界错误链；保留 ctx.Err() 作为 wrap 原因，便于上层
+		// 使用 errors.Is(err, context.DeadlineExceeded) 区分超时与普通退出。
+		boundedStderr, _ := truncateDevkitLogText(stderr.String(), maxDevkitDebugOutputCharacters)
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return "", fmt.Errorf("DevKit CLI timed out: %w (stderr: %s)", ctxErr, stderr.String())
+			return "", fmt.Errorf("DevKit CLI timed out: %w (stderr: %s)", ctxErr, boundedStderr)
 		}
-		return "", fmt.Errorf("%w (stderr: %s)", err, stderr.String())
+		return "", fmt.Errorf("%w (stderr: %s)", err, boundedStderr)
 	}
 	return stdout.String(), nil
 }
@@ -144,8 +165,7 @@ var sharedDevkitCollectionCoordinator devkitCollectionCoordinator
 // run 在共享采集门内执行一次完整的 CLI 与解析过程。锁的生命周期由本函数
 // 管理，调用方不能重复释放；即使日志或采集函数 panic，defer 也会释放全局门。
 func (c *devkitCollectionCoordinator) run(
-	logger *slog.Logger,
-	collector string,
+	logState *devkitCollectionLogState,
 	binaryPath string,
 	cliArgs []string,
 	collect func(roundID uint64) error,
@@ -156,40 +176,14 @@ func (c *devkitCollectionCoordinator) run(
 
 	c.nextRoundID++
 	roundID = c.nextRoundID
-	startedAt := time.Now()
-
-	fields := []any{
-		"collector", collector,
-		"round_id", roundID,
-		"binary_path", binaryPath,
-		"cli_args", append([]string(nil), cliArgs...),
-	}
-	fields = append(fields, configFields...)
-	if logger != nil {
-		logger.Info("collection_start", fields...)
-	}
+	attempt := logState.start(roundID, binaryPath, cliArgs, configFields...)
 
 	defer func() {
-		finishFields := append([]any(nil), fields...)
-		finishFields = append(finishFields, "elapsed_ms", time.Since(startedAt).Milliseconds())
-
 		if panicValue := recover(); panicValue != nil {
-			finishFields = append(finishFields, "status", "panic", "panic", panicValue)
-			if logger != nil {
-				logger.Error("collection_finish", finishFields...)
-			}
+			logState.recordPanic(attempt, panicValue)
 			panic(panicValue)
 		}
-
-		status := "success"
-		if err != nil {
-			status = "failed"
-			finishFields = append(finishFields, "error", err)
-		}
-		finishFields = append(finishFields, "status", status)
-		if logger != nil {
-			logger.Info("collection_finish", finishFields...)
-		}
+		logState.finish(attempt, err)
 	}()
 
 	err = collect(roundID)

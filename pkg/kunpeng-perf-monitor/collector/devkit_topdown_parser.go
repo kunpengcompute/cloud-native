@@ -105,11 +105,19 @@ func parseTopdownOutput(output string, attempt devkitAttemptMetadata, logger *sl
 		return nil, err
 	}
 	requested := topdownScope{targetType: attempt.targetType, target: attempt.targetValue}
-	if requested.targetType != "" && (reported.targetType != requested.targetType || reported.target != requested.target) {
-		return nil, fmt.Errorf(
-			"TopDown scope does not match current argv: requested_type=%s requested_target=%s reported_type=%s reported_target=%s",
-			requested.targetType, requested.target, reported.targetType, reported.target,
-		)
+	if requested.targetType != "" {
+		// CLI 可能把降序、重复或重叠 CPU raw 规范化后写入报告；这里只比较
+		// 临时 canonical 集合。指标 label 仍使用 attempt 中的 raw target。
+		scopeMatches, compareErr := devkitTopdownScopesEquivalent(requested, reported)
+		if compareErr != nil {
+			return nil, fmt.Errorf("compare TopDown scope with current argv: %w", compareErr)
+		}
+		if !scopeMatches {
+			return nil, fmt.Errorf(
+				"TopDown scope does not match current argv: requested_type=%s requested_target=%s reported_type=%s reported_target=%s",
+				requested.targetType, requested.target, reported.targetType, reported.target,
+			)
+		}
 	}
 	cycles, instructions, ipc, err := parseTopdownSummary(reportText)
 	if err != nil {
@@ -161,6 +169,8 @@ func selectLastTopdownReport(text string) (string, int, error) {
 }
 
 func parseTopdownScope(reportText string) (topdownScope, error) {
+	// scope 来自所选报告的业务标题，仅用于与 argv attempt 做集合等价比较；
+	// 指标 target 仍由 attempt metadata 提供，避免报告 Command 覆盖 raw target。
 	line := topdownScopeLinePattern.FindString(reportText)
 	if line == "" {
 		return topdownScope{}, fmt.Errorf("missing Top-down metrics of ... scope marker")
@@ -195,6 +205,7 @@ func parseTopdownSummary(reportText string) (uint64, uint64, float64, error) {
 	return cycles, instructions, ipc, nil
 }
 
+// requiredUintField 解析允许千位逗号的无符号计数，并保留 ParseUint 的溢出错误。
 func requiredUintField(text, field string) (uint64, error) {
 	pattern := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(field) + `\s+([\d,]+(?:\.\d+)?)\s*$`)
 	match := pattern.FindStringSubmatch(text)
@@ -209,6 +220,7 @@ func requiredUintField(text, field string) (uint64, error) {
 	return value, nil
 }
 
+// requiredFloatField 解析 Summary 中的十进制浮点字段；字段缺失与非法值均使整轮失败。
 func requiredFloatField(text, field string) (float64, error) {
 	pattern := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(field) + `\s+([\d,]+(?:\.\d+)?)\s*$`)
 	match := pattern.FindStringSubmatch(text)
@@ -359,6 +371,7 @@ func validateTopdownTree(nodes []topdownNode) error {
 	return nil
 }
 
+// keysOf 让错误信息中的缺失节点顺序保持稳定，便于日志比对和回归测试。
 func keysOf(m map[string]struct{}) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
