@@ -101,7 +101,7 @@ Go版本推荐 1.25，Docker daemon应处于可用状态。
        test -f /opt/devkit/tuner/lib/libkperf.so'
     ```
 
-    命令退出码为`0`且没有错误输出，说明镜像包含Collector运行所需文件。
+    命令退出码为`0`且没有错误输出，说明镜像包含DevKit Collector运行所需文件。
 
 5. 将镜像导出为tar包。
 
@@ -121,7 +121,7 @@ Go版本推荐 1.25，Docker daemon应处于可用状态。
 > **须知：**
 > 部署清单使用`imagePullPolicy: IfNotPresent`，可避免重复拉取镜像。如果导入镜像前环境内已有`kunpeng-perf-monitor:1.0`镜像，需要删除节点上的旧镜像或导入后确认镜像内容已经更新。
 
-## 部署Collector<a name="devkit-collector-deployment"></a>
+## 部署DevKit Collector<a name="devkit-collector-deployment"></a>
 
 本节命令在已经获取源码并能访问Kubernetes集群的控制节点上执行。首次使用时，建议先部署NodePort独立模式。
 
@@ -194,7 +194,7 @@ Go版本推荐 1.25，Docker daemon应处于可用状态。
 
 **（可选）部署Prometheus模式<a name="devkit-collector-prometheus-deployment"></a>**
 
-如果集群已经部署kube-Prometheus，并希望由Prometheus自动发现Collector并收集相关指标，可以执行以下步骤。
+如果集群已经部署kube-Prometheus，并希望由Prometheus自动发现DevKit Collector并收集相关指标，可以执行以下步骤。
 
 1. 检查`ServiceMonitor` CRD。
 
@@ -232,11 +232,11 @@ Go版本推荐 1.25，Docker daemon应处于可用状态。
 
     Service类型应为`ClusterIP`，ServiceMonitor的采集路径为`/metrics`，每个Ready Pod应对应一个endpoint。
 
-## 使用Collector<a name="devkit-collector-usage"></a>
+## 使用DevKit Collector<a name="devkit-collector-usage"></a>
 
 ### 验证指标采集<a name="devkit-collector-first-verification"></a>
 
-Collector启动后会立即开始首次采集。TopDown和Memory在同一个Pod中串行执行，建议在Pod就绪后等待约 15 秒，再检查指标。
+DevKit Collector启动后会立即开始首次采集。TopDown和Memory在同一个Pod中串行执行，建议在Pod就绪后等待约 15 秒，再检查指标。
 
 **NodePort独立模式<a name="devkit-collector-nodeport-verification"></a>**
 
@@ -308,7 +308,7 @@ Collector启动后会立即开始首次采集。TopDown和Memory在同一个Pod�
 
 **Grafana图形化查看指标<a name="devkit-collector-grafana"></a>**
 
-本节适用于已经部署kube-prometheus，并使用Prometheus模式 部署Collector的场景。NodePort独立模式只提供`/metrics`接口，不会自动将历史数据写入Prometheus，因此不能直接在Grafana中查看趋势图。
+本节适用于已经部署kube-prometheus，并使用Prometheus模式部署DevKit Collector的场景。NodePort独立模式只提供`/metrics`接口，不会自动将历史数据写入Prometheus，因此不能直接在Grafana中查看趋势图。
 
 **（可选）配置Prometheus和Grafana的NodePort**
 kube-prometheus默认部署时，Prometheus和Grafana的Service类型为ClusterIP，仅在集群内可访问。如果需要在外部访问这两个服务，需要将它们的类型改为NodePort。修改内容参考：
@@ -392,7 +392,7 @@ memory:
 - Memory不支持PID或cgroup采集范围。
 - `memory.duration`为`1`时，`memory.period`必须省略或设置为`100`。
 - TopDown profile level固定为`-L 0`，Memory metric固定为`-m 1`，用户不能通过ConfigMap修改。
-- 配置中包含未知字段、错误类型或非法值时，Collector会拒绝整份配置并继续使用上一份有效配置。
+- 配置中包含未知字段、错误类型或非法值时，DevKit Collector会拒绝整份配置并继续使用上一份有效配置。
 
 执行以下步骤修改采集范围。
 
@@ -426,7 +426,7 @@ memory:
       --dry-run=client -o yaml | kubectl apply -f -
     ```
 
-4. 查看Collector是否接受配置。
+4. 查看DevKit Collector是否接受配置。
 
     ```bash
     kubectl -n default logs \
@@ -434,11 +434,11 @@ memory:
       grep -E 'collection configuration reloaded|devkit_config_rejected'
     ```
 
-    出现`collection configuration reloaded`表示配置已经生效。出现`devkit_config_rejected`表示配置被拒绝，Collector会继续使用上一份有效配置。
+    出现`collection configuration reloaded`表示配置已经生效。出现`devkit_config_rejected`表示配置被拒绝，DevKit Collector会继续使用上一份有效配置。
 
 5. 等待下一轮采集（15-30s）后，再次查询相关指标。CPU `0-3`示例对应的标签应包含`target_type="cpu"`和`target="cpu0-3"`。
 
-如需恢复system采集范围，请将`topdown.cpu`、`topdown.pid`和`memory.cpu`都设置为空字符串，再整体更新ConfigMap。**删除ConfigMap不会恢复默认值**，Collector会继续使用上一份有效配置。
+如需恢复system采集范围，请将`topdown.cpu`、`topdown.pid`和`memory.cpu`都设置为空字符串，再整体更新ConfigMap。**删除ConfigMap不会恢复默认值**，DevKit Collector会继续使用上一份有效配置。
 
 **TopDown PID采集范围示例<a name="devkit-collector-pid-scope-example"></a>**
 
@@ -548,11 +548,11 @@ kunpeng_node_devkit_topdown_bound_percent{
 ```
 
 > **说明：**
-> Prometheus的`up=1`只表示HTTP scrape成功。判断DevKit后台采集是否成功时，应同时查询对应Collector的`collection_success`和`last_success_unixtime_seconds`。
+> Prometheus的`up=1`只表示HTTP scrape成功。判断DevKit Collector后台采集是否成功时，应同时查询对应采集器的`collection_success`和`last_success_unixtime_seconds`。
 
 ### 故障处理<a name="devkit-collector-troubleshooting"></a>
 
-1. 查看最近 10 分钟的Collector日志。
+1. 查看最近 10 分钟的DevKit Collector日志。
 
     ```bash
     kubectl -n default logs \
@@ -575,11 +575,11 @@ kunpeng_node_devkit_topdown_bound_percent{
     |ConfigMap修改不生效|YAML包含未知字段、字段类型或取值错误，或者TopDown CPU和PID冲突|查看`devkit_config_rejected`，修正后重新提交完整配置|
     |删除ConfigMap后没有恢复system采集范围|删除事件会保留上一份有效配置|重新提交CPU和PID均为空的完整配置|
     |Prometheus中没有target|ServiceMonitor未被Prometheus选中|检查Prometheus的`serviceMonitorSelector`、namespace selector和Service labels|
-    |Prometheus中`up=1`但业务采集失败|HTTP scrape正常，后台采集失败|查询两个Collector的`collection_success`和最近成功时间|
+    |Prometheus中`up=1`但业务采集失败|HTTP scrape正常，后台采集失败|查询两个采集器的`collection_success`和最近成功时间|
 
-DevKit Tuner CLI或结果解析失败时，Collector会将本轮`collection_success`设置为`0`，并停止发布本轮业务指标，避免把旧数据误认为当前数据。最近一次成功采集时间会保留；问题修复后，下一轮成功采集会重新发布业务指标。
+DevKit Tuner CLI或结果解析失败时，DevKit Collector会将本轮`collection_success`设置为`0`，并停止发布本轮业务指标，避免把旧数据误认为当前数据。最近一次成功采集时间会保留；问题修复后，下一轮成功采集会重新发布业务指标。
 
-## （可选）卸载Collector<a name="devkit-collector-uninstall"></a>
+## （可选）卸载DevKit Collector<a name="devkit-collector-uninstall"></a>
 
 根据当前部署模式选择对应命令。
 
@@ -605,4 +605,4 @@ DevKit Tuner CLI或结果解析失败时，Collector会将本轮`collection_succ
       | grep kunpeng-perf-monitor || true
     ```
 
-    没有回显结果，说明本文创建的Collector资源已经删除。
+    没有回显结果，说明本文创建的DevKit Collector资源已经删除。
