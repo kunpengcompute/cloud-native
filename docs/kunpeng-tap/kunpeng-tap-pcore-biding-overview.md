@@ -7,6 +7,7 @@
 当前骨架能力：
 
 - 白名单过滤（namespace/runtimeClass）。
+- 只对聚合 CPU limit 恰好为 `2` 的 Pod 执行收敛，CPU request 不参与过滤。
 - 扫描所有 Pod 的 `cpuset.cpus` 并收敛。
 - 固定目标：将 Pod 绑定到同物理核心的 2 个逻辑 CPU。
 - 同时收敛 Pod parent cgroup 和 kata sandbox cgroup，适配 containerd/kata 的 cgroup v1 路径形态。
@@ -48,6 +49,7 @@ Kubernetes 部署清单：
 
 - `config/kunpeng-tap-pcore-biding/test-pods.yaml`
 - 创建两个 `runtimeClassName: kata`、CPU request/limit 均为 `2` 的 Pod，用于验证 dry-run 模式下目标 sibling 规划不会重复。
+- `config/kunpeng-tap-pcore-biding/test-pods-cpu-limit.yaml` 创建 CPU limit 分别为 `1`、`2`、`4` 的三个 `kata-clh` Pod，用于验证只有 limit 为 `2` 的 Pod 被收敛；其中该 Pod 的 request 为 `1`，用于验证 request 不参与过滤。
 - 如果测试环境的 kata 配置不支持 CPU hotplug，Pod 可能进入 `StartError`；此时仍可通过插件日志确认 NRI 事件和 dry-run 目标规划是否生效。
 - `config/kunpeng-tap-pcore-biding/runtimeclass-cloud-hypervisor.yaml` 定义 `kata-clh` RuntimeClass。
 - `config/kunpeng-tap-pcore-biding/test-pods-cloud-hypervisor.yaml` 创建两个 `runtimeClassName: kata-clh` 的测试 Pod，用于 cloud-hypervisor 后端验证。

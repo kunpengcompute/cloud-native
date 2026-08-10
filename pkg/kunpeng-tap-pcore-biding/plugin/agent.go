@@ -35,8 +35,9 @@ import (
 )
 
 const (
-	PluginName = "kunpeng-tap-pcore-biding"
-	PluginIdx  = "01"
+	PluginName     = "kunpeng-tap-pcore-biding"
+	PluginIdx      = "01"
+	targetCPULimit = uint64(2)
 )
 
 // Config keeps only the settings needed by the initial pod-level binding flow.
@@ -61,11 +62,14 @@ func DefaultConfig() Config {
 }
 
 type podInfo struct {
-	id           string
-	name         string
-	namespace    string
-	runtimeClass string
-	cgroupPath   string
+	id            string
+	name          string
+	namespace     string
+	runtimeClass  string
+	cgroupPath    string
+	cpuQuota      int64
+	cpuPeriod     uint64
+	cpuLimitKnown bool
 }
 
 // Agent implements the NRI plugin entry and the scan-based cpuset reconciliation.
@@ -274,7 +278,15 @@ func (a *Agent) match(pod podInfo) bool {
 	if _, ok := a.runtimeClasses[pod.runtimeClass]; !ok {
 		return false
 	}
-	return true
+	return hasTargetCPULimit(pod)
+}
+
+func hasTargetCPULimit(pod podInfo) bool {
+	if !pod.cpuLimitKnown || pod.cpuQuota <= 0 || pod.cpuPeriod == 0 {
+		return false
+	}
+	quota := uint64(pod.cpuQuota)
+	return quota/pod.cpuPeriod == targetCPULimit && quota%pod.cpuPeriod == 0
 }
 
 func (a *Agent) targetCpuset(current string, occupied map[string]struct{}) string {
@@ -372,6 +384,16 @@ func convertPod(p *api.PodSandbox) podInfo {
 	}
 	if p.Linux != nil {
 		out.cgroupPath = p.Linux.CgroupParent
+		resources := p.Linux.PodResources
+		if resources == nil {
+			resources = p.Linux.Resources
+		}
+		if resources != nil && resources.Cpu != nil &&
+			resources.Cpu.Quota != nil && resources.Cpu.Period != nil {
+			out.cpuQuota = resources.Cpu.Quota.GetValue()
+			out.cpuPeriod = resources.Cpu.Period.GetValue()
+			out.cpuLimitKnown = true
+		}
 	}
 	if p.RuntimeHandler != "" {
 		out.runtimeClass = p.RuntimeHandler

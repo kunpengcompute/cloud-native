@@ -17,7 +17,7 @@
 ### 2.1 目标
 
 1. 仅支持 Pod 层级绑核。
-2. 仅支持固定资源模型：Pod 目标 `2CPU`。
+2. 仅处理聚合 CPU limit 恰好为 `2` 的 Pod，CPU request 不参与过滤。
 3. 将 2 个逻辑 CPU 绑定到同一物理核心（同 core 的 sibling）。
 4. 支持 namespace 白名单和 runtimeClass 白名单（如 `kata`）。
 5. 不维护容器生命周期状态；采用扫描式收敛，以当前 cgroup cpuset 为事实来源。
@@ -62,7 +62,7 @@
 ### 4.3 收敛流程
 
 1. 拉取当前 Pod 列表（来自 NRI 同步视图）。
-2. 过滤非白名单 namespace 或 runtimeClass 的 Pod。
+2. 过滤非白名单 namespace、runtimeClass 或聚合 CPU limit 不等于 `2` 的 Pod。
 3. 定位 Pod cgroup 并读取 `cpuset.cpus`。
 4. 在单次扫描过程中维护临时 `occupied` 集合，记录已被本轮 Pod 占用的 sibling 对。
 5. 为 Pod 计算未占用的目标 sibling 对（长度固定 2）。

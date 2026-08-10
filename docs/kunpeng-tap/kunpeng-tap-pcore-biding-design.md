@@ -26,7 +26,7 @@
 功能边界如下：
 
 - 仅处理 Pod 层级 cpuset，不处理单 container 级独立策略。
-- 仅支持目标 Pod 使用固定 `2` CPU request/limit 的场景。
+- 仅处理聚合 CPU limit 恰好为 `2` 的目标 Pod，不限制 CPU request。
 - 不做跨节点资源协调，不影响 Kubernetes 节点级调度决策。
 - 不维护持久化分配状态，插件重启后依赖 NRI `Synchronize` 和当前 cgroup 文件重新收敛。
 - 不提供机密计算证明、镜像加密、密钥注入等安全能力，只服务于 Kata / 机密容器运行时的 CPU 绑定稳定性。
@@ -43,7 +43,7 @@
 4. `RunPodSandbox` 将新 Pod 写入缓存，`StopPodSandbox` 和 `RemovePodSandbox` 从缓存删除 Pod。
 5. 每次事件处理后向调和通道发送一次异步调和请求；后台 ticker 也按 `scan-interval` 周期触发调和。
 6. 调和阶段按 namespace、Pod 名称、Pod ID 对 Pod 排序，保证单轮处理顺序稳定。
-7. 对命中白名单的 Pod 解析 cgroup 路径，读取当前 `cpuset.cpus`，并计算目标 sibling pair。
+7. 对命中白名单且聚合 CPU limit 恰好为 `2` 的 Pod 解析 cgroup 路径，读取当前 `cpuset.cpus`，并计算目标 sibling pair。
 8. 如果当前 cpuset 已经是可用 sibling pair 且未被本轮其他 Pod 占用，则保持不变；否则选择第一个未占用 sibling pair。
 9. 对 Pod parent cgroup 和 Kata sandbox cgroup 的 `cpuset.cpus` 做一致性检查，发现不一致时写入目标值。
 10. 单 Pod 解析、读取或写入失败时记录错误并继续处理后续 Pod。

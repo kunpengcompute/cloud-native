@@ -7,7 +7,7 @@ Kunpeng-TAP Pcore Biding插件是Kunpeng-TAP面向Kata机密容器场景提供�
 ## 1. 功能范围
 
 - 只处理Pod层级，不处理container层级。
-- 目标Pod的CPU request/limit固定为`2`。
+- 只处理聚合CPU limit恰好为`2`的目标Pod，CPU request不参与过滤。
 - 将Pod的2个逻辑CPU绑定到同一个物理核心的sibling pair。
 - 不保存绑定状态；插件每轮从当前Pod cgroup的`cpuset.cpus`重新计算占用。
 - 不允许多个符合条件的Pod收敛到同一对sibling。
@@ -29,17 +29,34 @@ Kunpeng-TAP Pcore Biding插件是Kunpeng-TAP面向Kata机密容器场景提供�
 | Kata hypervisor | cloud-hypervisor |
 | 验证规模 | 100个`runtimeClassName: kata-clh`的Pod |
 
+### 2.1 理论兼容范围
+
+除上述实测版本外，根据插件当前实现所依赖的CRI和NRI接口，可以得到以下理论兼容范围：
+
+| 组件 | 理论兼容范围 | 说明 |
+| --- | --- | --- |
+| Kubernetes | `v1.26.x-v1.36.x` | 插件运行时不访问Kubernetes API Server，不依赖特定版本的Kubernetes API对象。版本下限取`v1.26`，因为从该版本开始kubelet只支持CRI v1；版本上限为本文编写时已发布且具备推荐containerd组合的版本。 |
+| containerd | `v1.7.x-v2.3.x` | containerd从`v1.7`开始集成CRI NRI支持，`v2.0`起该能力转为稳定并默认启用。插件要求containerd能够通过NRI PodSandbox事件提供Pod级CPU quota和period。 |
+
+该范围是基于接口和代码路径得出的兼容性判断，不是所有版本组合均已完成认证，也不代表对范围内每个patch版本的支持承诺。选择Kubernetes和containerd组合时，应遵循[containerd官方Kubernetes支持矩阵](https://github.com/containerd/containerd/blob/main/RELEASES.md#kubernetes-support)，并满足以下条件：
+
+- Kubernetes与containerd之间使用CRI v1。Kubernetes从`v1.26`开始要求运行时支持CRI v1，具体说明见[Kubernetes容器运行时文档](https://kubernetes.io/docs/setup/production-environment/container-runtimes/#cri-version-support)。
+- containerd已启用CRI和NRI，且插件能够连接NRI socket并接收`Synchronize`、`RunPodSandbox`、`StopPodSandbox`和`RemovePodSandbox`事件。
+- NRI PodSandbox数据包含聚合后的CPU quota和period；字段缺失时，插件无法确认CPU limit，会保守跳过该Pod。
+- containerd `v1.7`中的CRI NRI属于实验能力，建议使用该分支的最新patch版本；containerd `v2.0`及以上为优先选择。NRI版本状态见[containerd版本说明](https://github.com/containerd/containerd/blob/main/RELEASES.md#experimental-features)。
+- 超出上述范围、跨大版本升级或使用未实测组合时，需要重新执行本文的1/2/4 CPU limit回归测试，并确认Pod parent和Kata sandbox cgroup的`cpuset.cpus`结果一致。
+
 部署前需要确认：
 
 - containerd已启用NRI，并生成`/var/run/nri/nri.sock`。
 - Kata Containers已安装，并配置可用的runtime handler，例如`kata-clh`。
 - 节点CPU开启SMT，且可读取`/sys/devices/system/cpu/cpu*/topology/thread_siblings_list`。
 - 目标namespace和runtimeClass已加入插件白名单。
-- 目标Pod使用2核CPU request/limit。
+- 目标Pod的聚合CPU limit为2核；CPU request可按业务需要设置，但不能大于limit。
 
 ## 3. 启用containerd NRI
 
-containerd v2.1可通过`/etc/containerd/config.toml`启用NRI。建议先备份配置文件：
+containerd `v1.7`和`v2.x`均可通过`/etc/containerd/config.toml`配置NRI。containerd `v2.0`及以上默认启用NRI，但仍建议显式检查配置和socket。修改配置前建议先备份配置文件：
 
 ```bash
 cp /etc/containerd/config.toml /etc/containerd/config.toml.bak
@@ -200,6 +217,15 @@ kubectl patch ds kunpeng-tap-pcore-biding -n kunpeng-tap-pcore-biding --type=jso
 
 ## 8. 创建测试Pod
 
+创建CPU limit分别为1、2、4核的回归测试Pod：
+
+```bash
+kubectl apply -f config/kunpeng-tap-pcore-biding/test-pods-cpu-limit.yaml
+kubectl wait --for=condition=Ready pod -l app=kata-clh-cpuset-limit-test -n default --timeout=300s
+```
+
+只有`kata-clh-cpuset-limit-2`应被收敛到一个SMT sibling pair。该Pod的CPU request为1核，用于确认request不参与过滤；limit为1核和4核的Pod应保持原有`cpuset.cpus`。
+
 创建2个cloud-hypervisor测试Pod：
 
 ```bash
@@ -327,6 +353,7 @@ bad_records 0
 ```bash
 kubectl delete -f config/kunpeng-tap-pcore-biding/test-deployment-cloud-hypervisor-scale.yaml --ignore-not-found
 kubectl delete -f config/kunpeng-tap-pcore-biding/test-pods-cloud-hypervisor.yaml --ignore-not-found
+kubectl delete -f config/kunpeng-tap-pcore-biding/test-pods-cpu-limit.yaml --ignore-not-found
 ```
 
 卸载插件：
