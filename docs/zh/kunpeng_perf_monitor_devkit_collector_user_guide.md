@@ -2,9 +2,11 @@
 
 ## 简介<a name="devkit-collector-introduction"></a>
 
-本文介绍如何在鲲鹏服务器的Kubernetes集群中部署和使用kunpeng-perf-monitor的DevKit Collector。
+kunpeng-perf-monitor是一款面向鲲鹏服务器Kubernetes集群的节点性能监控组件，以DaemonSet方式部署在集群节点上，并通过Prometheus Exporter接口提供性能指标。
 
-DevKit Collector使用镜像内的[Kunpeng DevKit Tuner CLI](https://www.hikunpeng.com/document/detail/zh/kunpengdevps/profiler/profiler/KunpengDevKitCli_0032.html)采集CPU流水线和内存访问数据，并将采集结果转换为Prometheus指标。DevKit Collector包含以下两个采集器。
+DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https://www.hikunpeng.com/document/detail/zh/kunpengdevps/profiler/profiler/KunpengDevKitCli_0032.html)实现的采集组件。该组件周期性采集CPU流水线、Cache和内存访问数据，并将采集结果转换为Prometheus指标，用于分析CPU流水线瓶颈、内存访问效率和带宽等性能问题。
+
+通过部署DevKit Collector，用户可以在Prometheus或Grafana中持续观察节点性能变化，缩短性能瓶颈的定位时间。本文介绍DevKit Collector的环境准备、部署、配置、指标查询和故障处理方法。DevKit Collector包含以下两个采集器。
 
 **表 1** DevKit Collector采集器说明<a id="devkit-collector采集器说明"></a>
 
