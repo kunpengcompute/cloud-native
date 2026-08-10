@@ -1,0 +1,16 @@
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: host-network-cx5
+  namespace: sriov-network-operator
+spec:
+  ipam: |
+    {
+      "type": "whereabouts", 
+      "range": "10.56.217.0/24",
+      "exclude": ["10.56.217.1"]
+    }
+  type: host-device
+  logLevel: debug
+  logFile: /var/log/host-device.log
+  resourceName: mlxcx5

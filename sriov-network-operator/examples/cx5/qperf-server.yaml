@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: qperf-server
+  namespace: sriov-network-operator
+  annotations:
+    k8s.v1.cni.cncf.io/networks: host-network-cx5
+spec:
+  nodeName: sno-compute01
+  volumes:
+    - name: qperf-result
+      hostPath:
+        path: /root/qperf-result
+        type: DirectoryOrCreate
+  containers:
+  - name: qperf-server
+    image: iecedge/qperf:latest
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - name: qperf-result
+        mountPath: /root/qperf-result
+    command: ["sleep", "infinity"]  # 保持容器运行，手动进入后启动
+    resources:
+      limits:
+        cpu: "8"
+        memory: "16Gi"
+        openshift.io/mlxcx5: '1'
+      requests:
+        cpu: "8"
+        memory: "16Gi"
+        openshift.io/mlxcx5: '1'
