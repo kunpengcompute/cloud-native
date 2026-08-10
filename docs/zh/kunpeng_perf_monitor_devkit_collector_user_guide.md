@@ -288,20 +288,19 @@ DevKit Collector启动后会立即开始首次采集。TopDown和Memory在同一
 
     ```bash
     {
-    "scrapeUrl": "http://<pod-ip>:9100/metrics",
-    "health": "up",
-    "lastError": "",
-    "labels": {
-      "container": "kunpeng-perf-monitor",
-      "endpoint": "metrics",
-      "instance": "<pod-ip>:9100",
-      "job": "kunpeng-perf-monitor",
-      "namespace": "default",
-      "pod": "kunpeng-perf-monitor-devkit-bcclv",
-      "service": "kunpeng-perf-monitor-devkit"
+      "scrapeUrl": "http://<pod-ip>:9100/metrics",
+      "health": "up",
+      "lastError": "",
+      "labels": {
+        "container": "kunpeng-perf-monitor",
+        "endpoint": "metrics",
+        "instance": "<pod-ip>:9100",
+        "job": "kunpeng-perf-monitor",
+        "namespace": "default",
+        "pod": "kunpeng-perf-monitor-devkit-bcclv",
+        "service": "kunpeng-perf-monitor-devkit"
+      }
     }
-
-  }
     ```
 
     `health`应为`up`，`lastError`应为空。随后可以在Prometheus或Grafana中查询相关指标。
