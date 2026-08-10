@@ -131,13 +131,13 @@ Go版本推荐 1.25，Docker daemon应处于可用状态。
 
 |资源|名称或值|
 |--|--|
-|ServiceAccount|`kunpeng-perf-monitor`|
-|Role和RoleBinding|`kunpeng-perf-monitor-config-reader`|
-|ConfigMap|`kunpeng-perf-monitor-devkit-config`|
-|DaemonSet|`kunpeng-perf-monitor-devkit`|
-|Service|`kunpeng-perf-monitor-devkit`|
-|容器端口|`9100`|
-|DevKit Tuner CLI|`/opt/devkit/devkit`|
+|ServiceAccount|kunpeng-perf-monitor|
+|Role和RoleBinding|kunpeng-perf-monitor-config-reader|
+|ConfigMap|kunpeng-perf-monitor-devkit-config|
+|DaemonSet|kunpeng-perf-monitor-devkit|
+|Service|kunpeng-perf-monitor-devkit|
+|容器端口|9100|
+|DevKit Tuner CLI|/opt/devkit/devkit|
 
 > **须知：**
 > Kunpeng DevKit Tuner CLI利用PMU抓取相关数据，因此部署文件将DaemonSet以root用户运行，并添加`SYS_ADMIN` capability，同时以只读方式挂载CPU和PMU相关sysfs。部署前应确认这些权限符合所在集群的安全策略。
@@ -378,12 +378,12 @@ memory:
 
 |字段|作用|合法值|
 |--|--|--|
-|`topdown.cpu`|指定TopDown CPU采集范围；为空表示system|CPU编号、范围或逗号分隔集合，例如`0`、`0-3`、`0,2-3`|
-|`topdown.pid`|指定TopDown PID采集范围；为空表示system|纯数字或逗号分隔的PID，例如`12345`、`12345,12346`|
-|`topdown.duration`|TopDown采集时长，单位为秒|`1`到`5`的整数；省略时为`3`|
-|`memory.cpu`|指定Memory CPU采集范围；为空表示system|CPU编号、范围或逗号分隔集合|
-|`memory.duration`|Memory采集时长，单位为秒|`1`到`5`的整数；省略时为`3`|
-|`memory.period`|Memory采样周期，单位为毫秒|`100`或`1000`；省略时通常为`1000`|
+|topdown.cpu|指定TopDown CPU采集范围；为空表示system|CPU编号、范围或逗号分隔集合，例如0、0-3、0,2-3|
+|topdown.pid|指定TopDown PID采集范围；为空表示system|纯数字或逗号分隔的PID，例如12345、12345,12346|
+|topdown.duration|TopDown采集时长，单位为秒|1到5的整数；省略时为3|
+|memory.cpu|指定Memory CPU采集范围；为空表示system|CPU编号、范围或逗号分隔集合|
+|memory.duration|Memory采集时长，单位为秒|1到5的整数；省略时为3|
+|memory.period|Memory采样周期，单位为毫秒|100或1000；省略时通常为1000|
 
 配置时需要遵守以下规则。
 
@@ -494,28 +494,28 @@ topdown:
 
 |指标|说明|
 |--|--|
-|`kunpeng_node_devkit_topdown_cycles`|最近采集窗口的CPU cycles|
-|`kunpeng_node_devkit_topdown_instructions`|最近采集窗口的instructions|
-|`kunpeng_node_devkit_topdown_ipc_ratio`|IPC比值|
-|`kunpeng_node_devkit_topdown_bound_percent`|TopDown树节点百分比|
-|`kunpeng_node_devkit_topdown_pmu_event_count_value`|PMU Event的窗口计数值|
-|`kunpeng_node_devkit_topdown_collection_success`|最近一次TopDown采集是否成功|
-|`kunpeng_node_devkit_topdown_last_success_unixtime_seconds`|最近一次TopDown成功采集时间|
+|kunpeng_node_devkit_topdown_cycles|最近采集窗口的CPU cycles|
+|kunpeng_node_devkit_topdown_instructions|最近采集窗口的instructions|
+|kunpeng_node_devkit_topdown_ipc_ratio|IPC比值|
+|kunpeng_node_devkit_topdown_bound_percent|TopDown树节点百分比|
+|kunpeng_node_devkit_topdown_pmu_event_count_value|PMU Event的窗口计数值|
+|kunpeng_node_devkit_topdown_collection_success|最近一次TopDown采集是否成功|
+|kunpeng_node_devkit_topdown_last_success_unixtime_seconds|最近一次TopDown成功采集时间|
 
 **表 7** Memory主要指标<a id="devkit-collector-memory指标"></a>
 
 |指标|说明|
 |--|--|
-|`kunpeng_node_devkit_memory_cache_miss_percent`|Cache Miss百分比|
-|`kunpeng_node_devkit_memory_ddr_system_bandwidth_megabytes_per_second`|system DDR带宽|
-|`kunpeng_node_devkit_memory_access_bandwidth_megabytes_per_second`|L1、L2、TLB Access带宽|
-|`kunpeng_node_devkit_memory_access_hit_percent`|L1、L2、TLB命中率|
-|`kunpeng_node_devkit_memory_l3_read_bandwidth_megabytes_per_second`|L3 read带宽|
-|`kunpeng_node_devkit_memory_l3_read_hit_bandwidth_megabytes_per_second`|L3 read hit带宽|
-|`kunpeng_node_devkit_memory_l3_read_hit_percent`|L3 read命中率|
-|`kunpeng_node_devkit_memory_ddrc_bandwidth_megabytes_per_second`|DDRC read和write带宽|
-|`kunpeng_node_devkit_memory_collection_success`|最近一次Memory采集是否成功|
-|`kunpeng_node_devkit_memory_last_success_unixtime_seconds`|最近一次Memory成功采集时间|
+|kunpeng_node_devkit_memory_cache_miss_percent|Cache Miss百分比|
+|kunpeng_node_devkit_memory_ddr_system_bandwidth_megabytes_per_second|system DDR带宽|
+|kunpeng_node_devkit_memory_access_bandwidth_megabytes_per_second|L1、L2、TLB Access带宽|
+|kunpeng_node_devkit_memory_access_hit_percent|L1、L2、TLB命中率|
+|kunpeng_node_devkit_memory_l3_read_bandwidth_megabytes_per_second|L3 read带宽|
+|kunpeng_node_devkit_memory_l3_read_hit_bandwidth_megabytes_per_second|L3 read hit带宽|
+|kunpeng_node_devkit_memory_l3_read_hit_percent|L3 read命中率|
+|kunpeng_node_devkit_memory_ddrc_bandwidth_megabytes_per_second|DDRC read和write带宽|
+|kunpeng_node_devkit_memory_collection_success|最近一次Memory采集是否成功|
+|kunpeng_node_devkit_memory_last_success_unixtime_seconds|最近一次Memory成功采集时间|
 
 带宽指标的单位为DevKit Tuner CLI报告中的MB/s。百分比和命中率指标为无量纲数值。所有业务指标都是最近采集窗口的Gauge快照，不应使用promql的`rate()`或`increase()`按Counter处理。
 
@@ -569,13 +569,13 @@ kunpeng_node_devkit_topdown_bound_percent{
 
     |现象|可能原因|处理方法|
     |--|--|--|
-    |Pod启动失败并提示找不到镜像|镜像未导入containerd的`k8s.io` namespace，或节点仍使用旧镜像|执行`ctr -n k8s.io images ls`，重新导入镜像后删除失败Pod|
+    |Pod启动失败并提示找不到镜像|镜像未导入containerd的k8s.io namespace，或节点仍使用旧镜像|执行ctr -n k8s.io images ls，重新导入镜像后删除失败Pod|
     |NodePort无法访问|Pod或Service未就绪，节点端口被防火墙阻断|检查Pod、Service、EndpointSlice和节点网络|
-    |`/metrics`可访问但`collection_success=0`|DevKit Tuner CLI执行失败、超时或报告解析失败|查看`collection_finish`日志中的`status`和`error`|
-    |ConfigMap修改不生效|YAML包含未知字段、字段类型或取值错误，或者TopDown CPU和PID冲突|查看`devkit_config_rejected`，修正后重新提交完整配置|
+    |/metrics可访问但collection_success=0|DevKit Tuner CLI执行失败、超时或报告解析失败|查看collection_finish日志中的status和error|
+    |ConfigMap修改不生效|YAML包含未知字段、字段类型或取值错误，或者TopDown CPU和PID冲突|查看devkit_config_rejected，修正后重新提交完整配置|
     |删除ConfigMap后没有恢复system采集范围|删除事件会保留上一份有效配置|重新提交CPU和PID均为空的完整配置|
-    |Prometheus中没有target|ServiceMonitor未被Prometheus选中|检查Prometheus的`serviceMonitorSelector`、namespace selector和Service labels|
-    |Prometheus中`up=1`但业务采集失败|HTTP scrape正常，后台采集失败|查询两个采集器的`collection_success`和最近成功时间|
+    |Prometheus中没有target|ServiceMonitor未被Prometheus选中|检查Prometheus的serviceMonitorSelector、namespace selector和Service labels|
+    |Prometheus中up=1但业务采集失败|HTTP scrape正常，后台采集失败|查询两个采集器的collection_success和最近成功时间|
 
 DevKit Tuner CLI或结果解析失败时，DevKit Collector会将本轮`collection_success`设置为`0`，并停止发布本轮业务指标，避免把旧数据误认为当前数据。最近一次成功采集时间会保留；问题修复后，下一轮成功采集会重新发布业务指标。
 
