@@ -32,7 +32,7 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 |项目|要求|
 |--|--|
-|处理器|Kunpeng 950|
+|处理器|鲲鹏950处理器|
 
 **操作系统和软件要求<a name="devkit-collector-software-requirements"></a>**
 
