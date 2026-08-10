@@ -51,7 +51,7 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 ## 编译镜像 <a name="devkit-collector-build"></a>
 
-编译前请确保构建机可以访问Go module、DevKit Tuner CLI下载地址和容器基础镜像。推荐在ARM64构建机上执行本节操作。
+编译前请确保编译镜像的服务器可以访问Go module、DevKit Tuner CLI下载地址，并能拉取容器基础镜像。
 
 **编译前准备<a name="devkit-collector-build-preparation"></a>**
 
