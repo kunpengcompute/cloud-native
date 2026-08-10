@@ -12,8 +12,8 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 |采集器|用途|支持的采集范围|
 |--|--|--|
-|`devkit-topdown`|分析CPU流水线瓶颈|system、CPU、PID|
-|`devkit-memory`|采集Cache、内存等相关指标|system、CPU|
+|devkit-topdown|分析CPU流水线瓶颈|system、CPU、PID|
+|devkit-memory|采集Cache、内存等相关指标|system、CPU|
 
 本文以NodePort独立模式作为首次部署示例。完成部署后，可以通过节点IP和端口`30010`查看指标。如果集群中已经部署Prometheus Operator，也可以选择使用ServiceMonitor接入Prometheus。
 
