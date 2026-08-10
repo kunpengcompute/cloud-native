@@ -354,6 +354,7 @@ spec:
 
   ![Grafana操作图](figures/grafana-guide.png)
 
+> **说明：**
 > 在Explore页面右上角可设定查询时间范围。
 
 ### 配置采集范围<a name="devkit-collector-configure-scope"></a>
