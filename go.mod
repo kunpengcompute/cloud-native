@@ -9,7 +9,7 @@ require (
 	k8s.io/client-go v0.35.0
 	k8s.io/klog v1.0.0
 	k8s.io/kubelet v0.32.1
-	sigs.k8s.io/yaml v1.6.0 // indirect
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
