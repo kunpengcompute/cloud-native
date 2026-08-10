@@ -55,20 +55,20 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 **编译前准备<a name="devkit-collector-build-preparation"></a>**
 
-1. 检查Go和Docker，确保其已安装并版本符合要求。
+检查Go和Docker，确保其已安装并版本符合要求。
 
-    ```shell
-    go version
-    docker version
-    ```
+```bash
+go version
+docker version
+```
 
-    Go版本推荐 1.25，Docker daemon应处于可用状态。
+Go版本推荐 1.25，Docker daemon应处于可用状态。
 
 **操作步骤<a name="devkit-collector-build-steps"></a>**
 
 1. 获取源码。
 
-    ```shell
+    ```bash
     git clone https://gitcode.com/boostkit/cloud-native.git
     cd /path/to/cloud-native
     ```
@@ -77,7 +77,7 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 2. 构建`kunpeng-perf-monitor:1.0`镜像。
 
-    ```shell
+    ```bash
     make kunpeng-perf-monitor-docker
     ```
 
@@ -85,7 +85,7 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 3. 查看镜像是否构建成功。
 
-    ```shell
+    ```bash
     docker images | grep kunpeng-perf-monitor
     ```
 
@@ -93,7 +93,7 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 4. 检查镜像中的exporter和DevKit Tuner CLI。
 
-    ```shell
+    ```bash
     docker run --rm --entrypoint sh kunpeng-perf-monitor:1.0 -c \
       'test -x /bin/kunpeng-perf-monitor && \
        test -x /opt/devkit/devkit && \
@@ -105,13 +105,13 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 5. 将镜像导出为tar包。
 
-    ```shell
+    ```bash
     docker save kunpeng-perf-monitor:1.0 -o kunpeng-perf-monitor-1.0.tar
     ```
 
 6. 将`kunpeng-perf-monitor-1.0.tar`复制到每个ARM64目标节点，然后导入Kubernetes。
 
-    ```shell
+    ```bash
     ctr -n k8s.io images import kunpeng-perf-monitor-1.0.tar
     ctr -n k8s.io images ls | grep kunpeng-perf-monitor
     ```
@@ -147,25 +147,25 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 1. 进入源码目录。
 
-    ```shell
+    ```bash
     cd /path/to/cloud-native
     ```
 
 2. 确认没有部署Prometheus模式。如果之前部署过Prometheus模式，先执行以下命令删除。
 
-    ```shell
+    ```bash
     kubectl delete -f config/kunpeng-perf-monitor/k8s/devkit-prometheus/deployment.yaml --ignore-not-found
     ```
 
 3. 部署NodePort独立模式。
 
-    ```shell
+    ```bash
     kubectl apply -f config/kunpeng-perf-monitor/k8s/deployment-devkit.yaml
     ```
 
 4. 等待DaemonSet就绪。
 
-    ```shell
+    ```bash
     kubectl rollout status \
       daemonset/kunpeng-perf-monitor-devkit --timeout=5m
     ```
@@ -174,13 +174,13 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 5. 查看Pod和Service。
 
-    ```shell
+    ```bash
     kubectl get daemonset,pod,service -o wide
     ```
 
     每个符合条件的节点应运行一个`Running`且`Ready`的Pod。Service类型应为`NodePort`，端口应包含`9100:30010/TCP`。类似如下输出：
 
-    ```shell
+    ```bash
     NAME                                         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR              AGE   CONTAINERS             IMAGES                     SELECTOR
     daemonset.apps/kunpeng-perf-monitor-devkit   1         1         1       1            1           kubernetes.io/arch=arm64   43h   kunpeng-perf-monitor   kunpeng-perf-monitor:1.0   app.kubernetes.io/component=devkit-collector,app.kubernetes.io/name=kunpeng-perf-monitor
 
@@ -198,13 +198,13 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 1. 检查`ServiceMonitor` CRD。
 
-    ```shell
+    ```bash
     kubectl api-resources | grep -w servicemonitors
     ```
 
 2. 删除NodePort独立模式并等待旧Pod删除完成。
 
-    ```shell
+    ```bash
     kubectl delete -f config/kunpeng-perf-monitor/k8s/deployment-devkit.yaml \
       --ignore-not-found
     kubectl -n default wait --for=delete pod \
@@ -215,7 +215,7 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 3. 部署Prometheus模式。
 
-    ```shell
+    ```bash
     kubectl apply -f config/kunpeng-perf-monitor/k8s/devkit-prometheus/deployment.yaml
     kubectl -n default rollout status \
       daemonset/kunpeng-perf-monitor-devkit --timeout=5m
@@ -223,7 +223,7 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 4. 查看Service、ServiceMonitor和EndpointSlice。
 
-    ```shell
+    ```bash
     kubectl -n default get service kunpeng-perf-monitor-devkit
     kubectl -n default get servicemonitor kunpeng-perf-monitor-devkit
     kubectl -n default get endpointslice \
@@ -244,13 +244,13 @@ Collector启动后会立即开始首次采集。TopDown和Memory在同一个Pod�
 
     假设节点名称为`master`，使用如下命令查看该节点的`INTERNAL-IP`。
 
-    ```shell
+    ```bash
     kubectl get node master -o wide
     ```
 
     参考输出：
 
-    ```shell
+    ```bash
     NAME     STATUS   ROLES                  AGE   VERSION    INTERNAL-IP     EXTERNAL-IP   OS-IMAGE                    KERNEL-VERSION                             CONTAINER-RUNTIME
     master   Ready    control-plane,worker   22d   v1.28.14   192.168.122.2   <none>        openEuler 24.03 (LTS-SP3)   6.6.0   containerd://1.6.22.28
     ```
@@ -259,7 +259,7 @@ Collector启动后会立即开始首次采集。TopDown和Memory在同一个Pod�
 
 2. 访问指标接口即可查看相关指标。
 
-    ```shell
+    ```bash
     curl http://<node-ip>:30010/metrics | \
       grep -E kunpeng_node_devkit
     ```
@@ -277,7 +277,7 @@ Collector启动后会立即开始首次采集。TopDown和Memory在同一个Pod�
 
 1. 将`<prometheus-address>`替换为实际的Prometheus HTTP地址，查询active target。
 
-    ```shell
+    ```bash
     curl -fsS 'http://<prometheus-address>/api/v1/targets?state=active' | \
       jq '.data.activeTargets[] |
         select(.labels.job == "kunpeng-perf-monitor") |
@@ -286,7 +286,7 @@ Collector启动后会立即开始首次采集。TopDown和Memory在同一个Pod�
 
     应有类似如下结果：
 
-    ```shell
+    ```bash
     {
     "scrapeUrl": "http://<pod-ip>:9100/metrics",
     "health": "up",
@@ -398,14 +398,14 @@ memory:
 
 1. 查看当前ConfigMap。
 
-    ```shell
+    ```bash
     kubectl -n default get configmap kunpeng-perf-monitor-devkit-config \
       -o jsonpath='{.data.devkit-tuner\.yaml}'
     ```
 
 2. 创建完整的新配置。以下示例将TopDown和Memory都设置为CPU `0-3`采集范围。
 
-    ```shell
+    ```bash
     cat > /tmp/devkit-tuner.yaml <<'EOF'
     topdown:
       cpu: "0-3"
@@ -420,7 +420,7 @@ memory:
 
 3. 更新ConfigMap。
 
-    ```shell
+    ```bash
     kubectl -n default create configmap kunpeng-perf-monitor-devkit-config \
       --from-file=devkit-tuner.yaml=/tmp/devkit-tuner.yaml \
       --dry-run=client -o yaml | kubectl apply -f -
@@ -428,7 +428,7 @@ memory:
 
 4. 查看Collector是否接受配置。
 
-    ```shell
+    ```bash
     kubectl -n default logs \
       -l app.kubernetes.io/component=devkit-collector --since=2m | \
       grep -E 'collection configuration reloaded|devkit_config_rejected'
@@ -457,7 +457,7 @@ topdown:
 
 1. 临时修改当前DaemonSet的后台采集周期。
 
-    ```shell
+    ```bash
     kubectl -n default set env \
       daemonset/kunpeng-perf-monitor-devkit \
       DEVKIT_COLLECT_INTERVAL=30
@@ -477,13 +477,13 @@ topdown:
 3. 验证配置生效。
    使用如下命令查询当前采集周期：
 
-   ```shell
+   ```bash
    kubectl get daemonset/kunpeng-perf-monitor-devkit -o yaml | grep DEVKIT_COLLECT_INTERVAL -A 1
    ```
 
    预期输出：
 
-   ```shell
+   ```bash
     - name: DEVKIT_COLLECT_INTERVAL
       value: "30"
    ```
@@ -554,7 +554,7 @@ kunpeng_node_devkit_topdown_bound_percent{
 
 1. 查看最近 10 分钟的Collector日志。
 
-    ```shell
+    ```bash
     kubectl -n default logs \
       -l app.kubernetes.io/component=devkit-collector \
       --timestamps --since=10m | \
@@ -585,21 +585,21 @@ DevKit Tuner CLI或结果解析失败时，Collector会将本轮`collection_succ
 
 1. NodePort独立模式执行以下命令。
 
-    ```shell
+    ```bash
     kubectl delete -f config/kunpeng-perf-monitor/k8s/deployment-devkit.yaml \
       --ignore-not-found
     ```
 
 2. Prometheus模式执行以下命令。
 
-    ```shell
+    ```bash
     kubectl delete -f config/kunpeng-perf-monitor/k8s/devkit-prometheus/deployment.yaml \
       --ignore-not-found
     ```
 
 3. 检查资源是否已经删除。
 
-    ```shell
+    ```bash
     kubectl -n default get \
       daemonset,service,configmap,serviceaccount,role,rolebinding,servicemonitor \
       | grep kunpeng-perf-monitor || true
