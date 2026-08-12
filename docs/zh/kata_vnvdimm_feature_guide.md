@@ -9,7 +9,7 @@
 
 ### 约束与限制
 
-- 本文档仅适用于**AArch64（ARM64）**架构，基于鲲鹏920新型号处理器和鲲鹏950处理器验证，不适用于x86_64架构。
+- 本文档仅适用于 **AArch64（ARM64）** 架构，基于鲲鹏920新型号处理器和鲲鹏950处理器验证，不适用于x86_64架构。
 - 本特性通过容器挂载Guest PMEM文件系统提供额外数据访问路径，不改变容器默认rootfs使用方式。
 - PMEM路径可降低部分文件访问场景下的访问开销，尤其适用于高频小文件访问和文件打开关闭等场景。
 - 依赖Kata Containers、QEMU NVDIMM功能以及Guest kernel对PMEM设备的支持。
@@ -209,19 +209,19 @@ systemctl restart containerd
 
 1. 创建 ```runtimeclass.yaml```。
 
-```yaml
-apiVersion: node.k8s.io/v1
-kind: RuntimeClass
-metadata:
-  name: kata-qemu-pmem
-handler: kata-qemu-pmem
-```
+    ```yaml
+    apiVersion: node.k8s.io/v1
+    kind: RuntimeClass
+    metadata:
+    name: kata-qemu-pmem
+    handler: kata-qemu-pmem
+    ```
 
 2. 应用配置。
 
-```bash
-kubectl apply -f runtimeclass.yaml
-```
+    ```bash
+    kubectl apply -f runtimeclass.yaml
+    ```
 
 ### Pod配置
 
