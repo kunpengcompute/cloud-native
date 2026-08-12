@@ -1,36 +1,36 @@
 
-# Kata vNVDIMM 特性指南
+# Kata vNVDIMM特性指南
 
 ## 特性描述
 
 ### 简介
 
-本文介绍在 Kata Containers + QEMU 环境下，利用 QEMU NVDIMM 将 Kata Guest image 映射为 Guest PMEM 设备。容器 rootfs 保持使用 virtio-fs，额外通过 PMEM 文件系统路径访问数据。Guest 内核识别 PMEM 设备后，将 PMEM 分区只读挂载到容器目录，用于优化目录遍历、大量小文件访问、stat、open/close 和多文件读取等文件访问场景。
+本文介绍在Kata Containers + QEMU环境下，利用QEMU NVDIMM将Kata Guest image映射为Guest PMEM设备。容器rootfs保持使用virtio-fs，额外通过PMEM文件系统路径访问数据。Guest内核识别PMEM设备后，将PMEM分区只读挂载到容器目录，用于优化目录遍历、大量小文件访问、stat、open/close和多文件读取等文件访问场景。
 
 ### 约束与限制
 
 - 本文档仅适用于**AArch64（ARM64）**架构，基于鲲鹏920新型号处理器和鲲鹏950处理器验证，不适用于x86_64架构。
-- 本特性通过容器挂载 Guest PMEM 文件系统提供额外数据访问路径，不改变容器默认 rootfs 使用方式。
-- PMEM 路径可降低部分文件访问场景下的访问开销，尤其适用于高频小文件访问和文件打开关闭等场景。
-- 依赖 Kata Containers、QEMU NVDIMM 功能以及 Guest kernel 对 PMEM 设备的支持。
-- 当前仅支持将 PMEM 分区挂载到容器指定目录，不支持直接作为容器 rootfs。
-- PMEM 分区来源于 Kata Guest image，当前建议以只读方式挂载，不支持作为可写业务数据盘使用。
+- 本特性通过容器挂载Guest PMEM文件系统提供额外数据访问路径，不改变容器默认rootfs使用方式。
+- PMEM路径可降低部分文件访问场景下的访问开销，尤其适用于高频小文件访问和文件打开关闭等场景。
+- 依赖Kata Containers、QEMU NVDIMM功能以及Guest kernel对PMEM设备的支持。
+- 当前仅支持将PMEM分区挂载到容器指定目录，不支持直接作为容器rootfs。
+- PMEM分区来源于Kata Guest image，当前建议以只读方式挂载，不支持作为可写业务数据盘使用。
 
 ### 应用场景
 
-Kata PMEM 文件访问加速特性适用于容器内高频读取文件的场景。
+Kata PMEM文件访问加速特性适用于容器内高频读取文件的场景。
 
-- 在 AI 沙箱、开发环境等场景中，容器需要频繁访问模型文件、依赖库、配置文件等只读数据时，可将高频访问数据放置于 PMEM 文件系统路径，降低文件访问开销。
+- 在AI沙箱、开发环境等场景中，容器需要频繁访问模型文件、依赖库、配置文件等只读数据时，可将高频访问数据放置于PMEM文件系统路径，降低文件访问开销。
 
 - 在软件开发、构建等场景中，可用于优化大量小文件访问相关操作，例如目录遍历、文件属性查询、文件打开关闭等元数据操作。
 
-- 在 Kata 容器存储性能优化场景中，可用于减少 virtio-fs 文件访问路径开销，提升特定文件访问场景下的性能表现。
+- 在Kata容器存储性能优化场景中，可用于减少virtio-fs文件访问路径开销，提升特定文件访问场景下的性能表现。
 
 ### 原理描述
 
-在默认 Kata 容器场景中，容器 rootfs 通常通过 virtio-fs 访问。文件操作需要经过 Guest virtio-fs 驱动、virtiofsd 以及 Host 文件系统处理。
+在默认Kata容器场景中，容器rootfs通常通过virtio-fs访问。文件操作需要经过Guest virtio-fs驱动、virtiofsd以及Host文件系统处理。
 
-容器 rootfs 路径：
+容器rootfs路径：
 
 ```text
 Host rootfs/shared directory
@@ -40,7 +40,7 @@ Host rootfs/shared directory
 → Container rootfs (/)
 ```
 
-Guest PMEM 路径：
+Guest PMEM路径：
 
 ```text
 Host Kata Guest image
@@ -51,9 +51,9 @@ Host Kata Guest image
 → Container /pmem
 ```
 
-本特性通过 QEMU NVDIMM 功能将 Kata Guest image 提供为 Guest PMEM 设备。Guest 内核识别 PMEM 设备并挂载文件系统后，容器可通过挂载目录访问 PMEM 文件数据。
+本特性通过QEMU NVDIMM功能将Kata Guest image提供为Guest PMEM设备。Guest内核识别PMEM设备并挂载文件系统后，容器可通过挂载目录访问PMEM文件数据。
 
-相比 virtio-fs 路径，PMEM 文件访问主要由 Guest 内核和本地文件系统完成，减少了部分跨 Guest/Host 文件访问交互开销，适用于文件元数据操作和高频小文件访问场景。
+相比virtio-fs路径，PMEM文件访问主要由Guest内核和本地文件系统完成，减少了部分跨Guest/Host文件访问交互开销，适用于文件元数据操作和高频小文件访问场景。
 
 ## 软件安装
 
@@ -63,61 +63,18 @@ Host Kata Guest image
 
 **表1**  硬件要求
 
-<table><thead align="left"><tr id="row237mcpsimp"><th class="cellrowborder" valign="top" width="27%" id="mcps1.2.3.1.1"><p id="p239mcpsimp">项目</p>
-</th>
-<th class="cellrowborder" valign="top" width="73%" id="mcps1.2.3.1.2"><p id="p241mcpsimp">说明</p>
-</th>
-</tr>
-</thead>
-<tbody><tr id="row243mcpsimp"><td class="cellrowborder" valign="top" width="27%" headers="mcps1.2.3.1.1 "><p id="p245mcpsimp">处理器</p>
-</td>
-<td class="cellrowborder" valign="top" width="73%" headers="mcps1.2.3.1.2 "><p id="p173486314562">鲲鹏920新型号处理器、鲲鹏950处理器</p>
-</td>
-</tr>
-</tbody>
-</table>
+| 项目 | 说明 |
+| --- | --- |
+| 处理器 | 鲲鹏920新型号处理器、鲲鹏950处理器 |
 
 **表2**  操作系统和软件要求
 
-<table><thead align="left"><tr id="row254mcpsimp"><th class="cellrowborder" valign="top" width="26.26262626262626%" id="mcps1.2.4.1.1"><p id="p256mcpsimp">项目</p>
-</th>
-<th class="cellrowborder" valign="top" width="38.38383838383838%" id="mcps1.2.4.1.2"><p id="p258mcpsimp">版本</p>
-</th>
-<th class="cellrowborder" valign="top" width="35.35353535353536%" id="mcps1.2.4.1.3"><p id="p260mcpsimp">获取方法</p>
-</th>
-</tr>
-</thead>
-<tbody><tr id="row262mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p264mcpsimp">OS</p>
-</td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p266mcpsimp">openEuler 24.03 LTS SP3</p>
-</td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p268mcpsimp"><a href="https://mirrors.huaweicloud.com/openeuler/openEuler-24.03-LTS-SP3/ISO/aarch64/openEuler-24.03-LTS-SP3-everything-aarch64-dvd.iso" target="_blank" rel="noopener noreferrer">获取链接</a></p>
-</td>
-</tr>
-<tr id="row270mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p272mcpsimp">Kubernetes</p>
-</td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p274mcpsimp">1.28.14</p>
-</td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p276mcpsimp"><a href="https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Kubernetes/kunpengk8s_04_0001.html" target="_blank" rel="noopener noreferrer">获取链接</a></p>
-</td>
-</tr>
-<tr id="row278mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p280mcpsimp">Containerd</p>
-</td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p282mcpsimp">1.7.27</p>
-</td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p284mcpsimp"><a href="https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Containerd/kunpengcontainerd_03_0001.html" target="_blank" rel="noopener noreferrer">获取链接</a></p>
-</td>
-</tr>
-<tr id="row286mcpsimp"><td class="cellrowborder" valign="top" width="26.26262626262626%" headers="mcps1.2.4.1.1 "><p id="p288mcpsimp">Kata Containers</p>
-</td>
-<td class="cellrowborder" valign="top" width="38.38383838383838%" headers="mcps1.2.4.1.2 "><p id="p290mcpsimp">3.32.0</p>
-</td>
-<td class="cellrowborder" valign="top" width="35.35353535353536%" headers="mcps1.2.4.1.3 "><p id="p292mcpsimp"><a href="https://github.com/kata-containers/kata-containers/releases#release-3.32.0" target="_blank" rel="noopener noreferrer">获取链接</a></p>
-</td>
-</tr>
-
-</tbody>
-</table>
+| 项目 | 版本 | 获取方法 |
+| --- | --- | --- |
+| OS | openEuler 24.03 LTS SP3 | [获取链接](https://mirrors.huaweicloud.com/openeuler/openEuler-24.03-LTS-SP3/ISO/aarch64/openEuler-24.03-LTS-SP3-everything-aarch64-dvd.iso) |
+| Kubernetes | 1.28.14 | [获取链接](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Kubernetes/kunpengk8s_04_0001.html) |
+| Containerd | 1.7.27 | [获取链接](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Containerd/kunpengcontainerd_03_0001.html) |
+| Kata Containers | 3.32.0 | [获取链接](https://github.com/kata-containers/kata-containers/releases#release-3.32.0) |
 
 ## 使用特性
 
@@ -161,7 +118,7 @@ WORKDIR /bench
 CMD ["bash", "-lc", "sleep infinity"]
 ```
 
-构建：
+镜像构建。
 
 ```bash
 docker build -f Dockerfile -t docker.io/library/ubuntu-treewalk:latest .
@@ -188,13 +145,13 @@ kata-pmem-treewalk/
 上述测试程序和辅助脚本已集成至测试容器镜像中，方便测试环境快速部署和复用。
 也支持在容器启动后手动复制相关文件并执行测试。
 
-相关测试程序和脚本请参见 `附录 A：相关测试脚本`。
+相关测试程序和脚本请参见 `附录A：相关测试脚本`。
 
-### Kata 配置
+### Kata配置
 
 #### 创建独立配置
 
-为避免影响默认 Kata 配置，创建独立 QEMU PMEM 配置文件。
+为避免影响默认 Kata配置，创建独立QEMU PMEM配置文件。
 
 ```bash
 cp /etc/kata-containers/configuration-qemu.toml \
@@ -231,9 +188,9 @@ disable_image_nvdimm = false
 vm_rootfs_driver = "virtio-pmem"
 ```
 
-#### containerd runtime 配置
+#### containerd runtime配置
 
-修改 ```/etc/containerd/config.toml```，新增 kata-qemu-pmem runtime：
+修改 ```/etc/containerd/config.toml```，新增 kata-qemu-pmem runtime。
 
 ```toml
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.kata-qemu-pmem]
@@ -242,15 +199,15 @@ vm_rootfs_driver = "virtio-pmem"
     ConfigPath = "/etc/kata-containers/configuration-qemu-pmem.toml"
 ```
 
-重启 containerd
+重启 containerd。
 
 ```bash
 systemctl restart containerd
 ```
 
-#### 创建 RuntimeClass
+#### 创建RuntimeClass
 
-创建 ```runtimeclass.yaml```：
+1. 创建 ```runtimeclass.yaml```。
 
 ```yaml
 apiVersion: node.k8s.io/v1
@@ -260,17 +217,17 @@ metadata:
 handler: kata-qemu-pmem
 ```
 
-应用配置：
+2. 应用配置。
 
 ```bash
 kubectl apply -f runtimeclass.yaml
 ```
 
-### Pod 配置
+### Pod配置
 
 #### 测试结果目录
 
-在 Host 侧创建测试结果保存目录。
+在Host侧创建测试结果保存目录。
 
 ```bash
 mkdir -p /opt/kata-pmem-test/results
@@ -280,7 +237,7 @@ chmod 0770 /opt/kata-pmem-test/results
 ```
 
 ```text
-该目录用于保存 treewalk 测试日志和结果文件。
+该目录用于保存 treewalk测试日志和结果文件。
 ```
 
 #### Pod YAML
@@ -344,7 +301,7 @@ spec:
 
 ### 特性验证
 
-1. 部署测试 Pod。
+1. 部署测试Pod。
 
     ```bash
     kubectl apply -f kata-pmem-treewalk-pod.yaml
@@ -357,20 +314,20 @@ spec:
     kubectl exec -it kata-pmem-treewalk -- bash
     ```
 
-3. 验证容器 rootfs
+3. 验证容器rootfs。
 
     ```bash
     findmnt -T / -o TARGET,SOURCE,FSTYPE,OPTIONS
     ```
 
-    预期 `/` 的文件系统类型为 `virtiofs`：
+    预期`/`的文件系统类型为`virtiofs`。
 
     ```text
     TARGET SOURCE FSTYPE   OPTIONS
     /      none   virtiofs rw,relatime
     ```
 
-4. 验证 Guest 是否识别 PMEM 设备：
+4. 验证Guest是否识别PMEM设备。
 
     ```bash
     cat /proc/partitions | grep pmem
@@ -383,19 +340,19 @@ spec:
     259        1     259072 pmem0p1
     ```
 
-5. 创建设备节点：
+5. 创建设备节点。
 
     ```bash
     # 主设备号和次设备号以第4步中实际环境为准
     mknod /dev/pmem0p1 b 259 1
     ```
 
-6. mount：
+6. mount。
 
     ```bash
-    #创建挂载目录
+    #创建挂载目录。
     mkdir -p /pmem
-    #以只读方式挂载 PMEM 分区
+    #以只读方式挂载 PMEM分区。
     mount -t ext4 -o ro /dev/pmem0p1 /pmem
     ```
 
@@ -405,7 +362,7 @@ spec:
     根据实际文件系统类型调整 -t 参数。
     ```
 
-7. 查看挂载结果：
+7. 查看挂载结果。
 
     ```bash
     findmnt -T /pmem -o TARGET,SOURCE,FSTYPE,OPTIONS
@@ -417,7 +374,7 @@ spec:
     /pmem /dev/pmem0p1 ext4 ro,relatime,...
     ```
 
-8. 验证只读
+8. 验证只读。
 
     ```bash
     touch /pmem/write-test
@@ -431,7 +388,7 @@ spec:
 
 ### 测试执行
 
-1. 确认测试程序已打包
+1. 确认测试程序已打包。
 
     ```bash
     ls -l \
@@ -441,26 +398,26 @@ spec:
       /usr/local/bin/export_treewalk_results.py
     ```
 
-    确认 treewalk 可以执行：
+    确认 treewalk可以执行。
 
     ```bash
     /usr/local/bin/treewalk 2>&1 | head
     ```
 
-2. 执行数据准备脚本：
+2. 执行数据准备脚本。
 
     ```bash
     # 用于准备 PMEM 和 virtio-fs 两侧一致的测试数据。
     /usr/local/bin/prepare_treewalk_data.sh
     ```
 
-3. 执行测试：
+3. 执行测试。
 
     ```bash
     /usr/local/bin/run_treewalk_test.sh
     ```
 
-    如需指定测试轮数：
+    如需指定测试轮数，添加ROUNDS参数。
 
     ```bash
     ROUNDS=10 /usr/local/bin/run_treewalk_test.sh
@@ -476,7 +433,7 @@ spec:
 - `dataread`：顺序读测试。
 - `randread`：随机读测试，最后参数表示测试持续时间（秒）。
 
-PMEM 路径测试：
+PMEM路径测试如下：
 
 ```bash
 treewalk statwalk /pmem/usr
@@ -485,7 +442,7 @@ treewalk dataread /pmem/usr
 treewalk randread /pmem/usr 30
 ```
 
-virtio-fs 路径：
+virtio-fs路径测试如下：
 
 ```bash
 treewalk statwalk /vfs/usr
@@ -498,7 +455,7 @@ treewalk randread /vfs/usr  30
 
 #### 容器内导出
 
-执行数据导出脚本，将测试结果转换为 CSV 文件。
+执行数据导出脚本，将测试结果转换为CSV文件。
 
 ```bash
 python3 /usr/local/bin/export_treewalk_results.py /bench/treewalk-results
@@ -511,7 +468,7 @@ python3 /usr/local/bin/export_treewalk_results.py /bench/treewalk-results
 /bench/treewalk-results/treewalk-summary.csv
 ```
 
-由于测试结果目录通过 HostPath 挂载，导出文件会同步保存到 Host：
+由于测试结果目录通过HostPath挂载，导出文件会同步保存到Host。
 
 ```bash
 ls -l /opt/kata-pmem-test/results/treewalk-results
@@ -519,7 +476,7 @@ ls -l /opt/kata-pmem-test/results/treewalk-results
 
 ### 安全回退
 
-测试完成后，删除测试 Pod 和测试结果。
+测试完成后，删除测试Pod和测试结果。
 
 ```bash
 kubectl delete pod kata-pmem-treewalk
@@ -529,25 +486,25 @@ rm -rf /opt/kata-pmem-test/results/*
 
 如需恢复测试前环境：
 
-1. 删除 PMEM 独立 Kata 配置：
+1. 删除PMEM独立Kata配置。
 
     ```bash
     # 删除 RuntimeClass 前，请确认无其他 Pod 使用该 RuntimeClass。
     rm -f /etc/kata-containers/configuration-qemu-pmem.toml
     ```
 
-2. 删除 containerd 中 kata-qemu-pmem runtime 配置。
-3. 重启 containerd：
+2. 删除containerd中 kata-qemu-pmem runtime配置。
+3. 重启containerd。
 
     ```bash
     systemctl restart containerd
     ```
 
-## 附录 A：相关测试脚本
+## 附录A：相关测试脚本
 
 ### A.1 treewalk.c
 
-创建 `treewalk.c`：
+创建 `treewalk.c`。
 
 ```c
     // treewalk: read-only file access benchmark
@@ -1041,7 +998,7 @@ rm -rf /opt/kata-pmem-test/results/*
 
 ### A.2 prepare_treewalk_data.sh
 
-创建 `prepare_treewalk_data.sh`：
+创建 `prepare_treewalk_data.sh`。
 
 ```bash
 #!/usr/bin/env bash
@@ -1077,7 +1034,7 @@ echo "VFS files:  $(find "${VFS_DIR}" -type f | wc -l)"
 
 ### A.3 run_treewalk_test.sh
 
-创建 `run_treewalk_test.sh`：
+创建 `run_treewalk_test.sh`。
 
 ```bash
 #!/usr/bin/env bash
@@ -1174,7 +1131,7 @@ done
 
 ### A.4 export_treewalk_results.py
 
-创建 `export_treewalk_results.py`：
+创建 `export_treewalk_results.py`。
 
 ```python
 #!/usr/bin/env python3
@@ -1362,7 +1319,7 @@ if __name__ == "__main__":
 脚本最终生成两份文件：
 
     treewalk-raw.csv
-    → 每一轮的原始结果
+    → 每一轮的原始结果。
 
     treewalk-summary.csv
-    → 按 mode、backend、metric 汇总后的均值、中位数、范围和变异系数
+    → 按 mode、backend、metric 汇总后的均值、中位数、范围和变异系数。
