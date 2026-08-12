@@ -151,7 +151,7 @@ kata-pmem-treewalk/
 
 #### 创建独立配置
 
-为避免影响默认 Kata配置，创建独立QEMU PMEM配置文件。
+为避免影响默认Kata配置，创建独立QEMU PMEM配置文件。
 
 ```bash
 cp /etc/kata-containers/configuration-qemu.toml \
@@ -199,7 +199,7 @@ vm_rootfs_driver = "virtio-pmem"
     ConfigPath = "/etc/kata-containers/configuration-qemu-pmem.toml"
 ```
 
-重启 containerd。
+重启containerd。
 
 ```bash
 systemctl restart containerd
@@ -237,7 +237,7 @@ chmod 0770 /opt/kata-pmem-test/results
 ```
 
 ```text
-该目录用于保存 treewalk测试日志和结果文件。
+该目录用于保存treewalk测试日志和结果文件。
 ```
 
 #### Pod YAML
@@ -250,9 +250,9 @@ metadata:
   name: kata-pmem-treewalk
 
 spec:
-  # 使用启用 Guest image NVDIMM 的 Kata RuntimeClass。
+  # 使用启用Guest image NVDIMM的Kata RuntimeClass。
   runtimeClassName: kata-qemu-pmem
-  # Pod 退出后不自动重启，适合一次性性能测试。
+  # Pod退出后不自动重启，适合一次性性能测试。
   restartPolicy: Never
 
   containers:
@@ -262,7 +262,7 @@ spec:
       image:  docker.io/library/ubuntu-treewalk:latest
       imagePullPolicy: IfNotPresent
 
-      # 保持容器运行，进入容器后人工确认并挂载 PMEM 设备。
+      # 保持容器运行，进入容器后人工确认并挂载PMEM设备。
       command:
         - bash
         - -lc
@@ -273,21 +273,21 @@ spec:
         runAsUser: 0
         runAsGroup: 0
 
-        # 不开启完整特权模式，只添加测试所需 capability。
+        # 不开启完整特权模式，只添加测试所需capability。
         privileged: false
         allowPrivilegeEscalation: false
 
         capabilities:
           add:
-            # 当容器内没有 /dev/pmemX 设备节点时，
-            # 用于执行 mknod 创建块设备节点。
+            # 当容器内没有/dev/pmemX设备节点时，
+            # 用于执行mknod创建块设备节点。
             - MKNOD
 
-            # 用于容器内执行 mount/umount 操作。
+            # 用于容器内执行mount/umount操作。
             - SYS_ADMIN
 
       volumeMounts:
-        # 保存 treewalk 原始日志和汇总结果。
+        # 保存treewalk原始日志和汇总结果。
         - name: benchmark-results
           mountPath: /bench
 
@@ -352,7 +352,7 @@ spec:
     ```bash
     #创建挂载目录。
     mkdir -p /pmem
-    #以只读方式挂载 PMEM分区。
+    #以只读方式挂载PMEM分区。
     mount -t ext4 -o ro /dev/pmem0p1 /pmem
     ```
 
@@ -504,7 +504,7 @@ rm -rf /opt/kata-pmem-test/results/*
 
 ### A.1 treewalk.c
 
-创建 `treewalk.c`。
+创建`treewalk.c`。
 
 ```c
     // treewalk: read-only file access benchmark
@@ -582,7 +582,7 @@ rm -rf /opt/kata-pmem-test/results/*
 
     /*
      * statopen：
-     * 在 statwalk 的基础上，对每个普通文件执行：
+     * 在statwalk的基础上，对每个普通文件执行：
      *   open(O_RDONLY)
      *   close
      */
@@ -624,7 +624,7 @@ rm -rf /opt/kata-pmem-test/results/*
     }
 
     /*
-     * dataread 成功读取的总字节数。
+     * dataread成功读取的总字节数。
      */
     static unsigned long long db;
 
@@ -676,8 +676,8 @@ rm -rf /opt/kata-pmem-test/results/*
     }
 
     /*
-     * randread 最多收集 4,000,000 个文件路径。
-     * 当前 /usr 只有几千个文件，远低于这个上限。
+     * randread最多收集 4,000,000个文件路径。
+     * 当前/usr只有几千个文件，远低于这个上限。
      */
     static char *paths[4000000];
     static int npaths;
@@ -731,7 +731,7 @@ rm -rf /opt/kata-pmem-test/results/*
     }
 
     /*
-     * 防止编译器完全忽略 randread 读取到的数据。
+     * 防止编译器完全忽略randread读取到的数据。
      */
     static unsigned long long rx;
 
@@ -846,7 +846,7 @@ rm -rf /opt/kata-pmem-test/results/*
     /*
      * createdel：
      *
-     * 在指定目录创建 n 个空文件，再删除这些文件，
+     * 在指定目录创建n个空文件，再删除这些文件，
      * 分别统计创建和删除阶段的吞吐。
      *
      * 返回值：
@@ -998,7 +998,7 @@ rm -rf /opt/kata-pmem-test/results/*
 
 ### A.2 prepare_treewalk_data.sh
 
-创建 `prepare_treewalk_data.sh`。
+创建`prepare_treewalk_data.sh`。
 
 ```bash
 #!/usr/bin/env bash
@@ -1017,7 +1017,7 @@ rm -rf "${VFS_DIR}"
 
 mkdir -p "${VFS_ROOT}"
 
-# 将 /pmem/usr 整体复制到 /vfs 下。
+# 将/pmem/usr整体复制到/vfs下。
 cp -a "${PMEM_DIR}" "${VFS_ROOT}/"
 
 # 等待脏页写回，确保复制动作完成。
@@ -1041,7 +1041,7 @@ echo "VFS files:  $(find "${VFS_DIR}" -type f | wc -l)"
 
 set -euo pipefail
 
-# treewalk 可执行文件路径。
+# treewalk可执行文件路径。
 TREEWALK="${TREEWALK:-/usr/local/bin/treewalk}"
 
 # 测试目录。
@@ -1052,7 +1052,7 @@ OUT="${OUT:-/bench/treewalk-results}"
 # 每种测试模式执行的轮数。
 ROUNDS="${ROUNDS:-10}"
 
-# randread 单轮持续时间，单位为秒。
+# randread单轮持续时间，单位为秒。
 RANDREAD_SECS="${RANDREAD_SECS:-30}"
 
 mkdir -p "${OUT}"
@@ -1065,7 +1065,7 @@ for path in "${PMEM_DIR}" "${VFS_DIR}"; do
     }
 done
 
-# 统计 PMEM 和 virtio-fs 目录中的普通文件数量和逻辑大小。
+# 统计PMEM和virtio-fs目录中的普通文件数量和逻辑大小。
 for backend in pmem vfs; do
     eval path='${'$(echo "${backend}" | tr '[:lower:]' '[:upper:]')'_DIR}'
 
@@ -1093,7 +1093,7 @@ cmp -s \
         exit 23
     }
 
-# 执行单次 treewalk，并将输出同时保存到日志文件。
+# 执行单次treewalk，并将输出同时保存到日志文件。
 run_test() {
     local mode=$1
     local backend=$2
@@ -1116,7 +1116,7 @@ run_test() {
 for mode in statwalk statopen dataread randread; do
     for round in $(seq 1 "${ROUNDS}"); do
 
-        # 奇数轮先跑 PMEM，偶数轮先跑 VFS，
+        # 奇数轮先跑PMEM，偶数轮先跑VFS，
         # 用于减少固定执行顺序带来的缓存和系统状态偏差。
         if (( round % 2 == 1 )); then
             run_test "${mode}" pmem "${PMEM_DIR}" "${round}"
@@ -1145,7 +1145,7 @@ import sys
 from pathlib import Path
 
 
-# 匹配 treewalk 日志文件名。
+# 匹配treewalk日志文件名。
 # 格式：测试类型-后端-r次序.log
 LOG_RE = re.compile(
     r"^(statwalk|statopen|dataread|randread)-(pmem|vfs)-r(\d+)\.log$"
