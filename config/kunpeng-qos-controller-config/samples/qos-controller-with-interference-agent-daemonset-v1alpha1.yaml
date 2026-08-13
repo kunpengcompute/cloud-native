@@ -87,6 +87,7 @@ spec:
         # 镜像中需要包含 libkperf 和默认的本地模型文件。
         image: waas-agent:latest
         imagePullPolicy: IfNotPresent
+        command: ["python3", "src/agent/main.py"]
         args:
         - --analysis-mode=local
         - --http-host=127.0.0.1
