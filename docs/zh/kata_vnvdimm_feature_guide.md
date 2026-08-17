@@ -83,7 +83,7 @@ Host Kata Guest image
 #### Dockerfile
 
 ```dockerfile
-FROM ubuntu:latest AS builder
+FROM ubuntu:24.04 AS builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -95,7 +95,7 @@ COPY treewalk.c /tmp/treewalk.c
 RUN gcc /tmp/treewalk.c -o /tmp/treewalk
 
 
-FROM ubuntu:latest
+FROM ubuntu:24.04
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -154,9 +154,11 @@ kata-pmem-treewalk/
 为避免影响默认Kata配置，创建独立QEMU PMEM配置文件。
 
 ```bash
-cp /etc/kata-containers/configuration-qemu.toml \
-   /etc/kata-containers/configuration-qemu-pmem.toml
+cp /opt/kata/share/defaults/kata-containers/configuration-qemu.toml \
+   /opt/kata/share/defaults/kata-containers/configuration-qemu-pmem.toml
 ```
+
+注：配置文件路径以实际为准。
 
 #### 关键配置
 
@@ -196,7 +198,7 @@ vm_rootfs_driver = "virtio-pmem"
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.kata-qemu-pmem]
   runtime_type = "io.containerd.kata.v2"
   [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.kata-qemu-pmem.options]
-    ConfigPath = "/etc/kata-containers/configuration-qemu-pmem.toml"
+    ConfigPath = "/opt/kata/share/defaults/kata-containers/configuration-qemu-pmem.toml"
 ```
 
 重启containerd。
@@ -204,6 +206,8 @@ vm_rootfs_driver = "virtio-pmem"
 ```bash
 systemctl restart containerd
 ```
+
+注：配置文件路径以实际为准。
 
 #### 创建RuntimeClass
 
@@ -213,7 +217,7 @@ systemctl restart containerd
     apiVersion: node.k8s.io/v1
     kind: RuntimeClass
     metadata:
-    name: kata-qemu-pmem
+      name: kata-qemu-pmem
     handler: kata-qemu-pmem
     ```
 
