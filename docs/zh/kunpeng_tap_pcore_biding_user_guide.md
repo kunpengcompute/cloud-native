@@ -56,7 +56,14 @@ Kunpeng-TAP Pcore Biding插件是Kunpeng-TAP面向Kata机密容器场景提供�
 
 ## 3. 启用containerd NRI
 
-containerd `v1.7`和`v2.x`均可通过`/etc/containerd/config.toml`配置NRI。containerd `v2.0`及以上默认启用NRI，但仍建议显式检查配置和socket。修改配置前建议先备份配置文件：
+containerd `v1.7`和`v2.x`均可通过`/etc/containerd/config.toml`配置NRI，但默认状态和CRI插件名称不同：
+
+| containerd版本 | 推荐配置格式 | NRI默认状态 | CRI插件名称 |
+| --- | --- | --- | --- |
+| `v1.7.x` | `version = 2` | 默认禁用，必须显式设置`disable = false` | `io.containerd.grpc.v1.cri` |
+| `v2.x` | `version = 3` | 默认启用，仍需确认允许外部插件连接 | `io.containerd.cri.v1.runtime` |
+
+以下NRI配置块适用于containerd `v1.7`和`v2.x`。修改配置前建议先备份配置文件：
 
 ```bash
 cp /etc/containerd/config.toml /etc/containerd/config.toml.bak
@@ -271,12 +278,22 @@ kata-clh-cpuset-scale-56b8466877-262nc 2-3
 kata-clh-cpuset-scale-56b8466877-26kwr 4-5
 ```
 
-查看单个Pod的parent cgroup和sandbox cgroup文件：
+查看单个Pod的parent cgroup和sandbox cgroup文件。脚本使用Pod UID精确匹配对应sandbox：
 
 ```bash
-pod=kata-clh-cpuset-scale-56b8466877-254rp
-uid=$(kubectl get pod "$pod" -n default -o jsonpath='{.metadata.uid}' | tr - _)
-find /sys/fs/cgroup/cpuset -path "*pod${uid}.slice*/cpuset.cpus" -print | sort | while read -r file; do
+ns=default
+pod=kata-clh-cpuset-limit-2
+root=/sys/fs/cgroup/cpuset
+
+pod_uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}')
+uid=$(printf '%s' "$pod_uid" | tr - _)
+sid=$(crictl pods -q --label "io.kubernetes.pod.uid=${pod_uid}" --state Ready)
+test -n "$sid" || { printf 'Ready sandbox not found for %s\n' "$pod" >&2; exit 1; }
+
+find "$root" \( \
+  -path "*pod${uid}.slice/cpuset.cpus" -o \
+  -path "*pod${uid}.slice*${sid}*/cpuset.cpus" \
+\) -print | sort | while read -r file; do
   printf '%s = ' "$file"
   cat "$file"
 done
@@ -296,8 +313,9 @@ out=/tmp/kata-cpuset-scale-results.txt
 : > "$out"
 
 kubectl get pods -n "$ns" -l "$selector" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort | while read -r pod; do
-  uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}' | tr - _)
-  sid=$(crictl pods -q --name "^${pod}$" --namespace "$ns" --state Ready | head -n 1)
+  pod_uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}')
+  uid=$(printf '%s' "$pod_uid" | tr - _)
+  sid=$(crictl pods -q --label "io.kubernetes.pod.uid=${pod_uid}" --state Ready)
   sid=${sid:-NONE}
   parent_file=$(find "$root" -path "*pod${uid}.slice/cpuset.cpus" -print | sort | head -n 1)
   sandbox_file=
