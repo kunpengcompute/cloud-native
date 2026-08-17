@@ -494,10 +494,10 @@ rm -rf /opt/kata-pmem-test/results/*
 
     ```bash
     # 删除 RuntimeClass 前，请确认无其他 Pod 使用该 RuntimeClass。
-    rm -f /etc/kata-containers/configuration-qemu-pmem.toml
+    rm -f /opt/kata/share/defaults/kata-containers/configuration-qemu-pmem.toml
     ```
 
-2. 删除containerd中 kata-qemu-pmem runtime配置。
+2. 删除```/etc/containerd/config.toml```kata-qemu-pmem runtime配置。
 3. 重启containerd。
 
     ```bash
