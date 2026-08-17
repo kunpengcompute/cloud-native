@@ -53,7 +53,7 @@ Before compiling the plugin, ensure that KAE devices are available and the KAE d
 
         ![](figures/en-us_image_0000002549892321.png)
 
-    - If no command output is displayed, the license may not be installed on the compute nodes. In this case, install the license as instructed in [Obtaining a License](https://www.hikunpeng.com/document/detail/en/kunpengaccel/kae/usermanual/kunpengaccel_06_0008.html).
+    - If no command output is displayed, the license may not be installed on the compute nodes. In this case, install the license as instructed in [Obtaining a License](https://www.hikunpeng.com/document/detail/en/kunpengaccel/kae/kae/docs/en/installation_guide.md#obtaining-the-license).
 
 3. Run the following command to check whether the KAE drivers have been installed on the compute nodes:
 
@@ -61,7 +61,7 @@ Before compiling the plugin, ensure that KAE devices are available and the KAE d
     ls /sys/class/uacce
     ```
 
-    An example command output is as follows. If no command output is displayed, the KAE drivers may not be installed. In this case, install the KAE drivers as instructed in [Installation Using Source Code](https://www.hikunpeng.com/document/detail/en/kunpengaccel/kae/usermanual/kunpengaccel_06_0012.html).
+    An example command output is as follows. If no command output is displayed, the KAE drivers may not be installed. In this case, install the KAE drivers as instructed in [Installation Using Source Code](https://www.hikunpeng.com/document/detail/en/kunpengaccel/kae/kae/docs/en/installation_guide.md#installation-using-the-source-code).
 
     ![](figures/en-us_image_0000002518252552.png)
 
