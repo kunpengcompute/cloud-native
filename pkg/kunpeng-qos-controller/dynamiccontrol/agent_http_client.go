@@ -243,13 +243,7 @@ func (c *HTTPAgentClient) GetInterference(ctx context.Context, nodeName string) 
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return AgentAnalyzeResult{}, fmt.Errorf("decode interference response failed: %w", err)
 	}
-	if out.Version != defaultAgentAPIVersion {
-		return AgentAnalyzeResult{}, fmt.Errorf(
-			"unexpected interference response version: got %q, want %q",
-			out.Version,
-			defaultAgentAPIVersion,
-		)
-	}
+
 	if out.NodeName != nodeName {
 		return AgentAnalyzeResult{}, fmt.Errorf(
 			"unexpected interference response node: got %q, want %q",
