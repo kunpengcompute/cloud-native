@@ -80,6 +80,29 @@ Host Kata Guest image
 
 ### 容器镜像准备
 
+#### 目录结构
+
+```text
+kata-pmem-treewalk/
+├── Dockerfile
+├── treewalk.c
+├── prepare_treewalk_data.sh
+├── run_treewalk_test.sh
+└── export_treewalk_results.py
+```
+
+说明：
+
+- treewalk.c：文件访问性能测试程序源码。
+- prepare_treewalk_data.sh：数据准备脚本，用于生成测试所需文件数据。
+- run_treewalk_test.sh：测试执行脚本，用于执行测试流程。
+- export_treewalk_results.py：测试结果导出脚本，用于整理和导出测试数据。
+
+上述测试程序和辅助脚本已集成至测试容器镜像中，方便测试环境快速部署和复用。
+也支持在容器启动后手动复制相关文件并执行测试。
+
+相关测试程序和脚本请参见 `附录A：相关测试脚本`。
+
 #### Dockerfile
 
 ```dockerfile
@@ -123,29 +146,6 @@ CMD ["bash", "-lc", "sleep infinity"]
 ```bash
 docker build -f Dockerfile -t docker.io/library/ubuntu-treewalk:latest .
 ```
-
-#### 目录结构
-
-```text
-kata-pmem-treewalk/
-├── Dockerfile
-├── treewalk.c
-├── prepare_treewalk_data.sh
-├── run_treewalk_test.sh
-└── export_treewalk_results.py
-```
-
-说明：
-
-- treewalk.c：文件访问性能测试程序源码。
-- prepare_treewalk_data.sh：数据准备脚本，用于生成测试所需文件数据。
-- run_treewalk_test.sh：测试执行脚本，用于执行测试流程。
-- export_treewalk_results.py：测试结果导出脚本，用于整理和导出测试数据。
-
-上述测试程序和辅助脚本已集成至测试容器镜像中，方便测试环境快速部署和复用。
-也支持在容器启动后手动复制相关文件并执行测试。
-
-相关测试程序和脚本请参见 `附录A：相关测试脚本`。
 
 ### Kata配置
 
@@ -384,7 +384,7 @@ spec:
     touch /pmem/write-test
     ```
 
-    预期：
+    预期输出：
 
     ```text
     Read-only file system
