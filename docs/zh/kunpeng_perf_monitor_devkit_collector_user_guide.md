@@ -275,10 +275,21 @@ DevKit Collector启动后会立即开始首次采集。TopDown和Memory在同一
 
 **Prometheus模式<a name="devkit-collector-prometheus-verification"></a>**
 
-1. 将`<prometheus-address>`替换为实际的Prometheus HTTP地址，查询active target。
+1. 确认Prometheus Service的地址和端口。
 
     ```bash
-    curl -fsS 'http://<prometheus-address>/api/v1/targets?state=active' | \
+    kubectl get svc -A | grep -i prometheus
+    ```
+
+    从输出中找到Prometheus Service所在的命名空间、Service名称和`PORT(S)`。例如，`9090:30090/TCP`中，`9090`是Service端口，`30090`是NodePort。
+
+    - 在集群内访问Prometheus时，`<prometheus-address>`填写Service的`CLUSTER-IP`或Service DNS名称（格式为`<service-name>.<namespace>.svc`），`<port>`填写Service端口。
+    - 通过NodePort从集群外访问Prometheus时，`<prometheus-address>`填写节点的`INTERNAL-IP`，`<port>`填写`PORT(S)`中冒号后的NodePort。节点地址可以通过`kubectl get node <node-name> -o wide`确认。
+
+2. 将`<prometheus-address>:<port>`替换为上一步确认的实际地址和端口，查询active target。
+
+    ```bash
+    curl -fsS 'http://<prometheus-address>:<port>/api/v1/targets?state=active' | \
       jq '.data.activeTargets[] |
         select(.labels.job == "kunpeng-perf-monitor") |
         {scrapeUrl,health,lastError,labels}'
