@@ -442,10 +442,10 @@ memory:
     ```bash
     kubectl -n default logs \
       -l app.kubernetes.io/component=devkit-collector --since=2m | \
-      grep -E 'collection configuration reloaded|devkit_config_rejected'
+      grep -E 'devkit_config_changed|devkit_config_rejected'
     ```
 
-    出现`collection configuration reloaded`表示配置已经生效。出现`devkit_config_rejected`表示配置被拒绝，DevKit Collector会继续使用上一份有效配置。
+    出现`devkit_config_changed`表示配置已经生效。出现`devkit_config_rejected`表示配置被拒绝，DevKit Collector会继续使用上一份有效配置。
 
 5. 等待下一轮采集（15-30s）后，再次查询相关指标。CPU `0-3`示例对应的标签应包含`target_type="cpu"`和`target="cpu0-3"`。
 
