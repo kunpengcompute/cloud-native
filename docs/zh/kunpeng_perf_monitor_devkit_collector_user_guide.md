@@ -451,6 +451,12 @@ memory:
 
 如需恢复system采集范围，请将`topdown.cpu`、`topdown.pid`和`memory.cpu`都设置为空字符串，再整体更新ConfigMap。**删除ConfigMap不会恢复默认值**，DevKit Collector会继续使用上一份有效配置。
 
+如需删除ConfigMap，请执行：
+
+```bash
+kubectl -n default delete configmap kunpeng-perf-monitor-devkit-config
+```
+
 **TopDown PID采集范围示例<a name="devkit-collector-pid-scope-example"></a>**
 
 ```yaml
