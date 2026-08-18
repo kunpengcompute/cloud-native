@@ -157,7 +157,7 @@ Go版本推荐 1.25，Docker daemon应处于可用状态。
     kubectl delete -f config/kunpeng-perf-monitor/k8s/devkit-prometheus/deployment.yaml --ignore-not-found
     ```
 
-3. 部署NodePort独立模式。
+3. 部署NodePort独立模式的Devkit Collector。
 
     ```bash
     kubectl apply -f config/kunpeng-perf-monitor/k8s/deployment-devkit.yaml
@@ -194,7 +194,7 @@ Go版本推荐 1.25，Docker daemon应处于可用状态。
 
 **（可选）部署Prometheus模式<a name="devkit-collector-prometheus-deployment"></a>**
 
-如果集群已经部署kube-Prometheus，并希望由Prometheus自动发现DevKit Collector并收集相关指标，可以执行以下步骤。
+如果**集群已经部署[kube-Prometheus](https://github.com/prometheus-operator/kube-prometheus)，并希望由Prometheus自动发现DevKit Collector并收集相关指标**，可以执行以下步骤。
 
 1. 检查`ServiceMonitor` CRD。
 
@@ -213,7 +213,7 @@ Go版本推荐 1.25，Docker daemon应处于可用状态。
 
     如果此前未部署NodePort独立模式，第二条命令可能提示没有匹配资源，可以继续下一步。
 
-3. 部署Prometheus模式。
+3. 部署Prometheus模式的Devkit Collector。
 
     ```bash
     kubectl apply -f config/kunpeng-perf-monitor/k8s/devkit-prometheus/deployment.yaml
@@ -275,18 +275,57 @@ DevKit Collector启动后会立即开始首次采集。TopDown和Memory在同一
 
 **Prometheus模式<a name="devkit-collector-prometheus-verification"></a>**
 
-1. 确认Prometheus Service的地址和端口。
+1. 确认Prometheus Service的地址和端口 `<prometheus-address>:<port>`。
 
-    ```bash
-    kubectl get svc -A | grep -i prometheus
-    ```
+  > **说明:**
+  >
+  > 1. 默认的kube-prometheus部署时，Prometheus服务以ClusterIP形式部署，**仅在集群内可访问**。若想在集群外（如对应节点的物理机）访问，需要将其配置为**NodePort**。配置参考如下的 **配置Prometheus和Grafana的NodePort** 小节。
+  > 2. Grafana是kube-prometheus内置的图形化操作界面，可便捷查询指标，后文也将会使用它进行指标查询，所以一并配置为NodePort。
 
-    从输出中找到Prometheus Service所在的命名空间、Service名称和`PORT(S)`。例如，`9090:30090/TCP`中，`9090`是Service端口，`30090`是NodePort。
+  **（可选）配置Prometheus和Grafana的NodePort**
+  kube-prometheus默认部署时，Prometheus和Grafana的Service类型为ClusterIP，仅在集群内可访问。如果需要在外部访问这两个服务，需要将它们的类型改为NodePort。修改内容参考：
+  
+  在`manifests/`目录下，对两个Service文件进行如下修改,其中nodePort设定值可根据实际情况调整。
+  `grafana-service.yaml`：`spec.type`改为`NodePort`，为http端口指定`nodePort: 30000`。
 
-    - 在集群内访问Prometheus时，`<prometheus-address>`填写Service的`CLUSTER-IP`或Service DNS名称（格式为`<service-name>.<namespace>.svc`），`<port>`填写Service端口。
-    - 通过NodePort从集群外访问Prometheus时，`<prometheus-address>`填写节点的`INTERNAL-IP`，`<port>`填写`PORT(S)`中冒号后的NodePort。节点地址可以通过`kubectl get node <node-name> -o wide`确认。
+  ```yaml
+  spec:
+    type: NodePort
+    ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      nodePort: 30000
+  ```
 
-2. 将`<prometheus-address>:<port>`替换为上一步确认的实际地址和端口，查询active target。
+  `prometheus-service.yaml`（Service名`prometheus-k8s`）：`spec.type`改为`NodePort`，为web端口指定`nodePort: 30090`（`reloader-web`端口不对外暴露，由系统自动分配）。
+
+  ```yaml
+  spec:
+    type: NodePort
+    ports:
+    - name: web
+      port: 9090
+      targetPort: web
+      nodePort: 30090
+    - name: reloader-web
+      port: 8080
+      targetPort: reloader-web
+  ```
+  
+  **查询`<prometheus-address>:<port>`**
+  运行如下命令。
+
+  ```bash
+  kubectl get svc -A | grep -i prometheus
+  ```
+
+  从输出中找到Prometheus Service所在的命名空间（默认为monitoring）、Service名称（默认为prometheus-k8s）和`PORT(S)`（默认为9090）。如果按照上述参考配置Prometheus的NodePort，则`PORT(S)`为`9090:30090/TCP`中，`9090`是Service端口，`30090`是NodePort。
+
+- 在集群内访问Prometheus时，`<prometheus-address>`即为Service的`CLUSTER-IP`，`<port>`填写Service端口。
+- 通过NodePort从集群外访问Prometheus时，`<prometheus-address>`填写节点的`INTERNAL-IP`，`<port>`填写`PORT(S)`中冒号后的NodePort。节点地址可以通过`kubectl get node <node-name> -o wide`确认。
+
+1. 将`<prometheus-address>:<port>`替换为上一步确认的实际地址和端口，查询active target。
 
     ```bash
     curl -fsS 'http://<prometheus-address>:<port>/api/v1/targets?state=active' | \
@@ -315,58 +354,6 @@ DevKit Collector启动后会立即开始首次采集。TopDown和Memory在同一
     ```
 
     `health`应为`up`，`lastError`应为空。随后可以在Prometheus或Grafana中查询相关指标。
-
-**Grafana图形化查看指标<a name="devkit-collector-grafana"></a>**
-
-本节适用于已经部署kube-prometheus，并使用Prometheus模式部署DevKit Collector的场景。NodePort独立模式只提供`/metrics`接口，不会自动将历史数据写入Prometheus，因此不能直接在Grafana中查看趋势图。
-
-**（可选）配置Prometheus和Grafana的NodePort**
-kube-prometheus默认部署时，Prometheus和Grafana的Service类型为ClusterIP，仅在集群内可访问。如果需要在外部访问这两个服务，需要将它们的类型改为NodePort。修改内容参考：
-在`manifests/`目录下，对两个Service文件进行如下修改,其中nodePort设定值可根据实际情况调整。
-
-`grafana-service.yaml`：`spec.type`改为`NodePort`，为http端口指定`nodePort: 30000`。
-
-```yaml
-spec:
-  type: NodePort
-  ports:
-  - name: http
-    port: 3000
-    targetPort: http
-    nodePort: 30000
-```
-
-`prometheus-service.yaml`（Service名`prometheus-k8s`）：`spec.type`改为`NodePort`，为web端口指定`nodePort: 30090`（`reloader-web`端口不对外暴露，由系统自动分配）。
-
-```yaml
-spec:
-  type: NodePort
-  ports:
-  - name: web
-    port: 9090
-    targetPort: web
-    nodePort: 30090
-  - name: reloader-web
-    port: 8080
-    targetPort: reloader-web
-```
-
-**查看图形化指标**
-
-1. 使用浏览器访问Grafana。
-
-    ```text
-    http://<node-ip>:<grafana-node-port>/
-    ```
-
-2. 登录Grafana。默认用户名密码为`admin/admin`，登录后会要求修改密码，建议修改为复杂密码。
-3. 查询相关指标。
-   如下图所示，在左侧导航栏选择**Explore**，然后点击**Metric**，输入`devkit`便会自动列出所有相关指标，选择其中一个，最后点击**Run query**即可查看指标趋势图。
-
-  ![Grafana操作图](figures/grafana-guide.png)
-
-> **说明：**
-> 在Explore页面右上角可设定查询时间范围。
 
 ### 配置采集范围<a name="devkit-collector-configure-scope"></a>
 
@@ -536,7 +523,7 @@ topdown:
 
 带宽指标的单位为DevKit Tuner CLI报告中的MB/s。百分比和命中率指标为无量纲数值。所有业务指标都是最近采集窗口的Gauge快照，不应使用promql的`rate()`或`increase()`按Counter处理。
 
-#### Prometheus查询示例
+#### （可选）Prometheus查询示例promql
 
 查询TopDown system采集范围的健康状态。
 
@@ -566,6 +553,27 @@ kunpeng_node_devkit_topdown_bound_percent{
 
 > **说明：**
 > Prometheus的`up=1`只表示HTTP scrape成功。判断DevKit Collector后台采集是否成功时，应同时查询对应采集器的`collection_success`和`last_success_unixtime_seconds`。
+
+#### （推荐）Grafana图形化查看指标<a name="devkit-collector-grafana"></a>
+
+本节适用于**已经部署kube-prometheus**，并**使用Prometheus模式部署DevKit Collector**的场景。NodePort独立模式只提供`/metrics`接口，不会自动将历史数据写入Prometheus，因此不能直接在Grafana中查看趋势图。
+
+**查看图形化指标**
+
+1. 使用浏览器访问Grafana。
+
+    ```text
+    http://<node-ip>:<grafana-node-port>/
+    ```
+
+2. 登录Grafana。默认用户名密码为`admin/admin`，登录后会要求修改密码，建议修改为复杂密码。
+3. 查询相关指标。
+   如下图所示，在左侧导航栏选择**Explore**，然后点击**Metric**，输入`devkit`便会自动列出所有相关指标，选择其中一个，最后点击**Run query**即可查看指标趋势图。
+
+  ![Grafana操作图](figures/grafana-guide.png)
+
+> **说明：**
+> 在Explore页面右上角可设定查询时间范围。
 
 ### 故障处理<a name="devkit-collector-troubleshooting"></a>
 
