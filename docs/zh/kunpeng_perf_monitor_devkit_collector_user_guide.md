@@ -278,7 +278,6 @@ DevKit Collector启动后会立即开始首次采集。TopDown和Memory在同一
 1. 确认Prometheus Service的地址和端口 `<prometheus-address>:<port>`。
 
   > **说明:**
-  >
   > 1. 默认的kube-prometheus部署时，Prometheus服务以ClusterIP形式部署，**仅在集群内可访问**。若想在集群外（如对应节点的物理机）访问，需要将其配置为**NodePort**。配置参考如下的 **配置Prometheus和Grafana的NodePort** 小节。
   > 2. Grafana是kube-prometheus内置的图形化操作界面，可便捷查询指标，后文也将会使用它进行指标查询，所以一并配置为NodePort。
 
