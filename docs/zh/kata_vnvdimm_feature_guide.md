@@ -180,16 +180,6 @@ virtio_fs_cache = "auto"
 disable_image_nvdimm = false
 ```
 
-如使用runtime-rs， 需配置：
-
-```toml
-[hypervisor.qemu]
-
-# runtime-rs 中将 VM rootfs driver 配置为 virtio-pmem。
-# QEMU 底层仍通过 NVDIMM 设备向 Guest 提供 Kata Guest image。
-vm_rootfs_driver = "virtio-pmem"
-```
-
 #### containerd runtime配置
 
 修改 ```/etc/containerd/config.toml```，新增 kata-qemu-pmem runtime。
@@ -497,7 +487,7 @@ rm -rf /opt/kata-pmem-test/results/*
     rm -f /opt/kata/share/defaults/kata-containers/configuration-qemu-pmem.toml
     ```
 
-2. 删除```/etc/containerd/config.toml```kata-qemu-pmem runtime配置。
+2. 删除```/etc/containerd/config.toml```中的kata-qemu-pmem runtime配置。
 3. 重启containerd。
 
     ```bash
