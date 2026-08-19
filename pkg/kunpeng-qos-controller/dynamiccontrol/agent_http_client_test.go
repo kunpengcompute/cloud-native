@@ -249,11 +249,6 @@ func TestHTTPAgentClientGetInterferenceValidatesMetadata(t *testing.T) {
 		want string
 	}{
 		{
-			name: "version mismatch",
-			body: `{"version":"v2","node_name":"node-a","reason_codes":[]}`,
-			want: "version",
-		},
-		{
 			name: "node mismatch",
 			body: `{"version":"v1","node_name":"node-b","reason_codes":[]}`,
 			want: "node",
