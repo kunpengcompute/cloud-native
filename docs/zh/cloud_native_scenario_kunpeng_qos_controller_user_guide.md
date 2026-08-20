@@ -8,7 +8,7 @@
 
 - 监听 `QoSPolicy` CR，并在本节点创建、更新、删除对应 `resctrl` 控制组。
 - 将 Pod 绑定到目标控制组（通过 Pod 标签 `qos.kunpeng.huawei.com/group`）。
-- 根据干扰检测结果调整离线负载（`qos.kunpeng.huawei.com/workload-class=offline`）的资源配置。
+- 对离线负载（`qos.kunpeng.huawei.com/workload-class=offline`）执行动态控制相关附加动作（例如动态组打标）。
 - 可通过 `QoSPolicy` 的 `cpu.qosLevel` 字段控制组内 Pod 的 `cpu.qos_level`。
 
 ## 应用场景
@@ -234,134 +234,6 @@ kubectl exec -it offline-small-nginx -- cat /sys/fs/cgroup/cpu/cpu.qos_level
 可能的回显结果如下，可以看到`offline-small-nginx`的`cpu.qos_level`为`-1`,说明`offline-small-nginx`已加入到`offline-small`控制组中，且`cpu.qos_level`为`-1`
 ![图：验证](../images/kunpeng-qos-controller-pod-qos-level.png)
 
-## 使用干扰检测功能
-
-干扰检测功能用于在线、离线业务混部场景。干扰 Agent 监测在线业务的运行情况并识别干扰原因，Controller 根据检测结果调整同一节点上的离线业务，降低离线业务对在线业务的影响。
-
-### 部署干扰检测组件
-
-使用该功能前，需要先部署包含 Controller 和干扰 Agent 的 DaemonSet 清单：
-
-```text
-config/kunpeng-qos-controller-config/samples/qos-controller-with-interference-agent-daemonset-v1alpha1.yaml
-```
-
-部署前，按照实际环境修改清单中的以下镜像：
-
-- `kunpeng-qos-controller:0.1.0`：替换为实际使用的 Controller 镜像。
-- `waas-agent:latest`：替换为实际使用的干扰 Agent 镜像。Agent 镜像需要包含 `libkperf` 和默认的本地模型文件。
-
-然后执行：
-
-```bash
-kubectl apply -f \
-  config/kunpeng-qos-controller-config/samples/qos-controller-with-interference-agent-daemonset-v1alpha1.yaml
-
-kubectl -n qos-system rollout status daemonset/qos-controller
-```
-
-该清单会在每个节点的 `qos-controller` Pod 中运行以下两个容器：
-
-| 容器 | 作用 |
-|---------|---------|
-| `qos-controller` | 收集在线 Pod 信息、获取干扰原因，并根据检测结果调整离线业务。 |
-| `interference-agent` | 监测在线 Pod，分析节点干扰，并通过本地 HTTP 接口返回干扰原因。 |
-
-清单已经启用干扰检测和处理功能，并将 Controller 配置为通过 `http://127.0.0.1:18080` 与同一 Pod 内的干扰 Agent 交互，不需要再手动添加启动参数。
-
-部署完成后，确认两个容器都处于就绪状态：
-
-```bash
-kubectl -n qos-system get pods -l app=qos-controller
-kubectl -n qos-system get pods -l app=qos-controller \
-  -o jsonpath='{range .items[*]}{.metadata.name}{"  "}{.status.containerStatuses[*].name}{"\n"}{end}'
-```
-
-### 标识在线 Pod 和离线 Pod
-
-通过 Pod 标签 `qos.kunpeng.huawei.com/workload-class` 标识工作负载类型：
-
-| 标签值 | 作用 |
-|---------|------|
-| `online` | Controller 收集该 Pod 的 cgroup 路径并发送给干扰 Agent，作为干扰检测对象。 |
-| `offline` | 检测到干扰后，Controller 调整该 Pod 所属节点的离线 QoS 策略。 |
-
-在线 Pod 示例：
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: online-nginx
-  labels:
-    qos.kunpeng.huawei.com/workload-class: online
-spec:
-  containers:
-  - name: nginx
-    image: nginx:1.25
-```
-
-离线 Pod 示例：
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: offline-nginx
-  labels:
-    qos.kunpeng.huawei.com/workload-class: offline
-spec:
-  containers:
-  - name: nginx
-    image: nginx:1.25
-```
-
-也可以为已经创建的 Pod 添加标签：
-
-```bash
-kubectl label pod online-nginx qos.kunpeng.huawei.com/workload-class=online
-kubectl label pod offline-nginx qos.kunpeng.huawei.com/workload-class=offline
-```
-
-### 干扰检测和处理流程
-
-干扰检测和处理过程如下：
-
-1. Controller 收集本节点处于 `Running` 状态并带有 `online` 标签的 Pod，将其 cgroup 路径定期发送给干扰 Agent。
-2. Controller 定期从 Agent 获取本节点的干扰原因。
-3. Controller 将 Agent 的原始干扰原因映射为 CPU、内存带宽或 L3 干扰。
-4. 检测到干扰后，Controller 创建或更新本节点的 `qos-dynamic-offline-<node-name>` QoS 策略，并将调节结果应用到带有 `offline` 标签的 Pod。
-
-在线 Pod 是干扰检测对象，其资源配置不会被该功能调整；实际被调整的是同一节点上带有 `offline` 标签的 Pod。各类干扰的处理方式如下：
-
-| Agent 原始原因 | Controller 分类 | 对离线 Pod 的处理 |
-|---------|---------|---------|
-| `base` | `none` | 表示没有干扰，不执行调节。 |
-| `compute`、`l2`、`tlb`、`frontend` | `cpu` | 将离线策略的 `cpu.qosLevel` 设置为 `-1`。 |
-| `l3` | `l3` | 每次将离线策略的 `l3.ways` 减少 `1`，并将 `l3.max` 减少 `10`，最低为 `1`。 |
-| `membw` | `mb` | 每次将离线策略的 `mb.max` 减少 `10`，最低为 `1`。 |
-
-### 通过日志查看干扰原因
-
-使用以下命令查看 Controller 接收到的干扰原因：
-
-```bash
-kubectl -n qos-system logs \
-  -l app=qos-controller \
-  -c qos-controller \
-  --prefix \
-  --tail=200 | grep "dynamic-control received interference"
-```
-
-例如 Agent 返回的编号对应 `compute`、`l2`、`l3` 和 `membw` 时，可以看到以下日志：
-
-```text
-dynamic-control received interference reasons: node=k8s-master reasons=[compute l2 l3 membw]
-dynamic-control received interference result: node=k8s-master reasons=[cpu mb l3]
-```
-
-第一行是 Agent 返回编号对应的原始原因名称，便于确认 Agent 的检测结果；第二行是 Controller 去重并映射后的干扰分类，也是实际用于调整离线业务的原因。
-
 ## 删除控制组示例
 
 控制组的删除通过删除对应 `QoSPolicy` 完成，`QoSPolicy` 删除后，Operator 会在本节点清理同名 `resctrl` 控制组。
@@ -388,8 +260,6 @@ kubectl -n qos-system exec -it "${POD#pod/}" -- ls /sys/fs/resctrl
    `config/kunpeng-qos-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml`
 - 部署示例：
    `config/kunpeng-qos-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml`
-- 干扰检测部署示例：
-   `config/kunpeng-qos-controller-config/samples/qos-controller-with-interference-agent-daemonset-v1alpha1.yaml`
 - QoSPolicy 示例：
    `config/kunpeng-qos-controller-config/samples/qospolicy-examples-v1alpha1.yaml`
 - Pod 示例：
