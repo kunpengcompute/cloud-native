@@ -23,41 +23,96 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	qosv1alpha1 "kunpeng.huawei.com/kunpeng-cloud-computing/api/kunpeng-qos-controller/v1alpha1"
 )
 
-func TestQoSPolicyDynamicUpdaterApplyReasonUnknown(t *testing.T) {
+type operationCountingClient struct {
+	client.Client
+	getCalls    int
+	createCalls int
+	updateCalls int
+}
+
+func (c *operationCountingClient) Get(
+	ctx context.Context,
+	key client.ObjectKey,
+	obj client.Object,
+	opts ...client.GetOption,
+) error {
+	c.getCalls++
+	return c.Client.Get(ctx, key, obj, opts...)
+}
+
+func (c *operationCountingClient) Create(
+	ctx context.Context,
+	obj client.Object,
+	opts ...client.CreateOption,
+) error {
+	c.createCalls++
+	return c.Client.Create(ctx, obj, opts...)
+}
+
+func (c *operationCountingClient) Update(
+	ctx context.Context,
+	obj client.Object,
+	opts ...client.UpdateOption,
+) error {
+	c.updateCalls++
+	return c.Client.Update(ctx, obj, opts...)
+}
+
+func TestQoSPolicyDynamicUpdaterApplyReasonsNoActionableReason(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := qosv1alpha1.AddToScheme(scheme); err != nil {
 		t.Fatalf("add scheme failed: %v", err)
 	}
 
-	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	baseClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	cl := &operationCountingClient{Client: baseClient}
 	updater := NewQoSPolicyDynamicUpdater(cl)
-	if err := updater.ApplyReason(context.Background(), "node-a", InterferenceReasonUnknown); err == nil {
-		t.Fatalf("ApplyReason() should fail on unknown reason")
+	if err := updater.ApplyReasons(context.Background(), "node-a", []InterferenceReason{
+		InterferenceReasonNone,
+		InterferenceReason("unknown"),
+	}); err != nil {
+		t.Fatalf("ApplyReasons() unexpected error: %v", err)
+	}
+	if cl.getCalls != 0 || cl.createCalls != 0 || cl.updateCalls != 0 {
+		t.Fatalf(
+			"expected no Kubernetes API access, got get=%d create=%d update=%d",
+			cl.getCalls,
+			cl.createCalls,
+			cl.updateCalls,
+		)
 	}
 }
 
-func TestQoSPolicyDynamicUpdaterApplyReasonCreate(t *testing.T) {
+func TestQoSPolicyDynamicUpdaterApplyReasonsCreate(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := qosv1alpha1.AddToScheme(scheme); err != nil {
 		t.Fatalf("add scheme failed: %v", err)
 	}
 
-	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	baseClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	cl := &operationCountingClient{Client: baseClient}
 	updater := NewQoSPolicyDynamicUpdater(cl)
 	nodeName := "node-a"
 
-	if err := updater.ApplyReason(context.Background(), nodeName, InterferenceReasonL3); err != nil {
-		t.Fatalf("ApplyReason() unexpected error: %v", err)
+	if err := updater.ApplyReasons(context.Background(), nodeName, []InterferenceReason{
+		InterferenceReasonL3,
+		InterferenceReasonMB,
+		InterferenceReasonCPU,
+		InterferenceReasonL3,
+		InterferenceReasonNone,
+	}); err != nil {
+		t.Fatalf("ApplyReasons() unexpected error: %v", err)
 	}
 
 	name := dynamicPolicyName(nodeName)
 	var got qosv1alpha1.QoSPolicy
-	if err := cl.Get(context.Background(), types.NamespacedName{Name: name}, &got); err != nil {
+	if err := baseClient.Get(context.Background(), types.NamespacedName{Name: name}, &got); err != nil {
 		t.Fatalf("get created policy failed: %v", err)
 	}
 	if got.Spec.NodeSelector[DefaultNodeSelectorKey] != nodeName {
@@ -69,9 +124,23 @@ func TestQoSPolicyDynamicUpdaterApplyReasonCreate(t *testing.T) {
 	if got.Spec.L3.MAX != 90 {
 		t.Fatalf("unexpected l3 max after one l3 step: %d", got.Spec.L3.MAX)
 	}
+	if got.Spec.MB.MAX != 90 {
+		t.Fatalf("unexpected mb max after one mb step: %d", got.Spec.MB.MAX)
+	}
+	if got.Spec.CPU.QoSLevel != -1 {
+		t.Fatalf("unexpected cpu qos level: %d", got.Spec.CPU.QoSLevel)
+	}
+	if cl.getCalls != 1 || cl.createCalls != 1 || cl.updateCalls != 0 {
+		t.Fatalf(
+			"expected one get and create, got get=%d create=%d update=%d",
+			cl.getCalls,
+			cl.createCalls,
+			cl.updateCalls,
+		)
+	}
 }
 
-func TestQoSPolicyDynamicUpdaterApplyReasonUpdate(t *testing.T) {
+func TestQoSPolicyDynamicUpdaterApplyReasonsUpdate(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := qosv1alpha1.AddToScheme(scheme); err != nil {
 		t.Fatalf("add scheme failed: %v", err)
@@ -95,26 +164,43 @@ func TestQoSPolicyDynamicUpdaterApplyReasonUpdate(t *testing.T) {
 			L3: qosv1alpha1.L3Policy{PRI: 0, MIN: 0, MAX: 100, Ways: 4},
 		},
 	}
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).Build()
+	baseClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).Build()
+	cl := &operationCountingClient{Client: baseClient}
 	updater := NewQoSPolicyDynamicUpdater(cl)
 
-	if err := updater.ApplyReason(context.Background(), nodeName, InterferenceReasonMB); err != nil {
-		t.Fatalf("ApplyReason() unexpected error: %v", err)
+	if err := updater.ApplyReasons(context.Background(), nodeName, []InterferenceReason{
+		InterferenceReason(" MB "),
+		InterferenceReasonL3,
+		InterferenceReasonCPU,
+		InterferenceReasonMB,
+	}); err != nil {
+		t.Fatalf("ApplyReasons() unexpected error: %v", err)
 	}
 
 	var got qosv1alpha1.QoSPolicy
-	if err := cl.Get(context.Background(), types.NamespacedName{Name: name}, &got); err != nil {
+	if err := baseClient.Get(context.Background(), types.NamespacedName{Name: name}, &got); err != nil {
 		t.Fatalf("get updated policy failed: %v", err)
 	}
 	if got.Spec.MB.MAX != 90 {
 		t.Fatalf("expected MB.MAX=90 for one mb step, got %d", got.Spec.MB.MAX)
 	}
-	if got.Spec.L3.Ways != 4 {
-		t.Fatalf("expected l3 ways unchanged for mb reason, got %d", got.Spec.L3.Ways)
+	if got.Spec.L3.Ways != 3 || got.Spec.L3.MAX != 90 {
+		t.Fatalf("expected one l3 step, got ways=%d max=%d", got.Spec.L3.Ways, got.Spec.L3.MAX)
+	}
+	if got.Spec.CPU.QoSLevel != -1 {
+		t.Fatalf("expected cpu qos level=-1, got %d", got.Spec.CPU.QoSLevel)
+	}
+	if cl.getCalls != 1 || cl.createCalls != 0 || cl.updateCalls != 1 {
+		t.Fatalf(
+			"expected one get and update, got get=%d create=%d update=%d",
+			cl.getCalls,
+			cl.createCalls,
+			cl.updateCalls,
+		)
 	}
 }
 
-func TestQoSPolicyDynamicUpdaterApplyReasonNoChange(t *testing.T) {
+func TestQoSPolicyDynamicUpdaterApplyReasonsNoChange(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := qosv1alpha1.AddToScheme(scheme); err != nil {
 		t.Fatalf("add scheme failed: %v", err)
@@ -134,29 +220,28 @@ func TestQoSPolicyDynamicUpdaterApplyReasonNoChange(t *testing.T) {
 			NodeSelector: map[string]string{
 				DefaultNodeSelectorKey: nodeName,
 			},
-			MB: qosv1alpha1.MBPolicy{HDL: 1, PRI: 3, MIN: 0, MAX: 100},
-			L3: qosv1alpha1.L3Policy{PRI: 0, MIN: 0, MAX: 1, Ways: 1},
+			MB:  qosv1alpha1.MBPolicy{HDL: 1, PRI: 3, MIN: 0, MAX: 1},
+			L3:  qosv1alpha1.L3Policy{PRI: 0, MIN: 0, MAX: 1, Ways: 1},
+			CPU: qosv1alpha1.CPUPolicy{QoSLevel: -1},
 		},
 	}
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initial).Build()
+	baseClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initial).Build()
+	cl := &operationCountingClient{Client: baseClient}
 	updater := NewQoSPolicyDynamicUpdater(cl)
 
-	var before qosv1alpha1.QoSPolicy
-	if err := cl.Get(context.Background(), types.NamespacedName{Name: name}, &before); err != nil {
-		t.Fatalf("get before failed: %v", err)
+	if err := updater.ApplyReasons(context.Background(), nodeName, []InterferenceReason{
+		InterferenceReasonCPU,
+		InterferenceReasonMB,
+		InterferenceReasonL3,
+	}); err != nil {
+		t.Fatalf("ApplyReasons() unexpected error: %v", err)
 	}
-
-	if err := updater.ApplyReason(context.Background(), nodeName, InterferenceReasonL3); err != nil {
-		t.Fatalf("ApplyReason() unexpected error: %v", err)
-	}
-
-	var after qosv1alpha1.QoSPolicy
-	if err := cl.Get(context.Background(), types.NamespacedName{Name: name}, &after); err != nil {
-		t.Fatalf("get after failed: %v", err)
-	}
-
-	// No-op path should not change resourceVersion in fake client.
-	if before.ResourceVersion != "" && before.ResourceVersion != after.ResourceVersion {
-		t.Fatalf("expected no update when desired state unchanged, before rv=%s after rv=%s", before.ResourceVersion, after.ResourceVersion)
+	if cl.getCalls != 1 || cl.createCalls != 0 || cl.updateCalls != 0 {
+		t.Fatalf(
+			"expected one get and no write, got get=%d create=%d update=%d",
+			cl.getCalls,
+			cl.createCalls,
+			cl.updateCalls,
+		)
 	}
 }

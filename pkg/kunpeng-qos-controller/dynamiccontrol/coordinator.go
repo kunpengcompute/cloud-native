@@ -19,7 +19,10 @@ package dynamiccontrol
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -51,27 +54,55 @@ type AgentAnalyzeRequest struct {
 	Pods     []OnlinePodCgroup `json:"pods"`
 }
 
-// InterferenceReason is the dominant interference dimension reported by analyzer.
+// InterferenceReason is one interference dimension reported by analyzer.
 type InterferenceReason string
 
 const (
-	InterferenceReasonUnknown InterferenceReason = "unknown"
-	InterferenceReasonL3      InterferenceReason = "l3"
-	InterferenceReasonMB      InterferenceReason = "mb"
-	InterferenceReasonCPU     InterferenceReason = "cpu"
+	InterferenceReasonNone InterferenceReason = "none"
+	InterferenceReasonL3   InterferenceReason = "l3"
+	InterferenceReasonMB   InterferenceReason = "mb"
+	InterferenceReasonCPU  InterferenceReason = "cpu"
 )
-
-// InterferenceItem describes one interference target.
-type InterferenceItem struct {
-	PodUID string  `json:"pod_uid"`
-	Score  float64 `json:"score"`
-}
 
 // AgentAnalyzeResult is the output from external interference analyzer.
 type AgentAnalyzeResult struct {
-	Reason     InterferenceReason
-	TTLSeconds int64
-	Items      []InterferenceItem
+	Reasons []InterferenceReason
+}
+
+func normalizeInterferenceReasons(
+	reasons []InterferenceReason,
+	includeNone bool,
+) ([]InterferenceReason, []InterferenceReason) {
+	seen := make(map[InterferenceReason]struct{}, len(reasons))
+	ignored := make([]InterferenceReason, 0)
+	for _, reason := range reasons {
+		normalized := InterferenceReason(strings.ToLower(strings.TrimSpace(string(reason))))
+		switch normalized {
+		case InterferenceReasonNone:
+			if includeNone {
+				seen[normalized] = struct{}{}
+			}
+		case InterferenceReasonCPU, InterferenceReasonMB, InterferenceReasonL3:
+			seen[normalized] = struct{}{}
+		default:
+			ignored = append(ignored, reason)
+		}
+	}
+
+	normalized := make([]InterferenceReason, 0, len(seen))
+	if _, ok := seen[InterferenceReasonNone]; ok {
+		normalized = append(normalized, InterferenceReasonNone)
+	}
+	for _, reason := range []InterferenceReason{
+		InterferenceReasonCPU,
+		InterferenceReasonMB,
+		InterferenceReasonL3,
+	} {
+		if _, ok := seen[reason]; ok {
+			normalized = append(normalized, reason)
+		}
+	}
+	return normalized, ignored
 }
 
 // Coordinator orchestrates one dynamic-control cycle:
@@ -132,6 +163,10 @@ func (c *Coordinator) ApplyInterferenceOnce(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	klog.Infof(
+		"dynamic-control received interference result: node=%s reasons=%v",
+		nodeName, result.Reasons,
+	)
 
 	return c.Engine.HandleInterference(ctx, nodeName, result)
 }
