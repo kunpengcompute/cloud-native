@@ -1,0 +1,22 @@
+FROM openeuler/openeuler:24.03-lts-sp3
+
+# 安装构建工具与依赖
+# 说明: g++ 在 openEuler 上的包名为 gcc-c++; make 是 cmake 默认 Unix Makefiles 生成器所必需
+RUN dnf install -y gcc-c++ cmake make python3-pip git \
+    && dnf clean all
+
+# 下载 libkperf, 切到 v2.1.0 tag, 拉取全部子模块, 安装含 Python 绑定的库到 /usr/local
+RUN git clone https://gitcode.com/openeuler/libkperf.git /opt/libkperf \
+    && cd /opt/libkperf \
+    && git checkout v2.1.0 \
+    && git submodule update --init --recursive \
+    && bash build.sh install_path=/usr/local python=true python_exe=$(which python3) \
+    && rm -rf /opt/libkperf
+
+# 下载 waas, 切到 wagt 分支, 安装 Python 依赖
+RUN git clone https://gitcode.com/boostkit/waas.git /opt/waas \
+    && cd /opt/waas \
+    && git checkout waasagent-dev \
+    && python3 -m pip install --no-cache-dir -r requirements.txt
+
+WORKDIR /opt/waas
