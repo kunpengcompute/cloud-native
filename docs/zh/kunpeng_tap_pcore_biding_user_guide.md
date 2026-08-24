@@ -139,7 +139,7 @@ crictl info | grep -A20 kata-clh
 
 ## 5. 编译镜像
 
-在仓库根目录执行：
+以下示例使用`kunpeng-tap-pcore-biding:latest`，与仓库DaemonSet清单中的默认镜像名称一致，不包含个人镜像仓库前缀。在仓库根目录执行：
 
 ```bash
 make kunpeng-tap-pcore-biding-docker-build
@@ -151,7 +151,11 @@ make kunpeng-tap-pcore-biding-docker-build
 docker save kunpeng-tap-pcore-biding:latest | ssh root@192.168.25.61 'ctr -n k8s.io images import -'
 ```
 
-如果使用镜像仓库，将`config/kunpeng-tap-pcore-biding/daemonset.yaml`中的镜像地址改为仓库地址，并确认kubelet可以拉取该镜像。
+如果使用公共或企业镜像仓库，将构建标签和`config/kunpeng-tap-pcore-biding/daemonset.yaml`中的镜像地址同时改为实际仓库地址，并确认kubelet可以拉取该镜像。部署前检查DaemonSet使用的镜像名称：
+
+```bash
+grep -n 'image:' config/kunpeng-tap-pcore-biding/daemonset.yaml
+```
 
 ## 6. DaemonSet部署
 

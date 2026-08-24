@@ -25,7 +25,7 @@ spec:
       - operator: Exists
       containers:
       - name: kunpeng-tap-pcore-biding
-        image: xdlyqdocker/kunpeng-tap-pcore-biding:latest
+        image: kunpeng-tap-pcore-biding:latest
         imagePullPolicy: IfNotPresent
         args:
         - --nri-socket-path=/var/run/nri/nri.sock
