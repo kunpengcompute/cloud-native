@@ -631,3 +631,9 @@ DevKit Tuner CLI或结果解析失败时，DevKit Collector会将本轮`collecti
     ```
 
     没有回显结果，说明本文创建的DevKit Collector资源已经删除。
+
+## 修订记录
+   
+   | 发布日期 | 修订记录 |
+   | -------- | -------- |
+   | 2026-09-30 | 第一次正式发布。 |
