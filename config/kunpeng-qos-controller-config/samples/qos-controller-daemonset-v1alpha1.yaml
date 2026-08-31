@@ -22,7 +22,7 @@ rules:
   verbs: ["get", "list", "watch"]
 - apiGroups: ["qos.kunpeng.huawei.com"]
   resources: ["qospolicies"]
-  verbs: ["get", "list", "watch", "update", "patch"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
 - apiGroups: ["qos.kunpeng.huawei.com"]
   resources: ["qospolicies/finalizers"]
   verbs: ["update", "patch"]

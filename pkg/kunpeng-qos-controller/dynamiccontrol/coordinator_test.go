@@ -68,10 +68,17 @@ func (s *fakeAgentClient) GetInterference(_ context.Context, nodeName string) (A
 }
 
 type fakeEngine struct {
-	calls  int
-	node   string
-	result AgentAnalyzeResult
-	err    error
+	ensureCalls int
+	calls       int
+	node        string
+	result      AgentAnalyzeResult
+	err         error
+}
+
+func (e *fakeEngine) EnsurePolicy(_ context.Context, nodeName string) error {
+	e.ensureCalls++
+	e.node = nodeName
+	return e.err
 }
 
 func (e *fakeEngine) HandleInterference(_ context.Context, nodeName string, result AgentAnalyzeResult) error {
