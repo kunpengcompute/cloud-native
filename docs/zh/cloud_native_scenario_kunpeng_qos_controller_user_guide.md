@@ -467,45 +467,51 @@ kubectl -n qos-system exec -it "${POD#pod/}" -- ls /sys/fs/resctrl
 
 卸载建议按“先业务资源、再控制面资源”的顺序执行，避免残留对象。
 
-### 1. 清理QoSPolicy CR
+1. 清理QoSPolicy CR
 
-```bash
-kubectl delete qospolicy --all
-```
+    ```bash
+    kubectl delete qospolicy --all
+    ```
 
-如果你使用了特定命名的策略文件，也可以按文件删除：
+    如果你使用了特定命名的策略文件，也可以按文件删除：
 
-```bash
-kubectl delete -f config/kunpeng-qos-controller-config/samples/qospolicy-examples-v1alpha1.yaml
-```
+    ```bash
+    kubectl delete -f config/kunpeng-qos-controller-config/samples/qospolicy-examples-v1alpha1.yaml
+    ```
 
-### 2. 清理使用QoS的业务Pod（可选）
+2. 清理使用QoS的业务Pod（可选）
 
-```bash
-kubectl delete -f config/kunpeng-qos-controller-config/samples/pod-examples-for-qospolicy-v1alpha1.yaml
-```
+    ```bash
+    kubectl delete -f config/kunpeng-qos-controller-config/samples/pod-examples-for-qospolicy-v1alpha1.yaml
+    ```
 
-### 3. 卸载Operator（DaemonSet + RBAC + ServiceAccount + Namespace）
+3. 卸载Operator（DaemonSet + RBAC + ServiceAccount + Namespace）
 
-```bash
-kubectl delete -f config/kunpeng-qos-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml
-```
+    ```bash
+    kubectl delete -f config/kunpeng-qos-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml
+    ```
 
-### 4. 删除CRD
+4. 删除CRD
 
-```bash
-kubectl delete -f config/kunpeng-qos-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml
-```
+    ```bash
+    kubectl delete -f config/kunpeng-qos-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml
+    ```
 
-### 5. 验证清理结果
+5. 验证清理结果
 
-```bash
-kubectl get crd | grep qospolicies.qos.kunpeng.huawei.com
-kubectl get qospolicy
-kubectl -n qos-system get all
-```
+    ```bash
+    kubectl get crd | grep qospolicies.qos.kunpeng.huawei.com
+    kubectl get qospolicy
+    kubectl -n qos-system get all
+    ```
 
-可能的回显结果如下，可以看到查询不到相应的资源，说明已成功清理。
-![图：验证结果](../images/kunpeng-qos-controller-clean.png)
+    可能的回显结果如下，可以看到查询不到相应的资源，说明已成功清理。
+    ![图：验证结果](../images/kunpeng-qos-controller-clean.png)
 
-说明：如果已删除CRD，`kubectl get qospolicy`可能提示资源类型不存在，这是预期行为。
+    说明：如果已删除CRD，`kubectl get qospolicy`可能提示资源类型不存在，这是预期行为。
+
+# 修订记录
+
+|文档版本| 发布日期 | 修改说明 |
+|--------| -------- | -------- |
+| 01 | 2026-09-30 | 第一次正式发布。 |
