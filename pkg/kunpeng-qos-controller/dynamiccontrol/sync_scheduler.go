@@ -70,6 +70,9 @@ func (r *SyncScheduler) Start(ctx context.Context) error {
 		r.PublishInterval, r.ApplyInterval, r.TaskTimeout,
 	)
 
+	if err := r.runWithTimeout(ctx, r.Coordinator.EnsurePolicyOnce); err != nil {
+		return fmt.Errorf("ensure dynamic policy failed: %w", err)
+	}
 	go r.runLoop(ctx, "publish-online-pods", r.PublishInterval, r.Coordinator.PublishOnlinePodsOnce)
 	go r.runLoop(ctx, "apply-interference", r.ApplyInterval, r.Coordinator.ApplyInterferenceOnce)
 
@@ -84,7 +87,9 @@ func (r *SyncScheduler) runLoop(
 	interval time.Duration,
 	task func(context.Context) error,
 ) {
-	r.runWithTimeout(ctx, name, task)
+	if err := r.runWithTimeout(ctx, task); err != nil {
+		klog.Warningf("dynamic-control task %s failed: %v", name, err)
+	}
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -94,20 +99,19 @@ func (r *SyncScheduler) runLoop(
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			r.runWithTimeout(ctx, name, task)
+			if err := r.runWithTimeout(ctx, task); err != nil {
+				klog.Warningf("dynamic-control task %s failed: %v", name, err)
+			}
 		}
 	}
 }
 
 func (r *SyncScheduler) runWithTimeout(
 	ctx context.Context,
-	name string,
 	task func(context.Context) error,
-) {
+) error {
 	taskCtx, cancel := context.WithTimeout(ctx, r.TaskTimeout)
 	defer cancel()
 
-	if err := task(taskCtx); err != nil {
-		klog.Warningf("dynamic-control task %s failed: %v", name, err)
-	}
+	return task(taskCtx)
 }

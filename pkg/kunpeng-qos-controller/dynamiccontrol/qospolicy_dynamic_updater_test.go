@@ -18,6 +18,7 @@ package dynamiccontrol
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,6 +63,41 @@ func (c *operationCountingClient) Update(
 ) error {
 	c.updateCalls++
 	return c.Client.Update(ctx, obj, opts...)
+}
+
+func TestQoSPolicyDynamicUpdaterEnsurePolicyCreatesDefaultPolicy(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := qosv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add scheme failed: %v", err)
+	}
+
+	baseClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	cl := &operationCountingClient{Client: baseClient}
+	updater := NewQoSPolicyDynamicUpdater(cl)
+	if err := updater.EnsurePolicy(context.Background(), "node-a"); err != nil {
+		t.Fatalf("EnsurePolicy() unexpected error: %v", err)
+	}
+
+	var got qosv1alpha1.QoSPolicy
+	if err := baseClient.Get(
+		context.Background(),
+		types.NamespacedName{Name: dynamicPolicyName("node-a")},
+		&got,
+	); err != nil {
+		t.Fatalf("get created policy failed: %v", err)
+	}
+	want := defaultDynamicPolicySpec("node-a")
+	if !reflect.DeepEqual(got.Spec, want) {
+		t.Fatalf("unexpected default policy: got %+v, want %+v", got.Spec, want)
+	}
+	if cl.getCalls != 1 || cl.createCalls != 1 || cl.updateCalls != 0 {
+		t.Fatalf(
+			"expected one get and create, got get=%d create=%d update=%d",
+			cl.getCalls,
+			cl.createCalls,
+			cl.updateCalls,
+		)
+	}
 }
 
 func TestQoSPolicyDynamicUpdaterApplyReasonsNoActionableReason(t *testing.T) {

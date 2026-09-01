@@ -23,10 +23,17 @@ import (
 )
 
 type fakeDynamicPolicyUpdater struct {
+	ensureCalls int
 	calls       int
 	lastNode    string
 	lastReasons []InterferenceReason
 	err         error
+}
+
+func (u *fakeDynamicPolicyUpdater) EnsurePolicy(_ context.Context, nodeName string) error {
+	u.ensureCalls++
+	u.lastNode = nodeName
+	return u.err
 }
 
 func (u *fakeDynamicPolicyUpdater) ApplyReasons(
@@ -41,6 +48,17 @@ func (u *fakeDynamicPolicyUpdater) ApplyReasons(
 }
 
 func TestReasonDispatchTuningEngineHandleInterference(t *testing.T) {
+	t.Run("ensure policy", func(t *testing.T) {
+		updater := &fakeDynamicPolicyUpdater{}
+		engine := NewReasonDispatchTuningEngine(updater)
+		if err := engine.EnsurePolicy(context.Background(), "node-a"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if updater.ensureCalls != 1 || updater.lastNode != "node-a" {
+			t.Fatalf("unexpected updater call: %+v", updater)
+		}
+	})
+
 	t.Run("dispatch normalized unique actionable reasons once", func(t *testing.T) {
 		updater := &fakeDynamicPolicyUpdater{}
 		engine := NewReasonDispatchTuningEngine(updater)

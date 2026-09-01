@@ -131,6 +131,16 @@ func NewCoordinator(
 	}
 }
 
+// EnsurePolicyOnce creates the node-local dynamic policy with default settings.
+func (c *Coordinator) EnsurePolicyOnce(ctx context.Context) error {
+	nodeName := c.NodeIdentity.NodeName()
+	if nodeName == "" {
+		return fmt.Errorf("node name must not be empty")
+	}
+
+	return c.Engine.EnsurePolicy(ctx, nodeName)
+}
+
 // PublishOnlinePodsOnce executes one publish cycle:
 // collect online pod cgroup paths and publish to external agent.
 func (c *Coordinator) PublishOnlinePodsOnce(ctx context.Context) error {

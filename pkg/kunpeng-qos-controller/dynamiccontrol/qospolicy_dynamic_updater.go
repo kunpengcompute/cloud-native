@@ -41,6 +41,7 @@ const (
 // DynamicPolicyUpdater updates per-node dynamic QoSPolicy CR.
 // QoSPolicyDynamicUpdater is the default implementation.
 type DynamicPolicyUpdater interface {
+	EnsurePolicy(ctx context.Context, nodeName string) error
 	ApplyReasons(ctx context.Context, nodeName string, reasons []InterferenceReason) error
 }
 
@@ -62,6 +63,35 @@ func NewQoSPolicyDynamicUpdater(c client.Client) *QoSPolicyDynamicUpdater {
 		L3WaysStep: defaultDynamicL3WaysStep,
 		L3MaxStep:  defaultDynamicL3MaxStep,
 	}
+}
+
+// EnsurePolicy creates the node-local dynamic QoSPolicy with default settings if absent.
+func (u *QoSPolicyDynamicUpdater) EnsurePolicy(ctx context.Context, nodeName string) error {
+	if u.Client == nil {
+		return fmt.Errorf("client must not be nil")
+	}
+	if strings.TrimSpace(nodeName) == "" {
+		return fmt.Errorf("node name must not be empty")
+	}
+
+	name := dynamicPolicyName(nodeName)
+	var current qosv1alpha1.QoSPolicy
+	err := u.Client.Get(ctx, types.NamespacedName{Name: name}, &current)
+	if err == nil {
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	return u.Client.Create(ctx, &qosv1alpha1.QoSPolicy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "qos.kunpeng.huawei.com/v1alpha1",
+			Kind:       "QoSPolicy",
+		},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec:       defaultDynamicPolicySpec(nodeName),
+	})
 }
 
 // ApplyReasons ensures and updates one dynamic QoSPolicy for given node.

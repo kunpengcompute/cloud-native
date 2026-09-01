@@ -24,6 +24,7 @@ import (
 // TuningEngine encapsulates interference handling end-to-end (plan + apply).
 // ReasonDispatchTuningEngine is the default implementation.
 type TuningEngine interface {
+	EnsurePolicy(ctx context.Context, nodeName string) error
 	HandleInterference(ctx context.Context, nodeName string, result AgentAnalyzeResult) error
 }
 
@@ -36,6 +37,16 @@ type ReasonDispatchTuningEngine struct {
 // NewReasonDispatchTuningEngine creates a reason-dispatch tuning engine.
 func NewReasonDispatchTuningEngine(updater DynamicPolicyUpdater) *ReasonDispatchTuningEngine {
 	return &ReasonDispatchTuningEngine{Updater: updater}
+}
+
+func (e *ReasonDispatchTuningEngine) EnsurePolicy(ctx context.Context, nodeName string) error {
+	if e.Updater == nil {
+		return fmt.Errorf("dynamic policy updater must not be nil")
+	}
+	if nodeName == "" {
+		return fmt.Errorf("node name must not be empty")
+	}
+	return e.Updater.EnsurePolicy(ctx, nodeName)
 }
 
 func (e *ReasonDispatchTuningEngine) HandleInterference(
