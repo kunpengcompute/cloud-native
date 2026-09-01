@@ -389,6 +389,8 @@ kubectl label pod offline-nginx qos.kunpeng.huawei.com/workload-class=offline
 
 ### 干扰检测和处理流程
 
+> 说明：干扰检测是一个独立功能，部署干扰Agent、采集在线Pod信息及获取干扰原因不依赖`cpu.qos_level`，也不要求配置`xint`或启用`SMT_TAG_PULL`调度特性。只有使用`cpu.qosLevel`调节离线Pod的CPU优先级时，才需要满足前文所述的内核版本和调度特性要求。
+
 干扰检测和处理过程如下：
 
 1. Controller收集本节点处于`Running`状态并带有`online`标签的Pod，将其cgroup路径定期发送给干扰Agent。
