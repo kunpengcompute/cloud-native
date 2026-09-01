@@ -269,7 +269,7 @@ root=/sys/fs/cgroup/cpuset
 
 kubectl get pods -n "$ns" -l "$selector" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort | while read -r pod; do
   uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}' | tr - _)
-  values=$(find "$root" -path "*pod${uid}.slice*/cpuset.cpus" -exec cat {} \; | sort -u | paste -sd, -)
+  values=$(find "$root" -path "*pod${uid}.slice/cpuset.cpus" -exec cat {} \; | sort -u | paste -sd, -)
   printf '%s %s\n' "$pod" "${values:-NONE}"
 done
 ```
