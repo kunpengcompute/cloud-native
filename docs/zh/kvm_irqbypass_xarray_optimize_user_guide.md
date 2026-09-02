@@ -11,7 +11,7 @@ CubeSandbox从v0.5.0开始提供ARM64全栈支持。本文原始验证使用v0.5
 1. 确认ARM64、KVM、XFS和内核版本满足要求。
 2. 安装CubeSandbox，制作ARM64模板并记录优化前基线。
 3. 准备匹配的内核源码，检查vNMI系列并按需处理兼容问题。
-4. 确认KVM irqbypass XArray版本，按需回合完整补丁系列并安装目标内核。
+4. 确认KVM irqbypass XArray版本，按需回合明确的上游XArray提交并安装目标内核。
 5. 执行同参数性能复测，对比优化前后结果。
 
 KVM irqbypass原实现使用全局链表保存producer和consumer，注册时需要在同一个mutex保护下遍历对象。XArray优化将线性遍历改为按eventfd直接查找，主要降低大量Sandbox并发启动或恢复时的宿主机锁等待，不改变CubeSandbox API和模板格式。
@@ -97,7 +97,7 @@ KVM irqbypass原实现使用全局链表保存producer和consumer，注册时需
 - 只有目标内核已经合入ARM64 vNMI系列时，才需要检查是否合入PR #27059对应修复；未合入vNMI系列的内核不受该问题影响。
 - vNMI兼容修复和irqbypass性能优化解决的问题不同，不能相互替代。
 - 修改内核前，应检查目标源码是否已包含对应提交，避免重复合入。
-- irqbypass XArray上游完整系列首次合入Linux v6.17，低于该版本的内核应检查并按需回合最终上游系列。
+- irqbypass XArray提交首次合入Linux v6.17，低于该版本的内核应检查并按需回合上游提交`8394b32faecd`。
 - 当前CubeSandbox不支持ARM64 vNMI状态的64位保存和恢复，不得为Guest主动启用vNMI。
 - 补丁主要改善高并发场景，低并发或单实例固定开销不一定有明显变化。
 - 应在同一台服务器上使用相同模板、并发度和请求数进行优化前后对比。
@@ -619,7 +619,7 @@ git am --3way ~/kernel-patches/olk-vnmi-cubesandbox.patch
 
 如果补丁与目标发行分支存在冲突，应由内核维护人员完成回合和评审，不要跳过冲突。补丁合入后仍不得为CubeSandbox Guest启用vNMI；只有CubeSandbox VMM实现64位vNMI状态保存、恢复和显式特性协商后，才能启用该功能。
 
-如果目标内核未合入vNMI系列，可以跳过本章。如果需要PR #27059，应先构建并启动仅含vNMI修复的内核，再返回[采集优化前基线](#采集优化前基线)。完成基线后继续合入XArray系列，确保A/B测试中唯一性能变量是irqbypass实现。
+如果目标内核未合入vNMI系列，可以跳过本章。如果需要PR #27059，应先构建并启动仅含vNMI修复的内核，再返回[采集优化前基线](#采集优化前基线)。完成基线后继续合入上游XArray提交，确保A/B测试中唯一性能变量是irqbypass实现。
 
 ## 合入KVM irqbypass XArray优化
 
@@ -632,10 +632,10 @@ irqbypass XArray最终上游实现首次合入Linux v6.17，核心XArray提交�
 | 内核来源 | 首个包含版本 | XArray提交 | 使用建议 |
 | --- | --- | --- | --- |
 | Linux主线 | v6.17 | 8394b32faecd | 已包含，不重复合入 |
-| openEuler OLK-6.6 | 6.6.0-167.0.0 | c51917e52d7f，属于PR #26321完整系列 | 已完成上游系列回合，可作为OLK-6.6适配参考 |
-| openEuler 24.03 LTS SP3/SP4发行分支 | 截至2026-09-01尚未包含 | 无 | 由内核维护人员回合Linux v6.17上游完整系列 |
+| openEuler OLK-6.6 | 6.6.0-167.0.0 | c51917e52d7f | 上游提交8394b32faecd的OLK-6.6适配参考 |
+| openEuler 24.03 LTS SP3/SP4发行分支 | 截至2026-09-01尚未包含 | 无 | 由内核维护人员回合上游提交8394b32faecd |
 
-实际回合应以Linux v6.17上游8补丁系列为准。openEuler [PR #26321](https://gitcode.com/openeuler/kernel/pull/26321)展示了该系列在OLK-6.6上的接口适配和UB VFIO调用点修改，仅作为解决openEuler分支差异时的参考，不作为补丁来源。
+实际回合只以Linux上游提交`8394b32faecd`为补丁来源。openEuler [PR #26321](https://gitcode.com/openeuler/kernel/pull/26321)中的提交`c51917e52d7f`用于参考OLK-6.6的代码上下文适配，不作为补丁来源。
 
 在目标内核源码中执行以下命令。
 
@@ -648,40 +648,29 @@ git log --oneline --all \
 git grep -n 'DEFINE_XARRAY(producers)' -- virt/lib/irqbypass.c
 ```
 
-任一命令确认XArray实现存在时，不要重复合入。Linux v6.17及以上主线内核、包含提交`8394b32faecd`的内核，以及包含openEuler提交`c51917e52d7f`的内核均已具备该优化。如果当前运行内核已经包含XArray，只需执行功能验证；除非另行构建同基线的链表版本内核，否则不能生成严格的优化前后A/B数据。
+任一命令确认XArray实现存在时，不要重复合入。Linux v6.17及以上主线内核、包含提交`8394b32faecd`的内核，以及包含openEuler提交`c51917e52d7f`的内核均已具备该优化。除非另行构建同基线的链表版本内核，否则不能生成严格的优化前后A/B数据。
 
-### 回合Linux上游补丁系列
+### 回合Linux上游XArray提交
 
-对于不包含XArray实现的目标内核，应从Linux v6.17获取上游完整8补丁系列，不得只提取XArray单个提交。以下SHA是连续的依赖链，应按顺序执行。
+对于不包含XArray实现的目标内核，下载上游提交`8394b32faecd`的标准patch。
 
 ```bash
 mkdir -p ~/kernel-patches/irqbypass-v6.17
-upstream_commits=(
-  fa079a0616edbcdad538128306abbc19b68a9863
-  07fbc83c01520c62c89f6495f2f0bea2f4ac6684
-  2b521d86ee80a436a92445b8206d38d75aeb39ea
-  add57f493e0893ac0fb4acbdc441918d3e800f10
-  5d7dbdce388b43cf3a9bc50c4132493de26aeba4
-  46a4bfd0ae480cabbacc56fe0d8f91cbe229c7ce
-  8394b32faecd9c63b3c436e78e62519e9548e530
-  23b54381cee2928e8b5622e654ca4516f30d2f1a
-)
-for index in "${!upstream_commits[@]}"; do
-  number=$(printf '%02d' "$((index + 1))")
-  commit=${upstream_commits[$index]}
-  curl -fL \
-    "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id=${commit}" \
-    -o "${HOME}/kernel-patches/irqbypass-v6.17/${number}-${commit}.patch"
-done
 ```
-
-按文件名前缀顺序合入上游补丁。
 
 ```bash
-git am --3way ~/kernel-patches/irqbypass-v6.17/*.patch
+curl -fL \
+  'https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id=8394b32faecd9c63b3c436e78e62519e9548e530' \
+  -o ~/kernel-patches/irqbypass-v6.17/8394b32faecd.patch
 ```
 
-如果目标发行分支只包含其中部分提交，或者`git am`报告冲突，执行`git am --abort`恢复到回合前状态。由内核维护人员对照上游提交语义完成适配，并参考openEuler PR #26321处理OLK-6.6调用接口差异。不要直接改为回合openEuler提交。
+合入上游XArray补丁。
+
+```bash
+git am --3way ~/kernel-patches/irqbypass-v6.17/8394b32faecd.patch
+```
+
+上游提交基于Linux v6.17的irqbypass代码上下文，直接应用到旧内核时可能冲突。发生冲突后执行`git am --abort`，由内核维护人员仅围绕XArray替换语义适配`include/linux/irqbypass.h`和`virt/lib/irqbypass.c`，并参考openEuler提交`c51917e52d7f`处理OLK-6.6差异。
 
 确认最终源码使用XArray，并查看本次内核分支上的补丁记录。
 
@@ -690,7 +679,7 @@ git grep -n 'DEFINE_XARRAY' -- virt/lib/irqbypass.c
 ```
 
 ```bash
-git log --oneline -8
+git log --oneline -1 --grep='irqbypass: Use xarray to track producers and consumers'
 ```
 
 ### 构建和启动目标内核
@@ -701,7 +690,7 @@ git log --oneline -8
 
 - `.config`来源于目标宿主机或对应发行版配置。
 - 仅含vNMI修复的基线内核使用`-cubesandbox-vnmi`后缀。
-- 合入irqbypass系列的最终内核使用`-cubesandbox-kvm-opt`后缀。
+- 合入irqbypass XArray提交的最终内核使用`-cubesandbox-kvm-opt`后缀。
 - 启用Secure Boot或模块签名时，不清空证书配置，应完成组织要求的签名。
 - 安装前保留可启动的旧内核，并记录当前默认GRUB启动项。
 
@@ -861,9 +850,9 @@ sudo reboot
 
 **问题现象：** 执行`git am --3way`时出现补丁失败或合并冲突。
 
-**原因分析：** 目标openEuler内核基线与Linux v6.17上游补丁基线不同，或者目标内核已经包含部分前置提交。上游系列会修改KVM、VFIO和vDPA调用接口，openEuler还需要适配UB VFIO调用点。
+**原因分析：** 上游提交`8394b32faecd`基于Linux v6.17的irqbypass代码结构，目标openEuler内核可能仍使用旧字段和接口，因此patch上下文无法直接匹配。
 
-**解决方法：** 执行`git am --abort`恢复到回合前状态。确认内核分支与运行内核匹配，并检查目标源码是否已包含部分上游系列。仍需回合时，应以Linux上游补丁语义为准完成适配，并参考openEuler PR #26321处理OLK-6.6差异。处理后`git status --short`应无冲突或未提交文件。
+**解决方法：** 执行`git am --abort`恢复到回合前状态。确认目标源码尚未包含XArray实现，再以提交`8394b32faecd`的变更语义完成适配。openEuler提交`c51917e52d7f`仅用于参考OLK-6.6上下文差异。处理后`git status --short`应无冲突或未提交文件。
 
 ### 新内核版本无法识别的解决方法
 
@@ -905,11 +894,9 @@ sudo reboot
 - [CubeSandbox沙箱网段冲突排障](https://github.com/TencentCloud/CubeSandbox/blob/v0.7.0/docs/zh/guide/troubleshooting/local-network-cidr-conflict.md)
 - [cube-bench 使用说明](https://github.com/TencentCloud/CubeSandbox/tree/master/examples/cube-bench)
 - [CubeSandbox v0.7.0 ARM64 vGIC状态实现](https://github.com/TencentCloud/CubeSandbox/blob/v0.7.0/hypervisor/hypervisor/src/kvm/aarch64/gic/icc_regs.rs)
-- [Linux v6.17 irqbypass上游系列首提交](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=fa079a0616edbcdad538128306abbc19b68a9863)
 - [Linux v6.17 irqbypass XArray提交](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=8394b32faecd9c63b3c436e78e62519e9548e530)
-- [Linux v6.17 irqbypass上游系列末提交](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=23b54381cee2928e8b5622e654ca4516f30d2f1a)
 - [openEuler OLK-6.6 irqbypass XArray回合参考提交](https://gitcode.com/openeuler/kernel/commit/c51917e52d7f267f75adeeeb747ce967adf6989b)
-- [openEuler OLK-6.6 irqbypass完整系列回合参考PR](https://gitcode.com/openeuler/kernel/pull/26321)
+- [openEuler OLK-6.6 irqbypass回合参考PR](https://gitcode.com/openeuler/kernel/pull/26321)
 - [ARM64 KVM vNMI patchset](https://mailweb.openeuler.org/archives/list/kernel@openeuler.org/thread/ZRW2NMY5DXWIF25JSZRHM7W7XFC3RTQH/)
 - [ARM64 KVM vNMI上游分支](https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=arm64/nmi)
 - [openEuler OLK-6.6 vNMI兼容补丁PR](https://gitcode.com/openeuler/kernel/pull/27059)
