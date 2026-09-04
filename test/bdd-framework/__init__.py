@@ -7,7 +7,7 @@
 
 __version__ = "1.0.0"
 __author__ = "Kunpeng Cloud Computing Team"
-__email__ = "kunpeng@huawei.com"
+__email__ = "kunpeng@email.com"
 
 # 导出核心组件
 from .core.base_manager import BaseManager
