@@ -81,6 +81,10 @@ kunpeng-tap-build-manager: ## Build kunpeng-tap manager.
 kunpeng-tap-build-proxy: ## Build kunpeng-tap proxy.
 	$(MAKE) -f Makefile.kunpeng-tap build-proxy
 
+.PHONY: kunpeng-tap-build-pcore-biding
+kunpeng-tap-build-pcore-biding: ## Build the hardened ARM64 pcore binding plugin.
+	$(MAKE) -f Makefile.kunpeng-tap build-pcore-biding
+
 .PHONY: kunpeng-tap-test
 kunpeng-tap-test: ## Test kunpeng-tap project.
 	$(MAKE) -f Makefile.kunpeng-tap test

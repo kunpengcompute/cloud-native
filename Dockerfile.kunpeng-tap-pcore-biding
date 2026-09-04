@@ -1,11 +1,11 @@
 # Runtime image for kunpeng-tap-pcore-biding.
 #
 # Build the binary first, then build this image:
-#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kunpeng-tap-pcore-biding ./cmd/kunpeng-tap-pcore-biding
+#   make kunpeng-tap-build-pcore-biding
 #   docker build -f Dockerfile.kunpeng-tap-pcore-biding -t kunpeng-tap-pcore-biding:latest .
-FROM scratch
+FROM busybox:glibc
 
-COPY kunpeng-tap-pcore-biding /usr/local/bin/kunpeng-tap-pcore-biding
+COPY bin/kunpeng-tap-pcore-biding /usr/local/bin/kunpeng-tap-pcore-biding
 
 ENTRYPOINT ["/usr/local/bin/kunpeng-tap-pcore-biding"]
 

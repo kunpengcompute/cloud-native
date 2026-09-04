@@ -33,9 +33,8 @@
 镜像构建：
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kunpeng-tap-pcore-biding ./cmd/kunpeng-tap-pcore-biding
+make kunpeng-tap-build-pcore-biding
 docker build --platform=linux/arm64 -f Dockerfile.kunpeng-tap-pcore-biding -t kunpeng-tap-pcore-biding:latest .
-rm -f kunpeng-tap-pcore-biding
 ```
 
 Kubernetes 部署清单：
