@@ -135,8 +135,7 @@ crictl info | grep -A20 kata-clh
 在仓库根目录执行：
 
 ```bash
-make kunpeng-tap-build-pcore-biding
-docker build --platform=linux/arm64 -f Dockerfile.kunpeng-tap-pcore-biding -t kunpeng-tap-pcore-biding:latest .
+make kunpeng-tap-pcore-biding-docker-build
 ```
 
 如果测试节点无法从镜像仓库拉取镜像，可以直接导入到目标节点containerd的`k8s.io` namespace。以下命令以当前已验证节点为例：

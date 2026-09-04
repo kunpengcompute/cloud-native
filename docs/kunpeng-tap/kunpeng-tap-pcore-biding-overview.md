@@ -33,8 +33,7 @@
 镜像构建：
 
 ```bash
-make kunpeng-tap-build-pcore-biding
-docker build --platform=linux/arm64 -f Dockerfile.kunpeng-tap-pcore-biding -t kunpeng-tap-pcore-biding:latest .
+make kunpeng-tap-pcore-biding-docker-build
 ```
 
 Kubernetes 部署清单：

@@ -1,8 +1,7 @@
 # Runtime image for kunpeng-tap-pcore-biding.
 #
-# Build the binary first, then build this image:
-#   make kunpeng-tap-build-pcore-biding
-#   docker build -f Dockerfile.kunpeng-tap-pcore-biding -t kunpeng-tap-pcore-biding:latest .
+# Build the hardened ARM64 binary and image:
+#   make kunpeng-tap-pcore-biding-docker-build
 FROM busybox:glibc
 
 COPY bin/kunpeng-tap-pcore-biding /usr/local/bin/kunpeng-tap-pcore-biding
