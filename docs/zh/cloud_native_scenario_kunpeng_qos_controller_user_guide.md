@@ -469,7 +469,7 @@ kubectl -n qos-system exec -it "${POD#pod/}" -- ls /sys/fs/resctrl
 
 卸载建议按“先业务资源、再控制面资源”的顺序执行，避免残留对象。
 
-1. 清理QoSPolicy CR
+1. 清理QoSPolicy CR。
 
     ```bash
     kubectl delete qospolicy --all
@@ -481,25 +481,25 @@ kubectl -n qos-system exec -it "${POD#pod/}" -- ls /sys/fs/resctrl
     kubectl delete -f config/kunpeng-qos-controller-config/samples/qospolicy-examples-v1alpha1.yaml
     ```
 
-2. 清理使用QoS的业务Pod（可选）
+2. 清理使用QoS的业务Pod（可选）。
 
     ```bash
     kubectl delete -f config/kunpeng-qos-controller-config/samples/pod-examples-for-qospolicy-v1alpha1.yaml
     ```
 
-3. 卸载Operator（DaemonSet + RBAC + ServiceAccount + Namespace）
+3. 卸载Operator（DaemonSet + RBAC + ServiceAccount + Namespace）。
 
     ```bash
     kubectl delete -f config/kunpeng-qos-controller-config/samples/qos-controller-daemonset-v1alpha1.yaml
     ```
 
-4. 删除CRD
+4. 删除CRD。
 
     ```bash
     kubectl delete -f config/kunpeng-qos-controller-config/crd/bases/qos.kunpeng.huawei.com_qospolicies.yaml
     ```
 
-5. 验证清理结果
+5. 验证清理结果。
 
     ```bash
     kubectl get crd | grep qospolicies.qos.kunpeng.huawei.com
