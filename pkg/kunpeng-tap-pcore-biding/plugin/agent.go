@@ -310,7 +310,10 @@ func (a *Agent) targetCpuset(current string, occupied map[string]struct{}) strin
 }
 
 func (a *Agent) resolveCgroupPaths(pod podInfo) ([]string, error) {
-	paths := a.resolveCgroupPathCandidates(pod.cgroupPath, pod.id)
+	paths, err := a.resolveCgroupPathCandidates(pod.cgroupPath, pod.id)
+	if err != nil {
+		return nil, err
+	}
 	if len(paths) == 0 {
 		return nil, fmt.Errorf("cpuset.cpus not found for cgroup %q", pod.cgroupPath)
 	}
@@ -318,24 +321,32 @@ func (a *Agent) resolveCgroupPaths(pod podInfo) ([]string, error) {
 }
 
 func (a *Agent) resolveCgroupPath(cgroupPath string) (string, error) {
-	paths := a.resolveCgroupPathCandidates(cgroupPath, "")
+	paths, err := a.resolveCgroupPathCandidates(cgroupPath, "")
+	if err != nil {
+		return "", err
+	}
 	if len(paths) == 0 {
 		return "", fmt.Errorf("cpuset.cpus not found for cgroup %q", cgroupPath)
 	}
 	return paths[0], nil
 }
 
-func (a *Agent) resolveCgroupPathCandidates(cgroupPath, sandboxID string) []string {
-	candidates := []string{cgroupPath}
-	if a.cfg.CgroupRoot != "" {
-		trimmed := strings.TrimPrefix(cgroupPath, "/")
-		candidates = append(candidates, filepath.Join(a.cfg.CgroupRoot, trimmed))
-		candidates = append(candidates, systemdScopeCandidates(a.cfg.CgroupRoot, trimmed)...)
-		candidates = append(candidates, sandboxCgroupCandidates(a.cfg.CgroupRoot, trimmed, sandboxID)...)
+func (a *Agent) resolveCgroupPathCandidates(cgroupPath, sandboxID string) ([]string, error) {
+	root, relativePath, err := normalizeCgroupPath(a.cfg.CgroupRoot, cgroupPath)
+	if err != nil {
+		return nil, err
 	}
+	candidates := []string{filepath.Join(root, relativePath)}
+	candidates = append(candidates, systemdScopeCandidates(root, relativePath)...)
+	candidates = append(candidates, sandboxCgroupCandidates(root, relativePath, sandboxID)...)
+
 	var out []string
 	seen := map[string]struct{}{}
-	for _, candidate := range candidates {
+	for _, untrustedCandidate := range candidates {
+		candidate, ok := existingPathWithinRoot(root, untrustedCandidate)
+		if !ok {
+			continue
+		}
 		if _, ok := seen[candidate]; ok {
 			continue
 		}
@@ -344,14 +355,82 @@ func (a *Agent) resolveCgroupPathCandidates(cgroupPath, sandboxID string) []stri
 			out = append(out, candidate)
 		}
 	}
-	if a.cfg.CgroupRoot != "" {
-		if found, ok := findCgroupByBase(a.cfg.CgroupRoot, filepath.Base(cgroupPath)); ok {
+	if found, ok := findCgroupByBase(root, filepath.Base(relativePath)); ok {
+		if found, ok = existingPathWithinRoot(root, found); ok {
 			if _, exists := seen[found]; !exists {
 				out = append(out, found)
 			}
 		}
 	}
-	return out
+	return out, nil
+}
+
+// normalizeCgroupPath converts the runtime-provided path into a child path of CgroupRoot.
+func normalizeCgroupPath(root, cgroupPath string) (string, string, error) {
+	if root == "" {
+		return "", "", fmt.Errorf("cgroup root is empty")
+	}
+	if cgroupPath == "" {
+		return "", "", fmt.Errorf("cgroup path is empty")
+	}
+
+	cleanRoot, err := filepath.Abs(filepath.Clean(root))
+	if err != nil {
+		return "", "", fmt.Errorf("clean cgroup root %q: %w", root, err)
+	}
+	cleanInput := filepath.Clean(cgroupPath)
+	if filepath.IsAbs(cleanInput) {
+		if candidate, ok := pathWithinRoot(cleanRoot, cleanInput); ok {
+			relativePath, relErr := filepath.Rel(cleanRoot, candidate)
+			if relErr != nil || relativePath == "." {
+				return "", "", fmt.Errorf("cgroup path %q does not identify a child of root %q", cgroupPath, cleanRoot)
+			}
+			return cleanRoot, relativePath, nil
+		}
+		cleanInput = strings.TrimLeft(cleanInput, string(filepath.Separator))
+	}
+
+	candidate, ok := pathWithinRoot(cleanRoot, filepath.Join(cleanRoot, cleanInput))
+	if !ok {
+		return "", "", fmt.Errorf("cgroup path %q escapes root %q", cgroupPath, cleanRoot)
+	}
+	relativePath, err := filepath.Rel(cleanRoot, candidate)
+	if err != nil || relativePath == "." {
+		return "", "", fmt.Errorf("cgroup path %q does not identify a child of root %q", cgroupPath, cleanRoot)
+	}
+	return cleanRoot, relativePath, nil
+}
+
+// pathWithinRoot uses path components instead of string prefixes, so sibling paths cannot match.
+func pathWithinRoot(root, candidate string) (string, bool) {
+	cleanRoot := filepath.Clean(root)
+	cleanCandidate := filepath.Clean(candidate)
+	relativePath, err := filepath.Rel(cleanRoot, cleanCandidate)
+	if err != nil || filepath.IsAbs(relativePath) || relativePath == ".." ||
+		strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return cleanCandidate, true
+}
+
+// existingPathWithinRoot also resolves directory symlinks before accepting a candidate.
+func existingPathWithinRoot(root, candidate string) (string, bool) {
+	cleanCandidate, ok := pathWithinRoot(root, candidate)
+	if !ok {
+		return "", false
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", false
+	}
+	resolvedCandidate, err := filepath.EvalSymlinks(cleanCandidate)
+	if err != nil {
+		return "", false
+	}
+	if _, ok := pathWithinRoot(resolvedRoot, resolvedCandidate); !ok {
+		return "", false
+	}
+	return cleanCandidate, true
 }
 
 func (a *Agent) replacePods(pods []*api.PodSandbox) {
@@ -458,8 +537,8 @@ func systemdQoSSlice(podSlice string) string {
 }
 
 func hasCpusetFile(cgroupPath string) bool {
-	info, err := os.Stat(filepath.Join(cgroupPath, "cpuset.cpus"))
-	return err == nil && !info.IsDir()
+	info, err := os.Lstat(filepath.Join(cgroupPath, "cpuset.cpus"))
+	return err == nil && info.Mode().IsRegular()
 }
 
 func findCgroupByBase(root, base string) (string, bool) {
