@@ -424,3 +424,9 @@ First unify the template, concurrency level, number of requests, and warm-up cou
 - [KVM irqbypass XArray v1 patch archive](https://patchew.org/linux/20230801115646.33990-1-likexu%40tencent.com/)
 
 - [KVM irqbypass XArray v2 patch series](https://lore.kernel.org/all/20230802051700.52321-1-likexu@tencent.com/)
+
+## Change History
+
+|Document Version|Date|Description|
+|--|--|--|
+|01|2026-09-30|This is the first official release.|

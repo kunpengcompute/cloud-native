@@ -382,3 +382,9 @@ Uninstall the plugin.
 ```bash
 kubectl delete -f config/kunpeng-tap-pcore-binding/daemonset.yaml
 ```
+
+## Change History
+
+|Document Version|Date|Description|
+|--|--|--|
+|01|2026-09-30|This is the first official release.|
