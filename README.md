@@ -1,6 +1,6 @@
 # 项目介绍<a name="ZH-CN_TOPIC_0000002440791696"></a>
 
-简体中文 | [English](./README_EN.md)
+简体中文 | [English](./README_en.md)
 
 鲲鹏云原生项目集合，包含多个针对鲲鹏处理器优化的云原生组件。
 
