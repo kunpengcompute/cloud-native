@@ -67,7 +67,6 @@ kubectl get nodes -L kubernetes.io/arch -o wide
 
 目标节点应处于`Ready`状态，`kubernetes.io/arch`应为`arm64`。当前用户还应具有创建DaemonSet、Service、ConfigMap、ServiceAccount、Role和RoleBinding等资源的权限。
 
-
 ## 编译镜像 <a name="devkit-collector-build"></a>
 
 编译前请确保编译镜像的服务器可以访问Go module、DevKit Tuner CLI下载地址，并能拉取容器基础镜像。
