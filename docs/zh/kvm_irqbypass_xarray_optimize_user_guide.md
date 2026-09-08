@@ -428,3 +428,9 @@ Virtio MSI-X、网络 TAP、存储或调度资源过滤等路径。
 - [cube-bench 使用说明](https://github.com/TencentCloud/CubeSandbox/tree/master/examples/cube-bench)
 - [KVM irqbypass XArray v1 补丁归档](https://patchew.org/linux/20230801115646.33990-1-likexu%40tencent.com/)
 - [KVM irqbypass XArray v2 补丁系列](https://lore.kernel.org/all/20230802051700.52321-1-likexu@tencent.com/)
+
+## 修订记录
+
+|文档版本| 发布日期   | 修改说明         |
+|----------| ---------- | ---------------- |
+|01| 2026-09-30 | 第一次正式发布。 |

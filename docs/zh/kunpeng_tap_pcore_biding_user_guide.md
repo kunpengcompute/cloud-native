@@ -361,3 +361,11 @@ kubectl delete -f config/kunpeng-tap-pcore-biding/test-pods-cpu-limit.yaml --ign
 ```bash
 kubectl delete -f config/kunpeng-tap-pcore-biding/daemonset.yaml
 ```
+
+## 修订记录
+
+|文档版本| 发布日期   | 修改说明         |
+|----------| ---------- | ---------------- |
+|01| 2026-09-30 | 第一次正式发布。 |
+
+

@@ -1,5 +1,7 @@
 # Project Introduction<a name="EN-US_TOPIC_0000002440791696"></a>
 
+English | [简体中文](./README.md)
+
 This is a collection of Kunpeng cloud-native projects, including multiple cloud-native components optimized for Kunpeng processors.
 
 # Version Description<a name="EN-US_TOPIC_0000002441456462"></a>
