@@ -15,7 +15,12 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 |devkit-topdown|分析CPU流水线瓶颈|system、CPU、PID|
 |devkit-memory|采集Cache、内存等相关指标|system、CPU|
 
-本文以NodePort独立模式作为首次部署示例。完成部署后，可以通过节点IP和端口`30010`查看指标。如果集群中已经部署Prometheus Operator，也可以选择使用ServiceMonitor接入Prometheus。
+本文提供以下两种部署模式。
+
+- NodePort独立模式：用于首次部署和快速验证，可以通过节点IP和端口`30010`查看当前指标。该模式不依赖kube-prometheus，不保存历史数据，也不能在Grafana中查看指标趋势。
+- Prometheus模式：用于持续采集、存储和可视化指标。该模式要求集群已经部署kube-prometheus，并通过ServiceMonitor将DevKit Collector接入Prometheus；本文后续使用Grafana进行指标可视化，因此Grafana也必须处于可用状态（kube-prometheus完整部署时会包含Grafana的部署，不需要单独操作）。
+
+首次使用时建议先部署NodePort独立模式，确认DevKit Collector可以正常采集指标后，再根据需要切换到Prometheus模式。
 
 > **说明：**
 > NodePort独立模式和Prometheus模式使用相同名称的Kubernetes资源，两种模式不能同时部署。切换模式前需要先卸载当前模式。
@@ -23,6 +28,9 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 ## 环境要求<a name="devkit-collector-environment-requirements"></a>
 
 本文基于特定环境提供指导。在正式操作前，请确保软硬件和操作权限均满足要求。
+
+> 说明：
+> Kubernetes是本文的基础前置环境，kube-prometheus是Prometheus模式的外部前置环境。前置环境的安装部署不属于本文的说明内容，但本文提供相关链接作为部署参考，完成部署后仍请按照本节要求检查环境状态。
 
 **硬件要求<a name="devkit-collector-hardware-requirements"></a>**
 
@@ -40,14 +48,25 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 
 **表 3** 已验证的操作系统和软件版本<a id="devkit-collector已验证的软件版本"></a>
 
-|软件|版本或要求|获取方式|
-|--|--|--|
-|操作系统|openEuler 24.03 LTS SP3|[获取链接](https://www.openeuler.org/zh/download/archive/detail/?version=openEuler%2024.03%20LTS%20SP3)|
-|Kubernetes|1.28.14|参考《[Kubernetes部署指南（CentOS&openEuler）](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Kubernetes/kunpengk8s_04_0001.html)》进行下载部署。|
-|containerd|1.6.22|参考《[Containerd 安装指南（CentOS 8.1&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/Containerd/kunpengcontainerd_03_0001.html)》进行下载安装。|
-|Go|推荐 1.25.0|[获取链接](https://go.dev/dl/)|
-|Docker|18.09.0|yum安装|
-|kube-prometheus|release-0.16|参考[官方社区](https://github.com/prometheus-operator/kube-prometheus/tree/release-0.16)进行安装和部署|
+|软件|版本或要求|获取方式|备注|
+|--|--|--|--|
+|操作系统|openEuler 24.03 LTS SP3|[获取链接](https://www.openeuler.org/zh/download/archive/detail/?version=openEuler%2024.03%20LTS%20SP3)||
+|Kubernetes|1.28.14|可参考[sealos部署k8s集群](https://sealos.run/docs/advanced/k8s/getting-started)进行快速部署。|DevKit Collector运行环境|
+|containerd|1.7.13|使用sealos安装k8s v1.28.14时一同安装|Kubernetes容器运行时|
+|Go|推荐 1.25.0|[获取链接](https://go.dev/dl/)|若官方链接下载速度太慢可替换为其他可信的国内下载源|
+|Docker|18.09.0|yum安装|用于构建kunpeng-perf-monitor镜像|
+|kube-prometheus|release-0.16|参考[官方社区](https://github.com/prometheus-operator/kube-prometheus/tree/release-0.16)进行安装和部署|Prometheus模式的前置环境|
+
+Docker只用于构建`kunpeng-perf-monitor`镜像，Kubernetes节点使用containerd作为底层的容器运行时。
+
+部署前执行以下命令检查Kubernetes节点。
+
+```bash
+kubectl get nodes -L kubernetes.io/arch -o wide
+```
+
+目标节点应处于`Ready`状态，`kubernetes.io/arch`应为`arm64`。当前用户还应具有创建DaemonSet、Service、ConfigMap、ServiceAccount、Role和RoleBinding等资源的权限。
+
 
 ## 编译镜像 <a name="devkit-collector-build"></a>
 
@@ -194,13 +213,16 @@ Go版本推荐 1.25，Docker daemon应处于可用状态。
 
 **（可选）部署Prometheus模式<a name="devkit-collector-prometheus-deployment"></a>**
 
-如果**集群已经部署[kube-Prometheus](https://github.com/prometheus-operator/kube-prometheus)，并希望由Prometheus自动发现DevKit Collector并收集相关指标**，可以执行以下步骤。
+如果**集群已经按照[kube-prometheus release-0.16官方文档](https://github.com/prometheus-operator/kube-prometheus/tree/release-0.16)完成Prometheus的部署，并希望由Prometheus自动发现DevKit Collector、持续收集指标并通过Grafana进行可视化**，可以执行以下步骤。
 
-1. 检查`ServiceMonitor` CRD。
+1. 检查`ServiceMonitor` CRD、Prometheus Service和Grafana Service。
 
     ```bash
     kubectl api-resources | grep -w servicemonitors
+    kubectl -n monitoring get service prometheus-k8s grafana
     ```
+
+    应能查询到`ServiceMonitor`资源以及`prometheus-k8s`和`grafana`两个Service，此时才可进行Devkit Collector的部署。
 
 2. 删除NodePort独立模式并等待旧Pod删除完成。
 
@@ -221,13 +243,11 @@ Go版本推荐 1.25，Docker daemon应处于可用状态。
       daemonset/kunpeng-perf-monitor-devkit --timeout=5m
     ```
 
-4. 查看Service、ServiceMonitor和EndpointSlice。
+4. 查看Service和ServiceMonitor。
 
     ```bash
     kubectl -n default get service kunpeng-perf-monitor-devkit
-    kubectl -n default get servicemonitor kunpeng-perf-monitor-devkit
-    kubectl -n default get endpointslice \
-      -l kubernetes.io/service-name=kunpeng-perf-monitor-devkit
+    kubectl -n default get servicemonitor kunpeng-perf-monitor-devkit -o yaml | grep endpoints
     ```
 
     Service类型应为`ClusterIP`，ServiceMonitor的采集路径为`/metrics`，每个Ready Pod应对应一个endpoint。
@@ -571,6 +591,8 @@ kunpeng_node_devkit_topdown_bound_percent{
    如下图所示，在左侧导航栏选择**Explore**，然后点击**Metric**，输入`devkit`便会自动列出所有相关指标，选择其中一个，最后点击**Run query**即可查看指标趋势图。
 
   ![Grafana操作图](figures/grafana-guide.png)
+
+   能查询到`kunpeng_node_devkit_*`指标并显示随时间变化的曲线，说明本文的指标可视化流程已经完成。
 
 > **说明：**
 > 在Explore页面右上角可设定查询时间范围。
