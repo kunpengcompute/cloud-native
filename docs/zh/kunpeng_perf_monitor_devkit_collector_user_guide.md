@@ -30,7 +30,7 @@ DevKit Collector是kunpeng-perf-monitor中基于[Kunpeng DevKit Tuner CLI](https
 本文基于特定环境提供指导。在正式操作前，请确保软硬件和操作权限均满足要求。
 
 > 说明：
-> Kubernetes是本文的基础前置环境，kube-prometheus是Prometheus模式的外部前置环境。前置环境的安装部署不属于本文的说明内容，但本文提供相关链接作为部署参考，完成部署后仍请按照本节要求检查环境状态。
+> Kubernetes是本文的基础前置环境，kube-prometheus是Prometheus模式的外部前置环境。前置环境的安装部署不属于本文的说明内容，但本文提供相关链接作为部署参考，完成部署后请按照本节要求检查环境状态。
 
 **硬件要求<a name="devkit-collector-hardware-requirements"></a>**
 
