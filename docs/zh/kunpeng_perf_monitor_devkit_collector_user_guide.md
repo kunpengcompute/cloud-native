@@ -304,7 +304,7 @@ DevKit Collector启动后会立即开始首次采集。TopDown和Memory在同一
   **（可选）配置Prometheus和Grafana的NodePort**
   kube-prometheus默认部署时，Prometheus和Grafana的Service类型为ClusterIP，仅在集群内可访问。如果需要在外部访问这两个服务，需要将它们的类型改为NodePort。修改内容参考：
   
-  在`manifests/`目录下，对两个Service文件进行如下修改,其中nodePort设定值可根据实际情况调整。
+  在kube-prometheus的`manifests/`目录下，对两个Service文件进行如下修改,其中nodePort设定值可根据实际情况调整。
   `grafana-service.yaml`：`spec.type`改为`NodePort`，为http端口指定`nodePort: 30000`。
 
   ```yaml
@@ -330,6 +330,19 @@ DevKit Collector启动后会立即开始首次采集。TopDown和Memory在同一
     - name: reloader-web
       port: 8080
       targetPort: reloader-web
+  ```
+
+  在kube-prometheus源码根目录执行以下命令，使修改后的Service配置生效。
+
+  ```bash
+  kubectl apply -f manifests/grafana-service.yaml \
+    -f manifests/prometheus-service.yaml
+  ```
+
+  应用完成后，执行以下命令确认两个Service已更新为NodePort，并记录实际分配的端口。
+
+  ```bash
+  kubectl -n monitoring get service grafana prometheus-k8s
   ```
   
   **查询`<prometheus-address>:<port>`**
@@ -488,12 +501,22 @@ topdown:
       daemonset/kunpeng-perf-monitor-devkit --timeout=5m
     ```
 
-2. 如需持久化配置，在实际使用的部署清单中为容器增加以下环境变量，然后重新应用清单。
+2. 如需持久化配置，在实际使用的部署清单（如`config/kunpeng-perf-monitor/k8s/deployment-devkit.yaml`和`onfig/kunpeng-perf-monitor/k8s/devkit-prometheus/deployment.yaml`）中为容器增加以下环境变量，然后重新应用清单。
 
     ```yaml
     env:
     - name: DEVKIT_COLLECT_INTERVAL
       value: "30"
+    ```
+
+    根据当前部署模式，在源码根目录重新应用对应清单。
+
+    ```bash
+    # NodePort独立模式
+    kubectl apply -f config/kunpeng-perf-monitor/k8s/deployment-devkit.yaml
+
+    # Prometheus模式
+    kubectl apply -f config/kunpeng-perf-monitor/k8s/devkit-prometheus/deployment.yaml
     ```
 
     该变量只在进程启动时读取，修改后会触发Pod滚动更新。配置值小于`11`秒时不会阻止启动，但日志会出现`devkit_capacity_warning`。Prometheus模式下建议使该值与ServiceMonitor的`interval`保持一致。
