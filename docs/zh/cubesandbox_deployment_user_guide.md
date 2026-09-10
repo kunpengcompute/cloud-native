@@ -1,12 +1,14 @@
-# CubeSandbox部署用户指南
+# CubeSandbox鲲鹏适配和优化 用户指南
 
 ## 简介
 
-[CubeSandbox](https://github.com/TencentCloud/CubeSandbox)是基于RustVMM和KVM的沙箱系统。在鲲鹏服务器上部署时，CubeSandbox使用鲲鹏处理器提供的ARM64虚拟化能力运行MicroVM。
+CubeSandbox是基于RustVMM和KVM的沙箱系统。在鲲鹏服务器上部署时，CubeSandbox使用鲲鹏处理器提供的ARM64虚拟化能力运行MicroVM。
 
-CubeSandbox从v0.5.0开始提供ARM64全栈支持。本文以已在ARM64环境完成验证的CubeSandbox v0.5.1为例，其对应的Python SDK包版本为0.5.0。除非特别说明，本文后续安装和测试命令均使用该版本组合。
+CubeSandbox从v0.5.0开始提供ARM64全栈支持。本文以已在ARM64环境完成验证的CubeSandbox v0.5.1为例，其对应的Python SDK包版本为0.5.0。
 
-本指南面向鲲鹏950处理器，介绍CubeSandbox的部署、模板制作和基础验证过程。
+除非特别说明，本文后续安装和测试命令均使用该版本组合。
+
+本指南面向鲲鹏950处理器，介绍CubeSandbox的部署、模板制作和基础验证过程，主要包含以下几个步骤。
 
 1. 确认ARM64、KVM、XFS和基础软件版本满足要求。
 2. 安装CubeSandbox并检查核心服务。
@@ -31,7 +33,7 @@ CubeSandbox从v0.5.0开始提供ARM64全栈支持。本文以已在ARM64环境�
 | 已验证Docker版本 | 25.0.3 |
 | 已验证Docker Compose版本 | v2.30.3 |
 | 功能验证工具 | Python 3 |
-| 可选性能评估工具 | cube-bench；构建时需要Go 1.25或以上版本 |
+| 可选性能评估工具 | cube-bench；构建时需要Go 1.25.0或以上版本 |
 
 执行以下步骤检查处理器架构、KVM、glibc和文件系统。
 
@@ -85,7 +87,8 @@ CubeSandbox从v0.5.0开始提供ARM64全栈支持。本文以已在ARM64环境�
 
 ## 注意事项
 
-- 只有目标内核已经合入ARM64 vNMI系列时，才需要检查是否合入PR #27059对应修复；未合入vNMI系列的内核不受该问题影响。
+- openEuler kernel [PR #27059](https://gitcode.com/openeuler/kernel/pull/27059)用于限制vNMI场景下`ICH_AP1Rn_EL2`仅执行64位访问。
+- 只有目标内核已经合入ARM64 vNMI系列时，才需要检查是否包含该修复；未合入vNMI系列的内核不受该问题影响。
 - 当前CubeSandbox不支持ARM64 vNMI状态的64位保存和恢复，不得为Guest主动启用vNMI。
 - 生产环境启用前，应在测试节点完成安装、模板、Sandbox和快照验证。
 
@@ -97,276 +100,275 @@ CubeSandbox从v0.5.0开始提供ARM64全栈支持。本文以已在ARM64环境�
 
 先完成[环境要求](#环境要求)中的架构、KVM、glibc和XFS检查，再执行以下补充检查。
 
-#### 检查物理内存
+1. 检查物理内存。
 
-```bash
-awk '/MemTotal/ {printf "memory: %.1f GiB\n", $2/1024/1024}' /proc/meminfo
-```
+    ```bash
+    awk '/MemTotal/ {printf "memory: %.1f GiB\n", $2/1024/1024}' /proc/meminfo
+    ```
 
-期望内存不少于8 GiB。低于该容量时安装器会终止，且高并发测试也无法得到有效结果。
+    期望内存不少于8 GiB。低于该容量时安装器会终止，且高并发测试也无法得到有效结果。
 
-#### 检查数据盘空间
+2. 检查数据盘空间。
 
-```bash
-df -h /data/cubelet
-```
+    ```bash
+    df -h /data/cubelet
+    ```
 
-期望可用空间不少于50 GB；制作多个模板或执行高并发测试时建议不少于200 GB。
+    期望可用空间不少于50 GB；制作多个模板或执行高并发测试时建议不少于200 GB。
 
-#### 检查内核是否支持bpffs
+3. 检查内核是否支持bpffs。
 
-```bash
-grep -w bpf /proc/filesystems
-```
+    ```bash
+    grep -w bpf /proc/filesystems
+    ```
 
-期望输出包含`bpf`。无输出表示内核未启用bpf文件系统，CubeVS无法运行。
+    期望输出包含`bpf`。无输出表示内核未启用bpf文件系统，CubeVS无法运行。
 
-#### 检查bpffs挂载状态
+4. 检查bpffs挂载状态。
 
-```bash
-findmnt -no FSTYPE /sys/fs/bpf
-```
+    ```bash
+    findmnt -no FSTYPE /sys/fs/bpf
+    ```
 
-期望输出`bpf`。无输出或输出其他类型时，执行`mount -t bpf bpf /sys/fs/bpf`完成挂载。
+    期望输出`bpf`。无输出或输出其他类型时，执行`mount -t bpf bpf /sys/fs/bpf`完成挂载。
 
-#### 检查cgroup类型和CPU控制器
+5. 检查cgroup类型和CPU控制器。
 
-```bash
-stat -fc %T /sys/fs/cgroup
-```
+    ```bash
+    stat -fc %T /sys/fs/cgroup
+    ```
 
-使用cgroup v2时，期望输出`cgroup2fs`。使用cgroup v1时会输出其他文件系统类型，由安装器通过v1接口继续检查。
+    使用cgroup v2时，期望输出`cgroup2fs`。使用cgroup v1时会输出其他文件系统类型，由安装器通过v1接口继续检查。
 
-使用cgroup v2时继续检查控制器。
+    使用cgroup v2时继续检查控制器。
 
-```bash
-cat /sys/fs/cgroup/cgroup.controllers
-```
+    ```bash
+    cat /sys/fs/cgroup/cgroup.controllers
+    ```
 
-期望输出包含`cpu`。使用cgroup v1时不执行该命令。
+    期望输出包含`cpu`。使用cgroup v1时不执行该命令。
 
-#### 检查Docker
+6. 检查Docker。
 
-```bash
-docker version --format '{{.Server.Version}}'
-```
+    ```bash
+    docker version --format '{{.Server.Version}}'
+    docker info
+    ```
 
-期望输出`25.0.3`。
+    版本命令期望输出`25.0.3`。`docker info`应正常输出Server信息且不包含连接错误。Docker异常会导致控制面依赖和CubeEgress镜像无法启动。
 
-```bash
-docker info
-```
+7. 检查Docker Compose。
 
-期望命令正常输出Server信息且不包含连接错误。Docker异常会导致控制面依赖和CubeEgress镜像无法启动。
+    ```bash
+    docker compose version --short
+    ```
 
-#### 检查Docker Compose
-
-```bash
-docker compose version --short
-```
-
-期望输出`2.30.3`。
+    期望输出`2.30.3`。
 
 ### 规划沙箱网段
 
-CubeSandbox默认使用`192.168.0.0/18`分配沙箱IP。该网段不能与宿主机接口、路由、容器网络或业务网络重叠。安装前检查现有网络。
+CubeSandbox默认使用`192.168.0.0/18`分配沙箱IP。该网段不能与宿主机接口、路由、容器网络或业务网络重叠。按照以下步骤检查并规划网段。
 
-```bash
-ip -4 address show
-```
+1. 检查宿主机接口地址。
 
-确认宿主机接口地址不在计划使用的沙箱网段内。
+    ```bash
+    ip -4 address show
+    ```
 
-```bash
-ip -4 route show
-```
+    确认宿主机接口地址不在计划使用的沙箱网段内。
 
-确认现有路由不覆盖计划使用的沙箱网段。
+2. 检查宿主机路由。
 
-```bash
-docker network ls
-```
+    ```bash
+    ip -4 route show
+    ```
 
-确认Docker网络未使用相同或重叠的网段。
+    确认现有路由不覆盖计划使用的沙箱网段。
 
-```bash
-ss -lntp | grep -E ':(80|443|3000|3010|3306|6379|9000|9001|12088)\b' || true
-```
+3. 检查Docker网络。
 
-无输出表示这些默认端口未被占用；有输出时应确认占用服务是否会与CubeSandbox冲突。
+    ```bash
+    docker network ls
+    ```
 
-如果默认网段冲突，选择未被使用的私有网段，并在安装时设置`CUBE_SANDBOX_NETWORK_CIDR`。掩码范围应为`/16`至`/24`，以下地址仅为示例，使用前仍需检查冲突。
+    确认Docker网络未使用相同或重叠的网段。
 
-```bash
-export CUBE_SANDBOX_NETWORK_CIDR=10.100.0.0/18
-```
+4. 检查CubeSandbox默认端口。
 
-不要通过`CUBE_SANDBOX_NETWORK_CIDR_SKIP_CONFLICT_CHECK=1`绕过已知冲突。网段冲突通常表现为模板探针超时、Sandbox网络不通或安装预检失败。
+    ```bash
+    ss -lntp | grep -E ':(80|443|3000|3010|3306|6379|9000|9001|12088)\b' || true
+    ```
+
+    无输出表示这些默认端口未被占用；有输出时应确认占用服务是否会与CubeSandbox冲突。
+
+5. 默认网段冲突时，选择未被使用的私有网段，并在安装时设置`CUBE_SANDBOX_NETWORK_CIDR`。掩码范围应为`/16`至`/24`，以下地址仅为示例，使用前仍需检查冲突。
+
+    ```bash
+    export CUBE_SANDBOX_NETWORK_CIDR=10.100.0.0/18
+    ```
+
+    不要通过`CUBE_SANDBOX_NETWORK_CIDR_SKIP_CONFLICT_CHECK=1`绕过已知冲突。网段冲突通常表现为模板探针超时、Sandbox网络不通或安装预检失败。
 
 ### 获取并安装ARM64版本
 
-从CubeSandbox官方release下载ARM64安装包。执行脚本前应审核安装包来源和`install.sh`内容。
+按照以下步骤获取并安装CubeSandbox ARM64版本。执行脚本前应审核安装包来源和`install.sh`内容。
 
-```bash
-export CUBE_VERSION=v0.5.1
-curl -fLO \
-  "https://github.com/TencentCloud/CubeSandbox/releases/download/${CUBE_VERSION}/cube-sandbox-one-click-${CUBE_VERSION}-arm64.tar.gz"
-```
+1. 设置版本并从CubeSandbox官方release下载安装包。
 
-检查压缩包是否完整。
+    ```bash
+    export CUBE_VERSION=v0.5.1
+    curl -fLO \
+      "https://github.com/TencentCloud/CubeSandbox/releases/download/${CUBE_VERSION}/cube-sandbox-one-click-${CUBE_VERSION}-arm64.tar.gz"
+    ```
 
-```bash
-tar -tzf "cube-sandbox-one-click-${CUBE_VERSION}-arm64.tar.gz" >/dev/null
-```
+2. 检查压缩包是否完整。
 
-解压安装包。
+    ```bash
+    tar -tzf "cube-sandbox-one-click-${CUBE_VERSION}-arm64.tar.gz" >/dev/null
+    ```
 
-```bash
-tar -xzf "cube-sandbox-one-click-${CUBE_VERSION}-arm64.tar.gz"
-```
+3. 解压安装包。
 
-进入安装目录并审核安装脚本。
+    ```bash
+    tar -xzf "cube-sandbox-one-click-${CUBE_VERSION}-arm64.tar.gz"
+    ```
 
-```bash
-cd "cube-sandbox-one-click-${CUBE_VERSION}-arm64"
-less install.sh
-```
+4. 进入安装目录并审核安装脚本。
 
-执行安装并保存日志。
+    ```bash
+    cd "cube-sandbox-one-click-${CUBE_VERSION}-arm64"
+    less install.sh
+    ```
 
-```bash
-set -o pipefail
-MIRROR=cn ./install.sh 2>&1 | tee cubesandbox-install.log
-```
+5. 执行安装并保存日志。
 
-国内网络使用`MIRROR=cn`选择CubeSandbox组件镜像。如果仍然拉取失败，应先验证Docker DNS、代理、镜像仓库连通性和剩余磁盘空间，再重新执行安装。
+    ```bash
+    set -o pipefail
+    MIRROR=cn ./install.sh 2>&1 | tee cubesandbox-install.log
+    ```
+
+    国内网络使用`MIRROR=cn`选择CubeSandbox组件镜像。如果仍然拉取失败，应先验证Docker DNS、代理、镜像仓库连通性和剩余磁盘空间，再重新执行安装。
 
 ### 检查安装结果
 
-安装完成后检查核心服务、监听端口、容器和一键部署健康检查。
+安装完成后，按照以下步骤检查核心服务、监听端口、容器和一键部署健康状态。
 
-```bash
-systemctl list-units 'cube-*' --all --no-pager
-```
+1. 检查核心服务。
 
-期望CubeSandbox核心单元的`LOAD`为`loaded`、`ACTIVE`为`active`、`SUB`为`running`。出现`failed`、`inactive`或缺少核心服务时，应查看对应单元日志。
+    ```bash
+    systemctl list-units 'cube-*' --all --no-pager
+    ```
 
-```bash
-ss -lntp | grep ':3000 '
-```
+    期望CubeSandbox核心单元的`LOAD`为`loaded`、`ACTIVE`为`active`、`SUB`为`running`。出现`failed`、`inactive`或缺少核心服务时，应查看对应单元日志。
 
-期望CubeAPI监听3000端口。
+2. 检查CubeAPI监听端口。
 
-```bash
-docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
-```
+    ```bash
+    ss -lntp | grep ':3000 '
+    ```
 
-确认CubeSandbox依赖容器处于运行状态。
+    期望CubeAPI监听3000端口。
 
-```bash
-/usr/local/services/cubetoolbox/scripts/one-click/quickcheck.sh
-```
+3. 检查依赖容器。
 
-核心服务应为`active`，CubeAPI应监听3000端口，健康检查应通过。检查失败时先查看安装日志和对应服务日志。
+    ```bash
+    docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+    ```
 
-```bash
-tail -n 200 cubesandbox-install.log
-```
+    确认CubeSandbox依赖容器处于运行状态。
 
-```bash
-journalctl \
-  -u cube-sandbox-cube-api.service \
-  -u cube-sandbox-cubemaster.service \
-  -u cube-sandbox-cubelet.service \
-  -n 100 --no-pager
-```
+4. 执行一键部署健康检查。
 
-```bash
-find /data/log/Cubelet /data/log/CubeVmm -maxdepth 2 -type f -print
-```
+    ```bash
+    /usr/local/services/cubetoolbox/scripts/one-click/quickcheck.sh
+    ```
 
-### 常见安装问题
+    核心服务应为`active`，CubeAPI应监听3000端口，健康检查应通过。
 
-**表 2** CubeSandbox常见安装问题
+5. 检查失败时，查看安装日志和对应服务日志。
 
-| 问题 | 典型现象 | 处理方法 |
-| --- | --- | --- |
-| 安装包架构错误 | 启动组件时报Exec format error | 确认uname -m为aarch64，并下载文件名包含arm64的安装包 |
-| KVM不可用 | 预检提示/dev/kvm not found | 使用开启虚拟化能力的物理机或裸金属服务器，检查KVM模块和设备权限 |
-| XFS或reflink不满足 | 预检提示not XFS，模板制作失败 | 将独立XFS数据盘挂载到/data/cubelet，并确认xfs_info显示reflink=1 |
-| bpffs未挂载 | eBPF或CubeVS初始化失败 | 确认内核支持bpf文件系统并挂载/sys/fs/bpf |
-| cgroup CPU控制器不可用 | Cubelet CPU配额初始化失败 | 检查cgroup版本及cgroup.controllers，按发行版要求启用CPU控制器 |
-| 沙箱网段冲突 | 安装预检失败、模板探针超时或Sandbox网络不通 | 设置不冲突的CUBE_SANDBOX_NETWORK_CIDR后重新安装 |
-| 镜像拉取失败 | Docker返回超时、DNS或TLS错误 | 使用MIRROR=cn，检查Docker DNS、代理、仓库连通性和磁盘空间 |
-| 端口占用 | 服务启动失败或监听检查不通过 | 使用ss -lntp定位占用进程，释放端口或按安装配置修改端口 |
-| 核心服务未启动 | systemctl is-active不是active | 查看安装日志、journalctl及/data/log/Cubelet、/data/log/CubeVmm |
+    ```bash
+    tail -n 200 cubesandbox-install.log
+    journalctl \
+      -u cube-sandbox-cube-api.service \
+      -u cube-sandbox-cubemaster.service \
+      -u cube-sandbox-cubelet.service \
+      -n 100 --no-pager
+    find /data/log/Cubelet /data/log/CubeVmm -maxdepth 2 -type f -print
+    ```
 
 ### 配置SDK环境
 
-安装与CubeSandbox v0.5.1配套的Python SDK 0.5.0，并设置API地址和密钥。
+按照以下步骤安装与CubeSandbox v0.5.1配套的Python SDK 0.5.0，并设置API地址和密钥。
 
-```bash
-python3 -m pip install 'cubesandbox==0.5.0'
-```
+1. 安装Python SDK。
 
-检查SDK版本。
+    ```bash
+    python3 -m pip install 'cubesandbox==0.5.0'
+    ```
 
-```bash
-python3 -c 'from importlib.metadata import version; print(version("cubesandbox"))'
-```
+2. 检查SDK版本。
 
-期望输出`0.5.0`。
+    ```bash
+    python3 -c 'from importlib.metadata import version; print(version("cubesandbox"))'
+    ```
 
-设置SDK连接参数。
+    期望输出`0.5.0`。
 
-```bash
-export CUBE_API_URL=http://127.0.0.1:3000
-export E2B_API_URL=http://127.0.0.1:3000
-export E2B_API_KEY=e2b_000000
-```
+3. 设置SDK连接参数。
 
-生产环境应将示例密钥替换为实际密钥，且不得将密钥提交到代码仓库。
+    ```bash
+    export CUBE_API_URL=http://127.0.0.1:3000
+    export E2B_API_URL=http://127.0.0.1:3000
+    export E2B_API_KEY=e2b_000000
+    ```
+
+    生产环境应将示例密钥替换为实际密钥，且不得将密钥提交到代码仓库。
 
 ## 制作并验证模板
 
 ### 创建ARM64模板
 
-`--image`应由用户指定，并且镜像必须支持ARM64。以下命令中的镜像地址只是示例；使用其他镜像时，还应根据镜像实际服务端口调整`--expose-port`和`--probe`。
+按照以下步骤创建ARM64模板。`--image`应由用户指定，并且镜像必须支持ARM64；使用其他镜像时，还应根据镜像实际服务端口调整`--expose-port`和`--probe`。
 
-```bash
-export CUBE_TEMPLATE_IMAGE='<your-arm64-oci-image>'
-```
+1. 设置ARM64 OCI镜像地址。
 
-创建模板。
+    ```bash
+    export CUBE_TEMPLATE_IMAGE='<your-arm64-oci-image>'
+    ```
 
-```bash
-cubemastercli tpl create-from-image \
-  --image "$CUBE_TEMPLATE_IMAGE" \
-  --writable-layer-size 1G \
-  --expose-port 49999 \
-  --expose-port 49983 \
-  --probe 49999
-```
+2. 创建模板。
 
-例如，测试代码解释器模板时可以将`CUBE_TEMPLATE_IMAGE`设置为`cube-sandbox-cn.tencentcloudcr.com/cube-sandbox/sandbox-code:latest`。该地址仅用于演示，不是客户环境必须使用的镜像。
+    ```bash
+    cubemastercli tpl create-from-image \
+      --image "$CUBE_TEMPLATE_IMAGE" \
+      --writable-layer-size 1G \
+      --expose-port 49999 \
+      --expose-port 49983 \
+      --probe 49999
+    ```
 
-记录命令返回的`job_id`，等待冷启动、快照和模板发布完成。
+    例如，测试代码解释器模板时可以将`CUBE_TEMPLATE_IMAGE`设置为`cube-sandbox-cn.tencentcloudcr.com/cube-sandbox/sandbox-code:latest`。该地址仅用于演示，不是客户环境必须使用的镜像。
 
-```bash
-cubemastercli tpl watch --job-id '<job-id>'
-```
+3. 记录命令返回的`job_id`，等待冷启动、快照和模板发布完成。
 
-任务完成后检查模板状态。
+    ```bash
+    cubemastercli tpl watch --job-id '<job-id>'
+    ```
 
-```bash
-cubemastercli tpl info --template-id '<template-id>'
-```
+4. 任务完成后检查模板状态。
 
-模板状态应为`READY`，并至少存在一个状态为`READY`的副本。设置后续验证使用的模板ID。
+    ```bash
+    cubemastercli tpl info --template-id '<template-id>'
+    ```
 
-```bash
-export CUBE_TEMPLATE_ID='<template-id>'
-```
+    模板状态应为`READY`，并至少存在一个状态为`READY`的副本。
+
+5. 设置后续验证使用的模板ID。
+
+    ```bash
+    export CUBE_TEMPLATE_ID='<template-id>'
+    ```
 
 ### 验证模板启动
 
@@ -435,13 +437,17 @@ PY
 
 KVM irqbypass XArray优化可能减少大量Sandbox并发创建或恢复时的宿主机锁等待，从而改善创建或恢复延迟及吞吐量。该优化不改变CubeSandbox API、模板格式或日常操作方式。
 
-实际收益取决于并发规模以及CPU、存储、网络和调度等瓶颈。低并发场景或irqbypass不是主要热点时，性能可能没有明显变化，因此不能将该优化视为固定收益或CubeSandbox部署的前置条件。
+实际收益取决于并发规模以及CPU、存储、网络和调度等瓶颈。低并发场景或irqbypass不是主要热点时，性能可能没有明显变化。
+
+因此，不能将该优化视为固定收益或CubeSandbox部署的前置条件。
 
 #### 基本原理
 
 KVM irqbypass原实现使用全局链表保存producer和consumer。注册或注销对象时，需要在同一个mutex保护下遍历链表，并根据共享token匹配对象；对象数量增多时，遍历和持锁开销会相应增加。
 
-优化补丁使用XArray分别保存producer和consumer，并以共享token作为索引。注册时可直接查找匹配对象，注销时可直接删除对应项，从而减少线性遍历和锁占用时间。补丁不改变现有回调关系和对外接口。
+优化补丁使用XArray分别保存producer和consumer，并以共享token作为索引。注册时可直接查找匹配对象，注销时可直接删除对应项，从而减少线性遍历和锁占用时间。
+
+补丁不改变现有回调关系和对外接口。
 
 #### 上游和下游补丁
 
@@ -449,27 +455,57 @@ KVM irqbypass原实现使用全局链表保存producer和consumer。注册或注
 
 对于尚未包含该优化的Linux 6.6内核，可以直接考虑合入BoostKit提供的[irqbypass XArray补丁](https://gitcode.com/boostkit/cloud-virtual/blob/br_bk26_630/kernel/kernel-6.6.0/irqbypass/%5Birqbypass%5Dkvm-irqbypass-xarray-v2.patch)。
 
-补丁合入方法可参考openEuler [PR #26321](https://gitcode.com/openeuler/kernel/pull/26321)及其提交[`c51917e52d7f`](https://gitcode.com/openeuler/kernel/commit/c51917e52d7f267f75adeeeb747ce967adf6989b)。合入前应由操作系统或内核维护人员确认目标内核基线与补丁适配。
+补丁合入方法可参考openEuler [PR #26321](https://gitcode.com/openeuler/kernel/pull/26321)及其提交[`c51917e52d7f`](https://gitcode.com/openeuler/kernel/commit/c51917e52d7f267f75adeeeb747ce967adf6989b)。
+
+合入前应由操作系统或内核维护人员确认目标内核基线与补丁适配。
 
 ### vNMI兼容问题（可选）
 
 CubeSandbox v0.5.1在ARM64 vGIC快照中以32位数据保存和恢复`ICC_AP1Rn_EL1`。目标内核未合入vNMI系列时只使用低32位，不存在该兼容问题。
 
-如果目标内核合入了[vNMI patchset](https://mailweb.openeuler.org/archives/list/kernel@openeuler.org/thread/ZRW2NMY5DXWIF25JSZRHM7W7XFC3RTQH/)，并在支持FEAT_NMI的宿主机上向Guest启用vNMI，`ICH_AP1Rn_EL2`高32位中的NMI优先级状态可能无法被CubeSandbox完整保存和恢复。
+如果目标内核合入了[vNMI patchset](https://mailweb.openeuler.org/archives/list/kernel@openeuler.org/thread/ZRW2NMY5DXWIF25JSZRHM7W7XFC3RTQH/)，并在支持FEAT_NMI的宿主机上向Guest启用vNMI，可能触发兼容问题。
 
-只有确认目标内核包含vNMI系列时，才需要处理该兼容问题。可以直接考虑合入BoostKit提供的[vNMI兼容补丁](https://gitcode.com/boostkit/cloud-virtual/blob/br_bk26_630/kernel/kernel-6.6.0/%5Bkvm%5Darm64-vgic-v3-Restrict-ICH_AP1Rn_EL2-accesses-to-64-bit-only-with-vNMI.patch)。
+`ICH_AP1Rn_EL2`高32位中的NMI优先级状态可能无法被CubeSandbox完整保存和恢复。
 
-补丁合入方法可参考openEuler kernel [PR #27059](https://gitcode.com/openeuler/kernel/pull/27059)。使用CubeSandbox v0.5.1时不得为Guest启用vNMI；合入前应由操作系统或内核维护人员确认目标内核已经包含vNMI系列，并审核补丁适配性。
+只有确认目标内核包含vNMI系列时，才需要处理该兼容问题。
+
+可以直接考虑合入BoostKit提供的[vNMI兼容补丁](https://gitcode.com/boostkit/cloud-virtual/blob/br_bk26_630/kernel/kernel-6.6.0/%5Bkvm%5Darm64-vgic-v3-Restrict-ICH_AP1Rn_EL2-accesses-to-64-bit-only-with-vNMI.patch)。
+
+补丁合入方法可参考openEuler kernel [PR #27059](https://gitcode.com/openeuler/kernel/pull/27059)。
+
+使用CubeSandbox v0.5.1时不得为Guest启用vNMI。合入前应由操作系统或内核维护人员确认目标内核已经包含vNMI系列，并审核补丁适配性。
 
 ## 故障排除
+
+### 常见安装问题
+
+**表 2** CubeSandbox常见安装问题
+
+| 问题 | 典型现象 | 处理方法 |
+| --- | --- | --- |
+| 安装包架构错误 | 启动组件时报Exec format error | 确认uname -m为aarch64，并下载文件名包含arm64的安装包 |
+| KVM不可用 | 预检提示/dev/kvm not found | 使用开启虚拟化能力的物理机或裸金属服务器，检查KVM模块和设备权限 |
+| XFS或reflink不满足 | 预检提示not XFS，模板制作失败 | 将独立XFS数据盘挂载到/data/cubelet，并确认xfs_info显示reflink=1 |
+| bpffs未挂载 | eBPF或CubeVS初始化失败 | 确认内核支持bpf文件系统并挂载/sys/fs/bpf |
+| cgroup CPU控制器不可用 | Cubelet CPU配额初始化失败 | 检查cgroup版本及cgroup.controllers，按发行版要求启用CPU控制器 |
+| 沙箱网段冲突 | 安装预检失败、模板探针超时或Sandbox网络不通 | 设置不冲突的CUBE_SANDBOX_NETWORK_CIDR后重新安装 |
+| 镜像拉取失败 | Docker返回超时、DNS或TLS错误 | 使用MIRROR=cn，检查Docker DNS、代理、仓库连通性和磁盘空间 |
+| 端口占用 | 服务启动失败或监听检查不通过 | 使用ss -lntp定位占用进程，释放端口或按安装配置修改端口 |
+| 核心服务未启动 | systemctl is-active不是active | 查看安装日志、journalctl及/data/log/Cubelet、/data/log/CubeVmm |
 
 ### 模板或快照启动失败的解决方法
 
 **问题现象：** 模板长时间不是`READY`，或者从模板、快照创建Sandbox失败。
 
-**原因分析：** 常见原因包括ARM64镜像不可用、`/data/cubelet`未启用XFS reflink、KVM不可用、模板探针失败、Cubelet或VMM异常。快照恢复失败还可能是宿主机默认启用vNMI，但CubeSandbox仍按32位保存和恢复`ICC_AP1Rn_EL1`。
+**原因分析：** 常见原因包括ARM64镜像不可用、`/data/cubelet`未启用XFS reflink、KVM不可用、模板探针失败、Cubelet或VMM异常。
 
-**解决方法：** 依次检查`/dev/kvm`、`xfs_info /data/cubelet`、模板任务状态，以及`/data/log/Cubelet/`、`/data/log/CubeVmm/`下的业务日志。修复环境或镜像问题后，模板应进入`READY`状态。如果目标内核包含vNMI系列，vGIC状态错误还需确认内核包含PR #27059对应修复，并确认CubeSandbox Guest没有启用vNMI。
+快照恢复失败还可能是宿主机默认启用vNMI，但CubeSandbox仍按32位保存和恢复`ICC_AP1Rn_EL1`。
+
+**解决方法：** 依次检查`/dev/kvm`、`xfs_info /data/cubelet`、模板任务状态，以及`/data/log/Cubelet/`、`/data/log/CubeVmm/`下的业务日志。
+
+修复环境或镜像问题后，模板应进入`READY`状态。
+
+如果目标内核包含vNMI系列，vGIC状态错误还需确认内核包含openEuler kernel PR #27059对应修复，并确认CubeSandbox Guest没有启用vNMI。
 
 ## 参考资料
 
