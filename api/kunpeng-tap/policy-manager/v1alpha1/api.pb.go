@@ -1152,97 +1152,129 @@ func file_api_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_api_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*PodSandboxMetadata); i {
+			msg, ok := v.(*PodSandboxMetadata)
+			if !ok {
+				return nil
+			}
+			switch i {
 			case 0:
-				return &v.state
+				return &msg.state
 			case 1:
-				return &v.sizeCache
+				return &msg.sizeCache
 			case 2:
-				return &v.unknownFields
+				return &msg.unknownFields
 			default:
 				return nil
 			}
 		}
 		file_api_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*PodSandboxHookRequest); i {
+			msg, ok := v.(*PodSandboxHookRequest)
+			if !ok {
+				return nil
+			}
+			switch i {
 			case 0:
-				return &v.state
+				return &msg.state
 			case 1:
-				return &v.sizeCache
+				return &msg.sizeCache
 			case 2:
-				return &v.unknownFields
+				return &msg.unknownFields
 			default:
 				return nil
 			}
 		}
 		file_api_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*PodSandboxHookResponse); i {
+			msg, ok := v.(*PodSandboxHookResponse)
+			if !ok {
+				return nil
+			}
+			switch i {
 			case 0:
-				return &v.state
+				return &msg.state
 			case 1:
-				return &v.sizeCache
+				return &msg.sizeCache
 			case 2:
-				return &v.unknownFields
+				return &msg.unknownFields
 			default:
 				return nil
 			}
 		}
 		file_api_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*LinuxContainerResources); i {
+			msg, ok := v.(*LinuxContainerResources)
+			if !ok {
+				return nil
+			}
+			switch i {
 			case 0:
-				return &v.state
+				return &msg.state
 			case 1:
-				return &v.sizeCache
+				return &msg.sizeCache
 			case 2:
-				return &v.unknownFields
+				return &msg.unknownFields
 			default:
 				return nil
 			}
 		}
 		file_api_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*HugepageLimit); i {
+			msg, ok := v.(*HugepageLimit)
+			if !ok {
+				return nil
+			}
+			switch i {
 			case 0:
-				return &v.state
+				return &msg.state
 			case 1:
-				return &v.sizeCache
+				return &msg.sizeCache
 			case 2:
-				return &v.unknownFields
+				return &msg.unknownFields
 			default:
 				return nil
 			}
 		}
 		file_api_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ContainerMetadata); i {
+			msg, ok := v.(*ContainerMetadata)
+			if !ok {
+				return nil
+			}
+			switch i {
 			case 0:
-				return &v.state
+				return &msg.state
 			case 1:
-				return &v.sizeCache
+				return &msg.sizeCache
 			case 2:
-				return &v.unknownFields
+				return &msg.unknownFields
 			default:
 				return nil
 			}
 		}
 		file_api_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ContainerResourceHookRequest); i {
+			msg, ok := v.(*ContainerResourceHookRequest)
+			if !ok {
+				return nil
+			}
+			switch i {
 			case 0:
-				return &v.state
+				return &msg.state
 			case 1:
-				return &v.sizeCache
+				return &msg.sizeCache
 			case 2:
-				return &v.unknownFields
+				return &msg.unknownFields
 			default:
 				return nil
 			}
 		}
 		file_api_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ContainerResourceHookResponse); i {
+			msg, ok := v.(*ContainerResourceHookResponse)
+			if !ok {
+				return nil
+			}
+			switch i {
 			case 0:
-				return &v.state
+				return &msg.state
 			case 1:
-				return &v.sizeCache
+				return &msg.sizeCache
 			case 2:
-				return &v.unknownFields
+				return &msg.unknownFields
 			default:
 				return nil
 			}
