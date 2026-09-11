@@ -193,6 +193,32 @@ var _ = Describe("Dispatcher", func() {
 			d.BackfillRequest(proxyReq, hookReq, hookResp)
 			Expect(proxyReq.Config.Annotations).To(Equal(hookResp.ContainerAnnotations))
 		})
+
+		It("should ignore a mismatched pod hook request", func() {
+			proxyReq := &runtimeapi.RunPodSandboxRequest{}
+			hookResp := &v1alpha1.PodSandboxHookResponse{Annotations: map[string]string{"key": "value"}}
+
+			Expect(func() {
+				d.BackfillRequest(proxyReq, &v1alpha1.ContainerResourceHookRequest{}, hookResp)
+			}).NotTo(Panic())
+			Expect(proxyReq.Config).To(BeNil())
+		})
+
+		It("should ignore a mismatched container hook request", func() {
+			proxyReq := &runtimeapi.CreateContainerRequest{}
+			hookResp := &v1alpha1.ContainerResourceHookResponse{ContainerAnnotations: map[string]string{"key": "value"}}
+
+			Expect(func() {
+				d.BackfillRequest(proxyReq, &v1alpha1.PodSandboxHookRequest{}, hookResp)
+			}).NotTo(Panic())
+			Expect(proxyReq.Config).To(BeNil())
+		})
+
+		It("should ignore an unknown hook response type", func() {
+			Expect(func() {
+				d.BackfillRequest(struct{}{}, struct{}{}, struct{}{})
+			}).NotTo(Panic())
+		})
 	})
 
 	Describe("ParseContainerRequest", func() {
@@ -237,6 +263,10 @@ var _ = Describe("Dispatcher", func() {
 			hookReq := d.ParseContainerRequest(request)
 			Expect(hookReq).To(BeNil())
 		})
+
+		It("should return nil for an unknown request type", func() {
+			Expect(d.ParseContainerRequest(struct{}{})).To(BeNil())
+		})
 	})
 
 	Describe("ParsePodRequest", func() {
@@ -263,6 +293,10 @@ var _ = Describe("Dispatcher", func() {
 			Expect(ok).To(BeTrue())
 			Expect(hookRequest.PodMeta.Name).To(Equal("test-pod"))
 			Expect(hookRequest.Annotations["key"]).To(Equal("value"))
+		})
+
+		It("should return nil for an unknown request type", func() {
+			Expect(d.ParsePodRequest(struct{}{})).To(BeNil())
 		})
 	})
 })

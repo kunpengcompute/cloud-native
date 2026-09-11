@@ -284,7 +284,10 @@ func (s *system) discoverCPUs() error {
 		klog.ErrorS(err, "Failed to get set of isolated cpus")
 	}
 
-	entries, _ := filepath.Glob(filepath.Join(s.path, sysfsCPUPath, "cpu[0-9]*"))
+	entries, err := filepath.Glob(filepath.Join(s.path, sysfsCPUPath, "cpu[0-9]*"))
+	if err != nil {
+		return fmt.Errorf("failed to glob CPU entries: %w", err)
+	}
 	for _, entry := range entries {
 		if err := s.discoverCPU(entry); err != nil {
 			return err

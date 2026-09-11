@@ -180,8 +180,10 @@ func (p *pod) getContainer(name string) *container {
 		return p.cache.Containers[id]
 	}
 
-	for _, c := range p.GetContainers() {
-		cptr := c.(*container)
+	for _, cptr := range p.cache.Containers {
+		if cptr.PodID != p.ID {
+			continue
+		}
 		p.containers[cptr.Name] = cptr.ID
 		if cptr.Name == name {
 			found = cptr

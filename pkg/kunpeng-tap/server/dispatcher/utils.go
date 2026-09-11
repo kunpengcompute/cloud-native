@@ -41,7 +41,7 @@ func TransferToCRIContainerEnvs(envs map[string]string) []*runtimeapi.KeyValue {
 }
 func TransferCRIContainerEnvsToMap(envs []*runtimeapi.KeyValue) map[string]string {
 	res := make(map[string]string)
-	if envs == nil {
+	if len(envs) == 0 {
 		return res
 	}
 	for _, item := range envs {
