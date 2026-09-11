@@ -27,7 +27,6 @@ Kunpeng-TAP Pcore Biding插件是Kunpeng-TAP面向Kata机密容器场景提供�
 
 | 项目 | 测试值 |
 | --- | --- |
-| 测试节点 | root@192.168.25.61 |
 | CPU架构 | aarch64 |
 | Kubernetes | v1.34.7 |
 | containerd | v2.1.7 |
@@ -161,10 +160,16 @@ crictl info | grep -A20 kata-clh
 make kunpeng-tap-pcore-biding-docker-build
 ```
 
-如果测试节点无法从镜像仓库拉取镜像，可以直接导入到目标节点containerd的`k8s.io` namespace。以下命令以当前已验证节点为例。
+如果测试节点无法从镜像仓库拉取镜像，可以先在构建节点保存镜像。
 
 ```bash
-docker save kunpeng-tap-pcore-biding:latest | ssh root@192.168.25.61 'ctr -n k8s.io images import -'
+docker save -o kunpeng-tap-pcore-biding.tar kunpeng-tap-pcore-biding:latest
+```
+
+将镜像文件复制到目标节点后，在目标节点导入containerd的`k8s.io` namespace。
+
+```bash
+ctr -n k8s.io images import kunpeng-tap-pcore-biding.tar
 ```
 
 如果使用公共或企业镜像仓库，将构建标签和`config/kunpeng-tap-pcore-biding/daemonset.yaml`中的镜像地址同时改为实际仓库地址，并确认kubelet可以拉取该镜像。部署前执行如下命令检查DaemonSet使用的镜像名称。
