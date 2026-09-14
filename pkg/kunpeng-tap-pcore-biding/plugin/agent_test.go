@@ -158,6 +158,79 @@ func TestResolveCgroupPathFallbackFindByBase(t *testing.T) {
 	}
 }
 
+func TestResolveCgroupPathRejectsEscapes(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "cpuset")
+	outside := root + "-outside"
+	mustWriteCpuset(t, outside)
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("create cgroup root: %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "symlink-outside")); err != nil {
+		t.Fatalf("create cgroup symlink: %v", err)
+	}
+	fileSymlinkDir := filepath.Join(root, "file-symlink-outside")
+	if err := os.MkdirAll(fileSymlinkDir, 0o755); err != nil {
+		t.Fatalf("create cgroup dir: %v", err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "cpuset.cpus"), filepath.Join(fileSymlinkDir, "cpuset.cpus")); err != nil {
+		t.Fatalf("create cpuset symlink: %v", err)
+	}
+
+	agent := &Agent{cfg: Config{CgroupRoot: root}}
+	for _, cgroupPath := range []string{
+		".",
+		"/",
+		"../outside",
+		"kubepods.slice/../../outside",
+		outside,
+		"/symlink-outside",
+		"/file-symlink-outside",
+	} {
+		t.Run(cgroupPath, func(t *testing.T) {
+			if got, err := agent.resolveCgroupPath(cgroupPath); err == nil {
+				t.Fatalf("resolve cgroup path %q = %q, want rejection", cgroupPath, got)
+			}
+		})
+	}
+}
+
+func TestResolveCgroupPathAcceptsAbsolutePathWithinRoot(t *testing.T) {
+	root := t.TempDir()
+	expected := filepath.Join(root, "kubepods.slice/kubepods-poduid.slice")
+	mustWriteCpuset(t, expected)
+
+	agent := &Agent{cfg: Config{CgroupRoot: root}}
+	got, err := agent.resolveCgroupPath(expected)
+	if err != nil {
+		t.Fatalf("resolve cgroup path: %v", err)
+	}
+	if got != expected {
+		t.Fatalf("resolved path mismatch: got %q want %q", got, expected)
+	}
+}
+
+func TestResolveCgroupPathsRejectsSandboxIDEscape(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "cpuset")
+	parent := filepath.Join(root, "kubepods-poduid.slice")
+	outside := root + "-outside"
+	mustWriteCpuset(t, parent)
+	mustWriteCpuset(t, outside)
+
+	agent := &Agent{cfg: Config{CgroupRoot: root}}
+	paths, err := agent.resolveCgroupPaths(podInfo{
+		id:         "../../../cpuset-outside",
+		cgroupPath: "/kubepods-poduid.slice",
+	})
+	if err != nil {
+		t.Fatalf("resolve cgroup paths: %v", err)
+	}
+	if len(paths) != 1 || paths[0] != parent {
+		t.Fatalf("resolved paths = %v, want only %q", paths, parent)
+	}
+}
+
 func TestResolveCgroupPathsIncludesSandboxCgroup(t *testing.T) {
 	root := t.TempDir()
 	pod := podInfo{
@@ -212,6 +285,39 @@ func TestReconcileUpdatesSandboxWhenParentAlreadyMatches(t *testing.T) {
 	}
 	assertCpuset(t, parent, "0,1")
 	assertCpuset(t, sandbox, "0,1")
+}
+
+func TestReconcileDoesNotWriteOutsideCgroupRoot(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "cpuset")
+	outside := filepath.Join(base, "outside")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("create cgroup root: %v", err)
+	}
+	mustWriteCpusetValue(t, outside, "0-7")
+
+	pod := podInfo{
+		id:            "sandboxid",
+		name:          "malicious-path-pod",
+		namespace:     "default",
+		runtimeClass:  "kata-clh",
+		cgroupPath:    "../outside",
+		cpuQuota:      200000,
+		cpuPeriod:     100000,
+		cpuLimitKnown: true,
+	}
+	agent := &Agent{
+		cfg:            Config{CgroupRoot: root},
+		siblingPairs:   []topology.SiblingPair{{CPU0: 0, CPU1: 1}},
+		namespaces:     toSet([]string{"default"}),
+		runtimeClasses: toSet([]string{"kata-clh"}),
+		pods:           map[string]podInfo{pod.id: pod},
+	}
+
+	if err := agent.reconcileOnce(); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	assertCpuset(t, outside, "0-7")
 }
 
 func TestReconcileOnlyUpdatesPodsWithTwoCPULimit(t *testing.T) {
