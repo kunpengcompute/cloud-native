@@ -27,7 +27,7 @@ Kunpeng-TAP Pcore Binding插件是Kunpeng-TAP面向Kata机密容器场景提供�
 
 | 项目 | 测试值 |
 | --- | --- |
-| CPU架构 | aarch64 |
+| CPU架构 | Aarch64 |
 | Kubernetes | v1.34.7 |
 | containerd | v2.1.7 |
 | cgroup | cgroup v1，cpuset挂载点为/sys/fs/cgroup/cpuset |
