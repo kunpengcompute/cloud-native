@@ -1,10 +1,10 @@
-# Kunpeng-TAP Pcore Biding插件 用户指南
+# Kunpeng-TAP Pcore Binding插件 用户指南
 
 ## 简介
 
-Kunpeng-TAP Pcore Biding插件是Kunpeng-TAP面向Kata机密容器场景提供的物理核绑定插件。Kunpeng-TAP提供通用的容器CPU、内存等资源拓扑亲和能力，本插件在此基础上针对Kata Pod提供更细粒度的物理核绑定能力，通过NRI接入containerd，将符合白名单条件的Pod的2个逻辑CPU收敛到同一个物理核心的SMT sibling pair。插件可独立部署，不依赖Kunpeng-TAP主程序。
+Kunpeng-TAP Pcore Binding插件是Kunpeng-TAP面向Kata机密容器场景提供的物理核绑定插件。Kunpeng-TAP提供通用的容器CPU、内存等资源拓扑亲和能力，本插件在此基础上针对Kata Pod提供更细粒度的物理核绑定能力，通过NRI接入containerd，将符合白名单条件的Pod的2个逻辑CPU收敛到同一个物理核心的SMT sibling pair。插件可独立部署，不依赖Kunpeng-TAP主程序。
 
-本文说明如何以DaemonSet方式部署和使用`kunpeng-tap-pcore-biding`。文中的containerd、Kata、cloud-hypervisor和arm64节点信息是当前已验证的测试条件。用户可在相同或等价条件下按本文步骤完成部署、参数配置和绑定结果检查。
+本文说明如何以DaemonSet方式部署和使用`kunpeng-tap-pcore-binding`。文中的containerd、Kata、cloud-hypervisor和arm64节点信息是当前已验证的测试条件。用户可在相同或等价条件下按本文步骤完成部署、参数配置和绑定结果检查。
 
 ### 功能范围
 
@@ -120,7 +120,7 @@ containerd `v1.7`和`v2.x`均可通过`/etc/containerd/config.toml`配置NRI，�
 如果测试环境的QEMU后端存在CPU hotplug限制，可以使用cloud-hypervisor后端。仓库提供`kata-clh` RuntimeClass清单。
 
 ```bash
-kubectl apply -f config/kunpeng-tap-pcore-biding/runtimeclass-cloud-hypervisor.yaml
+kubectl apply -f config/kunpeng-tap-pcore-binding/runtimeclass-cloud-hypervisor.yaml
 kubectl get runtimeclass kata-clh
 ```
 
@@ -154,28 +154,28 @@ crictl info | grep -A20 kata-clh
 
 ## 编译插件
 
-以下示例使用`kunpeng-tap-pcore-biding:latest`，与仓库DaemonSet清单中的默认镜像名称一致，不包含个人镜像仓库前缀。在仓库根目录执行如下命令。
+以下示例使用`kunpeng-tap-pcore-binding:latest`，与仓库DaemonSet清单中的默认镜像名称一致，不包含个人镜像仓库前缀。在仓库根目录执行如下命令。
 
 ```bash
-make kunpeng-tap-pcore-biding-docker-build
+make kunpeng-tap-pcore-binding-docker-build
 ```
 
 如果测试节点无法从镜像仓库拉取镜像，可以先在构建节点保存镜像。
 
 ```bash
-docker save -o kunpeng-tap-pcore-biding.tar kunpeng-tap-pcore-biding:latest
+docker save -o kunpeng-tap-pcore-binding.tar kunpeng-tap-pcore-binding:latest
 ```
 
 将镜像文件复制到目标节点后，在目标节点导入containerd的`k8s.io` namespace。
 
 ```bash
-ctr -n k8s.io images import kunpeng-tap-pcore-biding.tar
+ctr -n k8s.io images import kunpeng-tap-pcore-binding.tar
 ```
 
-如果使用公共或企业镜像仓库，将构建标签和`config/kunpeng-tap-pcore-biding/daemonset.yaml`中的镜像地址同时改为实际仓库地址，并确认kubelet可以拉取该镜像。部署前执行如下命令检查DaemonSet使用的镜像名称。
+如果使用公共或企业镜像仓库，将构建标签和`config/kunpeng-tap-pcore-binding/daemonset.yaml`中的镜像地址同时改为实际仓库地址，并确认kubelet可以拉取该镜像。部署前执行如下命令检查DaemonSet使用的镜像名称。
 
 ```bash
-grep -n 'image:' config/kunpeng-tap-pcore-biding/daemonset.yaml
+grep -n 'image:' config/kunpeng-tap-pcore-binding/daemonset.yaml
 ```
 
 ## 部署插件
@@ -185,15 +185,15 @@ DaemonSet是默认部署形式。每个节点运行一个插件Pod，只对本�
 执行如下命令部署插件。
 
 ```bash
-kubectl apply -f config/kunpeng-tap-pcore-biding/daemonset.yaml
-kubectl rollout status daemonset/kunpeng-tap-pcore-biding -n kunpeng-tap-pcore-biding --timeout=180s
+kubectl apply -f config/kunpeng-tap-pcore-binding/daemonset.yaml
+kubectl rollout status daemonset/kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --timeout=180s
 ```
 
 执行如下命令查看插件状态。
 
 ```bash
-kubectl get pod -n kunpeng-tap-pcore-biding -l app=kunpeng-tap-pcore-biding
-kubectl logs -n kunpeng-tap-pcore-biding -l app=kunpeng-tap-pcore-biding --since=10m
+kubectl get pod -n kunpeng-tap-pcore-binding -l app=kunpeng-tap-pcore-binding
+kubectl logs -n kunpeng-tap-pcore-binding -l app=kunpeng-tap-pcore-binding --since=10m
 ```
 
 默认清单使用较小权限面。
@@ -208,7 +208,7 @@ kubectl logs -n kunpeng-tap-pcore-biding -l app=kunpeng-tap-pcore-biding --since
 
 ### DaemonSet参数设置
 
-主要参数位于`config/kunpeng-tap-pcore-biding/daemonset.yaml`的container `args`。
+主要参数位于`config/kunpeng-tap-pcore-binding/daemonset.yaml`的container `args`。
 
 ```yaml
 args:
@@ -233,15 +233,15 @@ args:
 首次部署建议保持`--dry-run=true`，确认插件能正常注册NRI后再切换为实际写入。
 
 ```bash
-kubectl patch ds kunpeng-tap-pcore-biding -n kunpeng-tap-pcore-biding --type=json \
+kubectl patch ds kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args/4","value":"--dry-run=false"}]'
-kubectl rollout status daemonset/kunpeng-tap-pcore-biding -n kunpeng-tap-pcore-biding --timeout=180s
+kubectl rollout status daemonset/kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --timeout=180s
 ```
 
 如果只处理`kata-clh`，可以执行如下命令修改runtimeClass白名单。
 
 ```bash
-kubectl patch ds kunpeng-tap-pcore-biding -n kunpeng-tap-pcore-biding --type=json \
+kubectl patch ds kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args/3","value":"--runtimeclass-whitelist=kata-clh"}]'
 ```
 
@@ -252,7 +252,7 @@ kubectl patch ds kunpeng-tap-pcore-biding -n kunpeng-tap-pcore-biding --type=jso
 执行如下命令创建CPU limit分别为1、2、4核的回归测试Pod。
 
 ```bash
-kubectl apply -f config/kunpeng-tap-pcore-biding/test-pods-cpu-limit.yaml
+kubectl apply -f config/kunpeng-tap-pcore-binding/test-pods-cpu-limit.yaml
 kubectl wait --for=condition=Ready pod -l app=kata-clh-cpuset-limit-test -n default --timeout=300s
 ```
 
@@ -261,21 +261,21 @@ kubectl wait --for=condition=Ready pod -l app=kata-clh-cpuset-limit-test -n defa
 执行如下命令创建2个cloud-hypervisor测试Pod。
 
 ```bash
-kubectl apply -f config/kunpeng-tap-pcore-biding/test-pods-cloud-hypervisor.yaml
+kubectl apply -f config/kunpeng-tap-pcore-binding/test-pods-cloud-hypervisor.yaml
 kubectl wait --for=condition=Ready pod -l app=kata-clh-cpuset-test -n default --timeout=300s
 ```
 
 执行如下命令创建100副本规模测试。
 
 ```bash
-kubectl apply -f config/kunpeng-tap-pcore-biding/test-deployment-cloud-hypervisor-scale.yaml
+kubectl apply -f config/kunpeng-tap-pcore-binding/test-deployment-cloud-hypervisor-scale.yaml
 kubectl rollout status deployment/kata-clh-cpuset-scale -n default --timeout=900s
 ```
 
 执行如下命令确认插件日志没有写入失败。
 
 ```bash
-kubectl logs -n kunpeng-tap-pcore-biding -l app=kunpeng-tap-pcore-biding --since=10m | \
+kubectl logs -n kunpeng-tap-pcore-binding -l app=kunpeng-tap-pcore-binding --since=10m | \
   grep -E 'Write pod cpuset failed|Resolve pod cgroup path failed|No free sibling|broken pipe|failed sending|panic|Error' || true
 ```
 
@@ -394,15 +394,15 @@ bad_records 0
 执行如下命令清理测试workload。
 
 ```bash
-kubectl delete -f config/kunpeng-tap-pcore-biding/test-deployment-cloud-hypervisor-scale.yaml --ignore-not-found
-kubectl delete -f config/kunpeng-tap-pcore-biding/test-pods-cloud-hypervisor.yaml --ignore-not-found
-kubectl delete -f config/kunpeng-tap-pcore-biding/test-pods-cpu-limit.yaml --ignore-not-found
+kubectl delete -f config/kunpeng-tap-pcore-binding/test-deployment-cloud-hypervisor-scale.yaml --ignore-not-found
+kubectl delete -f config/kunpeng-tap-pcore-binding/test-pods-cloud-hypervisor.yaml --ignore-not-found
+kubectl delete -f config/kunpeng-tap-pcore-binding/test-pods-cpu-limit.yaml --ignore-not-found
 ```
 
 执行如下命令卸载插件。
 
 ```bash
-kubectl delete -f config/kunpeng-tap-pcore-biding/daemonset.yaml
+kubectl delete -f config/kunpeng-tap-pcore-binding/daemonset.yaml
 ```
 
 ## 修订记录

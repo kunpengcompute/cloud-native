@@ -1,6 +1,6 @@
-# Kunpeng-TAP Pcore Biding 插件设计文档（初稿）
+# Kunpeng-TAP Pcore Binding 插件设计文档（初稿）
 
-| 标题   | Kunpeng-TAP Pcore Biding 插件 |
+| 标题   | Kunpeng-TAP Pcore Binding 插件 |
 |------|------------------------|
 | 状态   | Draft                  |
 | 作者   | Kunpeng Boostkit Team  |
@@ -114,7 +114,7 @@ coreID -> [cpuA, cpuB]
 ## 6. 配置设计
 
 ```bash
-kunpeng-tap-pcore-biding \
+kunpeng-tap-pcore-binding \
   --nri-socket-path=/var/run/nri/nri.sock \
   --scan-interval=10s \
   --cgroup-root="" \
