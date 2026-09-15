@@ -320,7 +320,7 @@ func (p *TopologyAwarePolicy) allocatePool(containerCtx policy.ContainerContext)
 	}
 
 	supply := pool.FreeResource()
-	grant, err := supply.Allocate(request)
+	grant, err := supply.Allocate(request, p.enableMemoryTopology)
 	if err != nil {
 		return nil, fmt.Errorf("failed to allocate %s from %s: %v",
 			request, supply, err)
