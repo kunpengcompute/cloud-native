@@ -81,6 +81,10 @@ kunpeng-tap-build-manager: ## Build kunpeng-tap manager.
 kunpeng-tap-build-proxy: ## Build kunpeng-tap proxy.
 	$(MAKE) -f Makefile.kunpeng-tap build-proxy
 
+.PHONY: kunpeng-tap-build-pcore-biding
+kunpeng-tap-build-pcore-biding: ## Build the hardened ARM64 pcore binding plugin.
+	$(MAKE) -f Makefile.kunpeng-tap build-pcore-biding
+
 .PHONY: kunpeng-tap-test
 kunpeng-tap-test: ## Test kunpeng-tap project.
 	$(MAKE) -f Makefile.kunpeng-tap test
@@ -141,6 +145,10 @@ kunpeng-tap-uninstall-service: ## Uninstall kunpeng-tap service.
 .PHONY: kunpeng-tap-docker-build
 kunpeng-tap-docker-build: ## Build kunpeng-tap docker image.
 	$(MAKE) -f Makefile.kunpeng-tap docker-build
+
+.PHONY: kunpeng-tap-pcore-biding-docker-build
+kunpeng-tap-pcore-biding-docker-build: ## Build the hardened ARM64 pcore binding plugin image.
+	$(MAKE) -f Makefile.kunpeng-tap pcore-biding-docker-build
 
 .PHONY: kunpeng-tap-docker-push
 kunpeng-tap-docker-push: ## Push kunpeng-tap docker image.

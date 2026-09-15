@@ -2,7 +2,7 @@
 
 `kunpeng-tap-pcore-biding` 是一个基于 NRI 的 Pod 级 cpuset 收敛插件骨架。
 
-用户部署与验证步骤见[Kunpeng-TAP Pcore Biding插件 用户指南](kunpeng_tap_pcore_biding_user_guide.md)。
+用户部署与验证步骤见[Kunpeng-TAP Pcore Biding插件 用户指南](../zh/kunpeng_tap_pcore_biding_user_guide.md)。
 
 当前骨架能力：
 
@@ -28,14 +28,12 @@
 - `pkg/kunpeng-tap-pcore-biding/plugin/`：NRI 事件、Pod 快照、过滤和 cpuset 收敛。
 - `pkg/kunpeng-tap-pcore-biding/topology/`：SMT sibling 拓扑发现。
 - `config/kunpeng-tap-pcore-biding/`：DaemonSet、RuntimeClass 和测试 Pod 清单。
-- `docs/kunpeng-tap/`：设计文档和用户指南。
+- `docs/kunpeng-tap/`：设计文档和组件概览；`docs/zh/kunpeng_tap_pcore_biding_user_guide.md`：用户指南。
 
 镜像构建：
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kunpeng-tap-pcore-biding ./cmd/kunpeng-tap-pcore-biding
-docker build --platform=linux/arm64 -f Dockerfile.kunpeng-tap-pcore-biding -t kunpeng-tap-pcore-biding:latest .
-rm -f kunpeng-tap-pcore-biding
+make kunpeng-tap-pcore-biding-docker-build
 ```
 
 Kubernetes 部署清单：

@@ -135,9 +135,7 @@ crictl info | grep -A20 kata-clh
 在仓库根目录执行：
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kunpeng-tap-pcore-biding ./cmd/kunpeng-tap-pcore-biding
-docker build --platform=linux/arm64 -f Dockerfile.kunpeng-tap-pcore-biding -t kunpeng-tap-pcore-biding:latest .
-rm -f kunpeng-tap-pcore-biding
+make kunpeng-tap-pcore-biding-docker-build
 ```
 
 如果测试节点无法从镜像仓库拉取镜像，可以直接导入到目标节点containerd的`k8s.io` namespace。以下命令以当前已验证节点为例：
@@ -367,5 +365,3 @@ kubectl delete -f config/kunpeng-tap-pcore-biding/daemonset.yaml
 |文档版本| 发布日期   | 修改说明         |
 |----------| ---------- | ---------------- |
 |01| 2026-09-30 | 第一次正式发布。 |
-
-
