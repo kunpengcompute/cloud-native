@@ -1,6 +1,6 @@
-# Kunpeng-TAP Pcore Biding插件 用户指南
+# Kunpeng-TAP Pcore Binding插件 用户指南
 
-Kunpeng-TAP Pcore Biding插件是Kunpeng-TAP面向Kata机密容器场景提供的物理核绑定插件。Kunpeng-TAP提供通用的容器CPU、内存等资源拓扑亲和能力，本插件在此基础上针对Kata Pod提供更细粒度的物理核绑定能力，通过NRI接入containerd，将符合白名单条件的Pod的2个逻辑CPU收敛到同一个物理核心的SMT sibling pair。插件可独立部署，不依赖Kunpeng-TAP主程序。
+Kunpeng-TAP Pcore Binding插件是Kunpeng-TAP面向Kata机密容器场景提供的物理核绑定插件。Kunpeng-TAP提供通用的容器CPU、内存等资源拓扑亲和能力，本插件在此基础上针对Kata Pod提供更细粒度的物理核绑定能力，通过NRI接入containerd，将符合白名单条件的Pod的2个逻辑CPU收敛到同一个物理核心的SMT sibling pair。插件可独立部署，不依赖Kunpeng-TAP主程序。
 
 本文说明如何以DaemonSet方式部署和使用`kunpeng-tap-pcore-biding`。文中的containerd、Kata、cloud-hypervisor和arm64节点信息是当前已验证的测试条件。用户可在相同或等价条件下按本文步骤完成部署、参数配置和绑定结果检查。
 
