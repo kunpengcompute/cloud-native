@@ -396,7 +396,10 @@ kubectl label pod offline-nginx qos.kunpeng.huawei.com/workload-class=offline
 1. Controller收集本节点处于`Running`状态并带有`online`标签的Pod，将其cgroup路径定期发送给干扰Agent。
 2. Controller定期从Agent获取本节点的干扰原因。
 3. Controller将Agent的原始干扰原因映射为CPU、内存带宽或L3干扰。
-4. 检测到干扰后，Controller创建或更新本节点的`qos-dynamic-offline-<node-name>` QoS策略，并将调节结果应用到带有`offline`标签的Pod。
+4. 插件部署之后会创建一个名为`qos-dynamic-offline-<node-name>`的QoS策略，用来控制离线Pod的资源分配。
+5. 检测到干扰后，Controller会更新本节点的`qos-dynamic-offline-<node-name>` QoS策略，并将调节结果应用到带有`offline`标签的Pod。
+
+> 如果需要清理`qos-dynamic-offline-<node-name>` 这个控制组，可以在卸载插件后在`/sys/fs/resctrl`目录下手动删除该控制组。
 
 在线Pod是干扰检测对象，其资源配置不会被该功能调整；实际被调整的是同一节点上带有`offline`标签的Pod。各类干扰的处理方式如下：
 
