@@ -24,7 +24,7 @@ import (
 
 	"github.com/containerd/nri/pkg/api"
 
-	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap-pcore-biding/topology"
+	"kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap-pcore-binding/topology"
 )
 
 func TestMatchRequiresTwoCPULimit(t *testing.T) {

@@ -1,0 +1,412 @@
+# Kunpeng-TAP Pcore Binding插件 用户指南
+
+## 简介
+
+Kunpeng-TAP Pcore Binding插件是Kunpeng-TAP面向Kata机密容器场景提供的物理核绑定插件。Kunpeng-TAP提供通用的容器CPU、内存等资源拓扑亲和能力，本插件在此基础上针对Kata Pod提供更细粒度的物理核绑定能力，通过NRI接入containerd，将符合白名单条件的Pod的2个逻辑CPU收敛到同一个物理核心的SMT sibling pair。插件可独立部署，不依赖Kunpeng-TAP主程序。
+
+本文说明如何以DaemonSet方式部署和使用`kunpeng-tap-pcore-binding`。文中的containerd、Kata、cloud-hypervisor和arm64节点信息是当前已验证的测试条件。用户可在相同或等价条件下按本文步骤完成部署、参数配置和绑定结果检查。
+
+### 功能范围
+
+- 只处理Pod层级，不处理container层级。
+- 只处理聚合CPU limit恰好为`2`的目标Pod，CPU request不参与过滤。
+- 将Pod的2个逻辑CPU绑定到同一个物理核心的sibling pair。
+- 不保存绑定状态；插件每轮从当前Pod cgroup的`cpuset.cpus`重新计算占用。
+- 不允许多个符合条件的Pod收敛到同一对sibling。
+- 通过namespace和runtimeClass白名单限定处理范围。
+
+## 环境要求
+
+本文基于特定环境提供指导，在正式操作前请确保软硬件均满足要求。
+
+### 已验证测试条件
+
+当前部署流程已在以下arm64测试环境中验证通过。
+
+**表 1** 已验证测试条件
+
+| 项目 | 测试值 |
+| --- | --- |
+| CPU架构 | Aarch64 |
+| Kubernetes | v1.34.7 |
+| containerd | v2.1.7 |
+| cgroup | cgroup v1，cpuset挂载点为/sys/fs/cgroup/cpuset |
+| NRI socket | /var/run/nri/nri.sock |
+| Kata runtime handler | kata-clh |
+| Kata hypervisor | cloud-hypervisor |
+| 验证规模 | 100个runtimeClassName: kata-clh的Pod |
+
+### 理论兼容范围
+
+除上述实测版本外，根据插件当前实现所依赖的CRI和NRI接口，可以得到以下理论兼容范围。
+
+**表 2** 理论兼容范围
+
+| 组件 | 理论兼容范围 | 说明 |
+| --- | --- | --- |
+| Kubernetes | v1.26.x-v1.36.x | 插件运行时不访问Kubernetes API Server，不依赖特定版本的Kubernetes API对象。版本下限取v1.26，因为从该版本开始kubelet只支持CRI v1；版本上限为本文编写时已发布且具备推荐containerd组合的版本。 |
+| containerd | v1.7.x-v2.3.x | containerd从v1.7开始集成CRI NRI支持，v2.0起该能力转为稳定并默认启用。插件要求containerd能够通过NRI PodSandbox事件提供Pod级CPU quota和period。 |
+
+该范围是基于接口和代码路径得出的兼容性判断，不是所有版本组合均已完成认证，也不代表对范围内每个patch版本的支持承诺。选择Kubernetes和containerd组合时，应遵循[containerd官方Kubernetes支持矩阵](https://github.com/containerd/containerd/blob/main/RELEASES.md#kubernetes-support)，并满足以下条件。
+
+- Kubernetes与containerd之间使用CRI v1。Kubernetes从`v1.26`开始要求运行时支持CRI v1，具体说明见[Kubernetes容器运行时文档](https://kubernetes.io/docs/setup/production-environment/container-runtimes/#cri-version-support)。
+- containerd已启用CRI和NRI，且插件能够连接NRI socket并接收`Synchronize`、`RunPodSandbox`、`StopPodSandbox`和`RemovePodSandbox`事件。
+- NRI PodSandbox数据包含聚合后的CPU quota和period；字段缺失时，插件无法确认CPU limit，会保守跳过该Pod。
+- containerd `v1.7`中的CRI NRI属于实验能力，建议使用该分支的最新patch版本；containerd `v2.0`及以上为优先选择。NRI版本状态见[containerd版本说明](https://github.com/containerd/containerd/blob/main/RELEASES.md#experimental-features)。
+- 超出上述范围、跨大版本升级或使用未实测组合时，需要重新执行本文的1/2/4 CPU limit回归测试，并确认Pod parent和Kata sandbox cgroup的`cpuset.cpus`结果一致。
+
+### 部署前检查
+
+部署前需要确认以下事项。
+
+- containerd已启用NRI，并生成`/var/run/nri/nri.sock`。
+- Kata Containers已安装，并配置可用的runtime handler，例如`kata-clh`。
+- 节点CPU开启SMT，且可读取`/sys/devices/system/cpu/cpu*/topology/thread_siblings_list`。
+- 目标namespace和runtimeClass已加入插件白名单。
+- 目标Pod的聚合CPU limit为2核；CPU request可按业务需要设置，但不能大于limit。
+
+## 启用containerd NRI
+
+containerd `v1.7`和`v2.x`均可通过`/etc/containerd/config.toml`配置NRI，但默认状态和CRI插件名称不同。
+
+**表 3** containerd版本差异
+
+| containerd版本 | 推荐配置格式 | NRI默认状态 | CRI插件名称 |
+| --- | --- | --- | --- |
+| v1.7.x | version = 2 | 默认禁用，必须显式设置disable = false | io.containerd.grpc.v1.cri |
+| v2.x | version = 3 | 默认启用，仍需确认允许外部插件连接 | io.containerd.cri.v1.runtime |
+
+按照以下步骤启用NRI。
+
+1. 备份containerd配置文件。
+
+    ```bash
+    cp /etc/containerd/config.toml /etc/containerd/config.toml.bak
+    ```
+
+2. 在`/etc/containerd/config.toml`中确认或添加如下配置。
+
+    ```toml
+    [plugins.'io.containerd.nri.v1.nri']
+      disable = false
+      socket_path = '/var/run/nri/nri.sock'
+      plugin_path = '/opt/nri/plugins'
+      plugin_config_path = '/etc/nri/conf.d'
+      plugin_registration_timeout = '10s'
+      plugin_request_timeout = '5s'
+      disable_connections = false
+    ```
+
+3. 重启containerd。
+
+    ```bash
+    systemctl restart containerd
+    ```
+
+4. 检查NRI socket。
+
+    ```bash
+    test -S /var/run/nri/nri.sock && echo "NRI socket is ready"
+    ```
+
+5. 查看containerd配置导出结果，确认NRI配置生效。
+
+    ```bash
+    containerd config dump | grep -n -A8 "io.containerd.nri.v1.nri"
+    ```
+
+## 准备Kata RuntimeClass
+
+如果测试环境的QEMU后端存在CPU hotplug限制，可以使用cloud-hypervisor后端。仓库提供`kata-clh` RuntimeClass清单。
+
+```bash
+kubectl apply -f config/kunpeng-tap-pcore-binding/runtimeclass-cloud-hypervisor.yaml
+kubectl get runtimeclass kata-clh
+```
+
+containerd中需要存在与RuntimeClass handler同名的runtime配置。containerd 2.x的CRI插件拆分为`io.containerd.cri.v1.runtime`，当前已验证的containerd 2.1环境使用如下配置。
+
+```toml
+[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.kata-clh]
+  runtime_type = 'io.containerd.kata.v2'
+  sandboxer = 'podsandbox'
+  privileged_without_host_devices = false
+  [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.kata-clh.options]
+    ConfigPath = '/opt/kata/share/defaults/kata-containers/configuration-clh.toml'
+```
+
+containerd 1.7仍使用`io.containerd.grpc.v1.cri`作为CRI插件名称，不能直接使用上述containerd 2.x配置。containerd 1.7使用如下配置。
+
+```toml
+[plugins.'io.containerd.grpc.v1.cri'.containerd.runtimes.kata-clh]
+  runtime_type = 'io.containerd.kata.v2'
+  privileged_without_host_devices = false
+  [plugins.'io.containerd.grpc.v1.cri'.containerd.runtimes.kata-clh.options]
+    ConfigPath = '/opt/kata/share/defaults/kata-containers/configuration-clh.toml'
+```
+
+修改containerd配置后执行如下命令重启containerd并检查runtime配置。
+
+```bash
+systemctl restart containerd
+crictl info | grep -A20 kata-clh
+```
+
+## 编译插件
+
+以下示例使用`kunpeng-tap-pcore-binding:latest`，与仓库DaemonSet清单中的默认镜像名称一致，不包含个人镜像仓库前缀。在仓库根目录执行如下命令。
+
+```bash
+make kunpeng-tap-pcore-binding-docker-build
+```
+
+如果测试节点无法从镜像仓库拉取镜像，可以先在构建节点保存镜像。
+
+```bash
+docker save -o kunpeng-tap-pcore-binding.tar kunpeng-tap-pcore-binding:latest
+```
+
+将镜像文件复制到目标节点后，在目标节点导入containerd的`k8s.io` namespace。
+
+```bash
+ctr -n k8s.io images import kunpeng-tap-pcore-binding.tar
+```
+
+如果使用公共或企业镜像仓库，将构建标签和`config/kunpeng-tap-pcore-binding/daemonset.yaml`中的镜像地址同时改为实际仓库地址，并确认kubelet可以拉取该镜像。部署前执行如下命令检查DaemonSet使用的镜像名称。
+
+```bash
+grep -n 'image:' config/kunpeng-tap-pcore-binding/daemonset.yaml
+```
+
+## 部署插件
+
+DaemonSet是默认部署形式。每个节点运行一个插件Pod，只对本节点的Kata Pod cgroup做本地收敛。
+
+执行如下命令部署插件。
+
+```bash
+kubectl apply -f config/kunpeng-tap-pcore-binding/daemonset.yaml
+kubectl rollout status daemonset/kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --timeout=180s
+```
+
+执行如下命令查看插件状态。
+
+```bash
+kubectl get pod -n kunpeng-tap-pcore-binding -l app=kunpeng-tap-pcore-binding
+kubectl logs -n kunpeng-tap-pcore-binding -l app=kunpeng-tap-pcore-binding --since=10m
+```
+
+默认清单使用较小权限面。
+
+- 不启用`privileged`。
+- 禁止权限提升。
+- drop所有Linux capabilities。
+- 使用只读根文件系统。
+- 不自动挂载service account token。
+- 只读挂载`/var/run/nri`和`/sys/devices/system/cpu`。
+- 仅将`/sys/fs/cgroup/cpuset`作为可写hostPath挂载。
+
+### DaemonSet参数设置
+
+主要参数位于`config/kunpeng-tap-pcore-binding/daemonset.yaml`的container `args`。
+
+```yaml
+args:
+- --nri-socket-path=/var/run/nri/nri.sock
+- --scan-interval=10s
+- --namespace-whitelist=default
+- --runtimeclass-whitelist=kata,kata-clh
+- --dry-run=true
+```
+
+**表 4** DaemonSet参数说明
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| --nri-socket-path | /var/run/nri/nri.sock | containerd NRI socket路径。 |
+| --scan-interval | 10s | 后台扫描收敛周期。NRI事件也会触发一次异步收敛。 |
+| --cgroup-root | 空 | cpuset cgroup根路径。为空时插件从/proc/self/mountinfo自动发现。 |
+| --namespace-whitelist | default | 只处理这些namespace下的Pod，多个值用逗号分隔。 |
+| --runtimeclass-whitelist | kata | 只处理这些runtimeClass/runtime handler的Pod，多个值用逗号分隔。 |
+| --dry-run | false | 为true时只打印计划，不写cpuset.cpus。仓库DaemonSet清单默认设为true，用于首次部署验证。 |
+
+首次部署建议保持`--dry-run=true`，确认插件能正常注册NRI后再切换为实际写入。
+
+```bash
+kubectl patch ds kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --type=json \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args/4","value":"--dry-run=false"}]'
+kubectl rollout status daemonset/kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --timeout=180s
+```
+
+如果只处理`kata-clh`，可以执行如下命令修改runtimeClass白名单。
+
+```bash
+kubectl patch ds kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --type=json \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args/3","value":"--runtimeclass-whitelist=kata-clh"}]'
+```
+
+## 使用插件
+
+### 创建测试Pod
+
+执行如下命令创建CPU limit分别为1、2、4核的回归测试Pod。
+
+```bash
+kubectl apply -f config/kunpeng-tap-pcore-binding/test-pods-cpu-limit.yaml
+kubectl wait --for=condition=Ready pod -l app=kata-clh-cpuset-limit-test -n default --timeout=300s
+```
+
+只有`kata-clh-cpuset-limit-2`应被收敛到一个SMT sibling pair。该Pod的CPU request为1核，用于确认request不参与过滤；limit为1核和4核的Pod应保持原有`cpuset.cpus`。
+
+执行如下命令创建2个cloud-hypervisor测试Pod。
+
+```bash
+kubectl apply -f config/kunpeng-tap-pcore-binding/test-pods-cloud-hypervisor.yaml
+kubectl wait --for=condition=Ready pod -l app=kata-clh-cpuset-test -n default --timeout=300s
+```
+
+执行如下命令创建100副本规模测试。
+
+```bash
+kubectl apply -f config/kunpeng-tap-pcore-binding/test-deployment-cloud-hypervisor-scale.yaml
+kubectl rollout status deployment/kata-clh-cpuset-scale -n default --timeout=900s
+```
+
+执行如下命令确认插件日志没有写入失败。
+
+```bash
+kubectl logs -n kunpeng-tap-pcore-binding -l app=kunpeng-tap-pcore-binding --since=10m | \
+  grep -E 'Write pod cpuset failed|Resolve pod cgroup path failed|No free sibling|broken pipe|failed sending|panic|Error' || true
+```
+
+### 绑定结果检查
+
+#### 直接查看cpuset范围
+
+在节点上执行如下命令，可以直接展示每个测试Pod当前观测到的`cpuset.cpus`范围值。
+
+```bash
+ns=default
+selector=app=kata-clh-cpuset-scale
+root=/sys/fs/cgroup/cpuset
+
+kubectl get pods -n "$ns" -l "$selector" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort | while read -r pod; do
+  uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}' | tr - _)
+  values=$(find "$root" -path "*pod${uid}.slice/cpuset.cpus" -exec cat {} \; | sort -u | paste -sd, -)
+  printf '%s %s\n' "$pod" "${values:-NONE}"
+done
+```
+
+输出示例如下。
+
+```text
+kata-clh-cpuset-scale-56b8466877-254rp 0-1
+kata-clh-cpuset-scale-56b8466877-262nc 2-3
+kata-clh-cpuset-scale-56b8466877-26kwr 4-5
+```
+
+执行如下命令查看单个Pod的parent cgroup和sandbox cgroup文件。脚本使用Pod UID精确匹配对应sandbox。
+
+```bash
+ns=default
+pod=kata-clh-cpuset-limit-2
+root=/sys/fs/cgroup/cpuset
+
+pod_uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}')
+uid=$(printf '%s' "$pod_uid" | tr - _)
+sid=$(crictl pods -q --label "io.kubernetes.pod.uid=${pod_uid}" --state Ready)
+test -n "$sid" || { printf 'Ready sandbox not found for %s\n' "$pod" >&2; exit 1; }
+
+find "$root" \( \
+  -path "*pod${uid}.slice/cpuset.cpus" -o \
+  -path "*pod${uid}.slice*${sid}*/cpuset.cpus" \
+\) -print | sort | while read -r file; do
+  printf '%s = ' "$file"
+  cat "$file"
+done
+```
+
+输出中如果parent cgroup与sandbox cgroup均为同一个范围，例如`0-1`，说明该Pod已被收敛到对应sibling pair。
+
+#### 检查100个Pod是否重复绑定
+
+以下脚本读取每个测试Pod的Pod parent cgroup与Kata sandbox cgroup，检查二者是否一致，并统计sibling pair是否重复。
+
+```bash
+ns=default
+selector=app=kata-clh-cpuset-scale
+root=/sys/fs/cgroup/cpuset
+out=/tmp/kata-cpuset-scale-results.txt
+: > "$out"
+
+kubectl get pods -n "$ns" -l "$selector" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort | while read -r pod; do
+  pod_uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}')
+  uid=$(printf '%s' "$pod_uid" | tr - _)
+  sid=$(crictl pods -q --label "io.kubernetes.pod.uid=${pod_uid}" --state Ready)
+  sid=${sid:-NONE}
+  parent_file=$(find "$root" -path "*pod${uid}.slice/cpuset.cpus" -print | sort | head -n 1)
+  sandbox_file=
+  if [ "$sid" != NONE ]; then
+    sandbox_file=$(find "$root" -path "*pod${uid}.slice*${sid}*/cpuset.cpus" -print | sort | head -n 1)
+  fi
+  parent=$(cat "$parent_file" 2>/dev/null || printf NONE)
+  sandbox=$(cat "$sandbox_file" 2>/dev/null || printf NONE)
+  printf '%s %s %s %s\n' "$pod" "$sid" "$parent" "$sandbox" >> "$out"
+done
+
+awk '
+BEGIN { bad=0 }
+{
+  pods++
+  parent=$3
+  sandbox=$4
+  if (parent == "NONE" || sandbox == "NONE") { print "missing_cgroup", $1, parent, sandbox; bad++ }
+  if (parent != sandbox) { print "mismatch", $1, parent, sandbox; bad++ }
+  pair_count[parent]++
+}
+END {
+  dup=0
+  for (p in pair_count) {
+    if (p != "NONE") unique++
+    if (p != "NONE" && pair_count[p] > 1) {
+      print "duplicate_pair", p, pair_count[p]
+      dup++
+    }
+  }
+  print "pods", pods
+  print "unique_pairs", unique+0
+  print "duplicate_pairs", dup
+  print "bad_records", bad
+}' "$out"
+```
+
+100个Pod测试通过时应看到如下结果。
+
+```text
+pods 100
+unique_pairs 100
+duplicate_pairs 0
+bad_records 0
+```
+
+## （可选）卸载插件
+
+执行如下命令清理测试workload。
+
+```bash
+kubectl delete -f config/kunpeng-tap-pcore-binding/test-deployment-cloud-hypervisor-scale.yaml --ignore-not-found
+kubectl delete -f config/kunpeng-tap-pcore-binding/test-pods-cloud-hypervisor.yaml --ignore-not-found
+kubectl delete -f config/kunpeng-tap-pcore-binding/test-pods-cpu-limit.yaml --ignore-not-found
+```
+
+执行如下命令卸载插件。
+
+```bash
+kubectl delete -f config/kunpeng-tap-pcore-binding/daemonset.yaml
+```
+
+## 修订记录
+
+| 文档版本 | 发布日期 | 修改说明 |
+| --- | --- | --- |
+| 01 | 2026-09-30 | 第一次正式发布。 |
