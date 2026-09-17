@@ -56,8 +56,11 @@ type Supply interface {
 	// AllocatableSharedCPU calculates the allocatable amount of shared CPU of this supply.
 	AllocatableSharedCPU() int
 
-	// Allocate allocates resources for the given request.
-	Allocate(Request) (Grant, error)
+	// Allocate allocates resources for the given request. When enforceMemoryCapacity is true,
+	// allocation fails without changing supply state if the memory limit exceeds capacity.
+	// When false, memory usage is tracked without enforcing capacity to preserve the behavior
+	// of deployments that disable memory topology awareness.
+	Allocate(req Request, enforceMemoryCapacity bool) (Grant, error)
 
 	// SharableCPUs returns the sharable cpuset in this supply.
 	SharableCPUs() cpuset.CPUSet
@@ -214,28 +217,23 @@ func (s *supply) AllocatableCPUByLimit() int {
 	return s.TotalSharedCPU() - s.grantedCPUByLimit
 }
 
-func (s *supply) Allocate(req Request) (Grant, error) {
+func (s *supply) Allocate(req Request, enforceMemoryCapacity bool) (Grant, error) {
+	memoryRequest := req.MemoryLimit() / 1024 // Convert to KB
+	if enforceMemoryCapacity && memoryRequest > 0 {
+		availableMemory := s.AllocatableMemory()
+		if uint64(memoryRequest) > availableMemory {
+			return nil, fmt.Errorf("memory request %d KB exceeds allocatable %d KB on node %s",
+				memoryRequest, availableMemory, s.node.Name())
+		}
+	}
+
 	grant, err := s.AllocateCPU(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// Handle memory allocation
-	memoryRequest := req.GetContext().Request.Resources.GetLimits().Memory().Value() / 1024 // Convert to KB
 	if memoryRequest > 0 {
-		// Check if there is enough memory
-		if uint64(memoryRequest) > s.AllocatableMemory() {
-			// Log warning but don't fail - CPU was already allocated
-			klog.ErrorS(nil, "Not enough memory for container",
-				"node", s.node.Name(),
-				"request", req,
-				"available", s.AllocatableMemory())
-		}
-
-		// Allocate memory
 		s.grantedMemory += uint64(memoryRequest)
-
-		// Set memory allocation info to grant
 		grant.SetAllocatedMemory(uint64(memoryRequest))
 	}
 
