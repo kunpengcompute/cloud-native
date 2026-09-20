@@ -90,6 +90,16 @@ var _ = Describe("Utils", func() {
 			_, err = readSysfsEntry(tempDir, "invalid_int", &result)
 			Expect(err).To(HaveOccurred())
 		})
+
+		It("should reject an unsupported target type", func() {
+			testFile := filepath.Join(tempDir, "unsupported")
+			err := os.WriteFile(testFile, []byte("1.5\n"), 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			var result float64
+			_, err = readSysfsEntry(tempDir, "unsupported", &result)
+			Expect(err).To(MatchError("unsupported sysfs entry type *float64"))
+		})
 	})
 
 	Context("parseValue", func() {
