@@ -53,10 +53,10 @@ func TestParseConfig(t *testing.T) {
 		os.Args = oldArgs
 	})
 
-	flag.CommandLine = flag.NewFlagSet("pcore-biding-test", flag.ContinueOnError)
+	flag.CommandLine = flag.NewFlagSet("pcore-binding-test", flag.ContinueOnError)
 	flag.CommandLine.SetOutput(io.Discard)
 	os.Args = []string{
-		"kunpeng-tap-pcore-biding",
+		"kunpeng-tap-pcore-binding",
 		"--nri-socket-path=/tmp/nri-test.sock",
 		"--scan-interval=3s",
 		"--cgroup-root=/tmp/cgroup-test",

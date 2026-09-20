@@ -67,6 +67,22 @@ kubectl get nodes -L kubernetes.io/arch -o wide
 
 目标节点应处于`Ready`状态，`kubernetes.io/arch`应为`arm64`。当前用户还应具有创建DaemonSet、Service、ConfigMap、ServiceAccount、Role和RoleBinding等资源的权限。
 
+## 开放端口说明
+
+DevKit Collector通过HTTP暴露Prometheus指标，默认不启用认证和TLS；生产环境应通过Kubernetes NetworkPolicy、防火墙或安全组限制允许访问的源地址。
+
+NodePort独立模式为了便于在物理机获取指标，对应的部署文件中配置了`nodePort`为`30010`。在实际使用中，若无此需求可删除相关NodePort配置，不在物理机暴露相关端口。
+
+Prometheus模式下，Prometheus根据ServiceMonitor发现目标并直接抓取DevKit Collector Pod的`9100`端口。DevKit Collector程序本身不对集群外部暴露相关端口。
+
+|源设备|源IP|源端口|目的设备|目的IP|目的端口<br>（侦听）|协议|端口说明|侦听端口是否可更改|认证方式|加密方式|所属平面|版本|特殊场景|备注|
+|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|
+|Kubernetes节点|DevKit Collector Pod IP|9100|Kubernetes节点(DevKit Collector NodePort)|&lt;Kubernetes节点IP&gt;|30010|TCP|访问DevKit Collector的/metrics接口，验证当前采集结果。|是。修改deployment-devkit.yaml中Service的nodePort，并调整访问地址。|无|无，HTTP明文|运维管理平面|kunpeng-perf-monitor 1.0|仅NodePort独立模式|Service将30010转发到Collector Pod的9100；建议仅向运维网段开放。|
+
+> **说明：**
+>
+> `30010`是示例NodePort。修改时应避开集群NodePort范围内已占用的端口，并同步调整防火墙或安全组规则。
+
 ## 编译镜像 <a name="devkit-collector-build"></a>
 
 编译前请确保编译镜像的服务器可以访问Go module、DevKit Tuner CLI下载地址，并能拉取容器基础镜像。
@@ -677,7 +693,7 @@ DevKit Tuner CLI或结果解析失败时，DevKit Collector会将本轮`collecti
     没有回显结果，说明本文创建的DevKit Collector资源已经删除。
 
 ## 修订记录
-   
+
    | 文档版本 | 发布日期   | 修改说明         |
    | -------- | ---------- | ---------------- |
    | 01       | 2026-09-30 | 第一次正式发布。 |

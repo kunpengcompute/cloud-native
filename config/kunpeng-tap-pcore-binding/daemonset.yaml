@@ -1,31 +1,31 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: kunpeng-tap-pcore-biding
+  name: kunpeng-tap-pcore-binding
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: kunpeng-tap-pcore-biding
-  namespace: kunpeng-tap-pcore-biding
+  name: kunpeng-tap-pcore-binding
+  namespace: kunpeng-tap-pcore-binding
   labels:
-    app: kunpeng-tap-pcore-biding
+    app: kunpeng-tap-pcore-binding
 spec:
   selector:
     matchLabels:
-      app: kunpeng-tap-pcore-biding
+      app: kunpeng-tap-pcore-binding
   template:
     metadata:
       labels:
-        app: kunpeng-tap-pcore-biding
+        app: kunpeng-tap-pcore-binding
     spec:
       automountServiceAccountToken: false
       priorityClassName: system-node-critical
       tolerations:
       - operator: Exists
       containers:
-      - name: kunpeng-tap-pcore-biding
-        image: xdlyqdocker/kunpeng-tap-pcore-biding:latest
+      - name: kunpeng-tap-pcore-binding
+        image: kunpeng-tap-pcore-binding:latest
         imagePullPolicy: IfNotPresent
         args:
         - --nri-socket-path=/var/run/nri/nri.sock
