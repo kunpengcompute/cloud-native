@@ -1,114 +1,123 @@
 # Kunpeng-TAP Pcore Binding Plugin User Guide
 
-<!-- md-trans-meta sourceCommit=d607090d757f097e4681084239c69e6f8ebbb409 translatedAt=2026-08-17T03:07:37.563Z pushedAt=2026-08-26T07:18:29.867Z -->
+<!-- md-trans-meta sourceCommit=0d1806cc482ddad2e8b1db19de4c9f208d321266 translatedAt=2026-09-17T10:18:50.023Z pushedAt=2026-09-18T02:45:20.738Z -->
 
-The Kunpeng-TAP Pcore Binding plugin is a physical core binding plugin provided by Kunpeng-TAP for Kata confidential containers. Kunpeng-TAP provides general-purpose topology affinity capabilities for CPUs, memory, and other container resources. On top of this, the plugin provides finer-grained physical core binding for Kata Pods. It connects to containerd through the Node Resource Interface (NRI) and consolidates the 2 logical CPU cores of Pods that meet the trustlist conditions onto the simultaneous multi-threading (SMT) sibling pair of a single physical core. The plugin can be deployed independently and does not depend on the Kunpeng-TAP main program.
+## Introduction
+
+The Kunpeng-TAP Pcore Binding plugin is a physical core binding plugin provided by Kunpeng-TAP for Kata confidential containers. Kunpeng-TAP provides general-purpose topology affinity capabilities for CPUs, memory, and other container resources. On top of this, the plugin provides finer-grained physical core binding for Kata Pods. It connects to containerd through the Node Resource Interface (NRI) and consolidates the two logical CPU cores of Pods that meet the trustlist conditions onto the simultaneous multi-threading (SMT) sibling pair of a single physical core. The plugin can be deployed independently and does not depend on the Kunpeng-TAP main program.
 
 This document describes how to deploy and use `kunpeng-tap-pcore-binding` in DaemonSet mode. The information about the containerd, Kata, cloud-hypervisor, and AArch64 node in this document has been verified as test conditions. You can complete deployment, parameter configuration, and binding result checks by following the steps in this document under the same or equivalent conditions.
 
-## 1. Function Scope
+### Function Scope
 
 - The plugin operates at the Pod level, not at the container level.
-
 - The plugin processes only those Pods whose aggregated CPU limit is exactly `2`; CPU requests are not taken into account during filtering.
-
 - The two logical CPU cores of such a Pod are bound to the SMT sibling pair of a single physical core.
-
 - Binding state is not saved. On each iteration, the plugin recalculates occupancy from the current Pod cgroup's `cpuset.cpus`.
-
 - Multiple eligible Pods are not allowed to converge onto the same sibling pair.
-
 - The processing scope is restricted via namespace and RuntimeClass trustlists.
 
-## 2. Verified Test Conditions
+## Environment Requirements
 
-The deployment process has been verified in the following AArch64 test environment:
+This document provides guidance based on specific environments. Before performing operations, ensure that your hardware and software meet the requirements.
+
+### Verified Test Conditions
+
+The deployment process has been verified in the following AArch64 test environment.
+
+**Table 1** Verified test conditions
 
 | Item | Test Value |
 | --- | --- |
-| Test node | <code>root@192.168.25.61</code> |
-| CPU architecture | <code>aarch64</code> |
-| Kubernetes | <code>v1.34.7</code> |
-| containerd | <code>v2.1.7</code> |
-| cgroup | cgroup v1, with the cpuset mount point at <code>/sys/fs/cgroup/cpuset</code> |
-| NRI socket | <code>/var/run/nri/nri.sock</code> |
-| Kata runtime handler | <code>kata-clh</code> |
+| CPU architecture | AArch64 |
+| Kubernetes | v1.34.7 |
+| containerd | v2.1.7 |
+| cgroup | cgroup v1, with the cpuset mount point at `/sys/fs/cgroup/cpuset` |
+| NRI socket | `/var/run/nri/nri.sock` |
+| Kata runtime handler | `kata-clh` |
 | Kata hypervisor | cloud-hypervisor |
-| Verification scale | 100 Pods with <code>runtimeClassName: kata-clh</code> |
+| Verification scale | 100 Pods with `runtimeClassName: kata-clh` |
 
-### 2.1 Theoretical Compatibility Scope
+### Theoretical Compatibility Scope
 
 In addition to the tested versions above, the following theoretical compatibility scope can be derived based on the Container Resource Interface (CRI) and NRI that the current plugin implementation depends on.
 
+**Table 2** Theoretical compatibility scope
+
 | Component | Theoretical Compatibility Scope | Description |
 | --- | --- | --- |
-| Kubernetes | <code>v1.26.x to v1.36.x</code> | The plugin does not access the Kubernetes API Server at runtime and does not depend on Kubernetes API objects of a specific version. The lower version limit is <code>v1.26</code>, because starting from this version kubelet only supports CRI v1; the upper version limit is the version released at the time of writing that has a recommended containerd combination. |
+| Kubernetes | <code>v1.26.x to v1.36.x</code> | The plugin does not access the Kubernetes API Server at runtime and does not depend on Kubernetes API objects of a specific version. The lower version limit is <code>v1.26</code>, because starting from this version kubelet only supports CRI v1; the upper version limit is the version released at the time of document writing that has a recommended containerd combination. |
 | containerd | <code>v1.7.x to v2.3.x</code> | containerd has integrated CRI NRI support since <code>v1.7</code>, and this capability has been stable and enabled by default starting from <code>v2.0</code>. The plugin requires containerd to provide Pod-level CPU quota and period through NRI PodSandbox events. |
 
 This compatibility scope is a theoretical assessment based on the interfaces and code paths involved. It does not imply that all version combinations within the scope have been certified, nor does it represent a commitment to support every patch version within the scope. When selecting a Kubernetes and containerd combination, follow the [official Kubernetes support matrix for containerd](https://github.com/containerd/containerd/blob/main/RELEASES.md#kubernetes-support) and meet the following conditions:
 
 - CRI v1 is used between Kubernetes and containerd. Starting from `v1.26`, Kubernetes requires the runtime to support CRI v1. For details, see the [Kubernetes Container Runtimes](https://kubernetes.io/docs/setup/production-environment/container-runtimes/#cri-version-support).
-
 - containerd has CRI and NRI enabled, and the plugin can connect to the NRI socket and receive `Synchronize`, `RunPodSandbox`, `StopPodSandbox`, and `RemovePodSandbox` events.
-
 - The NRI PodSandbox data contains the aggregated CPU quota and period; if these fields are missing, the plugin cannot confirm the CPU limit and conservatively skips the Pod.
-
 - CRI NRI in containerd `v1.7` is an experimental capability. Therefore, you are advised to use the latest patch release of this branch. containerd `v2.0` or later is the preferred choice. For the NRI version status, see the [containerd release notes](https://github.com/containerd/containerd/blob/main/RELEASES.md#experimental-features).
-
 - If the scope above is exceeded, a cross-major-version upgrade is performed, or an untested combination is used, you must re-execute the 1/2/4 CPU limit regression tests in this document, and verify that the `cpuset.cpus` results of the Pod parent cgroup and Kata sandbox cgroup are consistent.
 
-Before deployment, confirm that:
+### Pre-Deployment Check
+
+Confirm the following items before deployment.
 
 - containerd has NRI enabled and `/var/run/nri/nri.sock` is generated.
-
 - Kata Containers is installed and a usable runtime handler, such as `kata-clh`, is configured.
-
 - SMT is enabled on the node CPU, and `/sys/devices/system/cpu/cpu*/topology/thread_siblings_list` is readable.
-
 - The target namespace and RuntimeClass have been added to the plugin trustlist.
+- The aggregated CPU limit of the target Pod is two cores. CPU requests can be set according to service needs, but must not exceed the limit.
 
-- The aggregated CPU limit of the target Pod is 2 cores. CPU requests can be set according to service needs, but must not exceed the limit.
+## Enabling containerd NRI
 
-## 3. Enabling containerd NRI
+Both containerd `v1.7` and `v2.x` can configure NRI through `/etc/containerd/config.toml`, but the default state and the CRI plugin name differ.
 
-Both containerd `v1.7` and `v2.x` can configure NRI via `/etc/containerd/config.toml`. For containerd `v2.0` and later, NRI is enabled by default, but it is still recommended that you explicitly check the configuration and socket. Before modifying the configuration, you are advised to back up the configuration file:
+**Table 3** containerd version differences
 
-```bash
-cp /etc/containerd/config.toml /etc/containerd/config.toml.bak
-```
+| containerd Version | Recommended Configuration Format | NRI Default State | CRI Plugin Name |
+| --- | --- | --- | --- |
+| v1.7.x | version = 2 | Disabled by default; you must explicitly set `disable = false` | io.containerd.grpc.v1.cri |
+| v2.x | version = 3 | Enabled by default; you still need to confirm that external plugin connections are allowed | io.containerd.cri.v1.runtime |
 
-Confirm or add the following configuration.
+Follow the steps below to enable NRI.
 
-```toml
-[plugins.'io.containerd.nri.v1.nri']
-  disable = false
-  socket_path = '/var/run/nri/nri.sock'
-  plugin_path = '/opt/nri/plugins'
-  plugin_config_path = '/etc/nri/conf.d'
-  plugin_registration_timeout = '10s'
-  plugin_request_timeout = '5s'
-  disable_connections = false
-```
+1. Back up the containerd configuration file.
 
-Restart containerd.
+    ```bash
+    cp /etc/containerd/config.toml /etc/containerd/config.toml.bak
+    ```
 
-```bash
-systemctl restart containerd
-```
+2. Confirm or add the following configuration in `/etc/containerd/config.toml`.
 
-Check the NRI socket.
+    ```toml
+    [plugins.'io.containerd.nri.v1.nri']
+      disable = false
+      socket_path = '/var/run/nri/nri.sock'
+      plugin_path = '/opt/nri/plugins'
+      plugin_config_path = '/etc/nri/conf.d'
+      plugin_registration_timeout = '10s'
+      plugin_request_timeout = '5s'
+      disable_connections = false
+    ```
 
-```bash
-test -S /var/run/nri/nri.sock && echo "NRI socket is ready"
-```
+3. Restart containerd.
 
-You can also confirm the information by checking the containerd configuration output result.
+    ```bash
+    systemctl restart containerd
+    ```
 
-```bash
-containerd config dump | grep -n -A8 "io.containerd.nri.v1.nri"
-```
+4. Check the NRI socket.
 
-## 4. Preparing the Kata RuntimeClass
+    ```bash
+    test -S /var/run/nri/nri.sock && echo "NRI socket is ready"
+    ```
+
+5. Check the containerd configuration output result to confirm that the NRI configuration has taken effect.
+
+    ```bash
+    containerd config dump | grep -n -A8 "io.containerd.nri.v1.nri"
+    ```
+
+## Preparing the Kata RuntimeClass
 
 If the QEMU backend in the test environment has CPU hotplug limitations, you can use the cloud-hypervisor backend. The repository provides the `kata-clh` RuntimeClass manifest.
 
@@ -138,43 +147,51 @@ containerd `1.7` still uses `io.containerd.grpc.v1.cri` as the CRI plugin name a
     ConfigPath = '/opt/kata/share/defaults/kata-containers/configuration-clh.toml'
 ```
 
-After modifying the containerd configuration, restart containerd.
+After modifying the containerd configuration, run the following commands to restart containerd and check the runtime configuration.
 
 ```bash
 systemctl restart containerd
 crictl info | grep -A20 kata-clh
 ```
 
-## 5. Compiling the Image
+## Compiling the Plugin
 
-Run the following commands in the repository root directory:
-
-```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o kunpeng-tap-pcore-binding ./cmd/kunpeng-tap-pcore-binding
-docker build --platform=linux/arm64 -f Dockerfile.kunpeng-tap-pcore-binding -t kunpeng-tap-pcore-binding:latest .
-rm -f kunpeng-tap-pcore-binding
-```
-
-If the test node cannot pull the image from the image repository, you can directly import it into the `k8s.io` namespace of containerd on the target node. The following command uses the currently verified node as an example:
+The following example uses `kunpeng-tap-pcore-binding:latest`, which is consistent with the default image name in the repository DaemonSet manifest and does not include a personal image repository prefix. Run the following command in the repository root directory:
 
 ```bash
-docker save kunpeng-tap-pcore-binding:latest | ssh root@192.168.25.61 'ctr -n k8s.io images import -'
+make kunpeng-tap-pcore-binding-docker-build
 ```
 
-If you use an image repository, change the image address in `config/kunpeng-tap-pcore-binding/daemonset.yaml` to the repository address, and confirm that kubelet can pull the image.
+If the test node cannot pull the image from the image repository, you can first save the image on the build node.
 
-## 6. Deployment in DaemonSet Mode
+```bash
+docker save -o kunpeng-tap-pcore-binding.tar kunpeng-tap-pcore-binding:latest
+```
+
+After copying the image file to the target node, import it into the `k8s.io` namespace of containerd on the target node.
+
+```bash
+ctr -n k8s.io images import kunpeng-tap-pcore-binding.tar
+```
+
+If you use a public or enterprise image repository, change both the build tag and the image address in `config/kunpeng-tap-pcore-binding/daemonset.yaml` to the actual repository address, and confirm that kubelet can pull the image. Before deployment, run the following command to check the image name used by the DaemonSet.
+
+```bash
+grep -n 'image:' config/kunpeng-tap-pcore-binding/daemonset.yaml
+```
+
+## Deploying the Plugin
 
 DaemonSet is the default deployment form. One plugin Pod runs on each node, and it only performs local convergence on the Kata Pod cgroups of that node.
 
-Deploy the plugin.
+Run the following commands to deploy the plugin.
 
 ```bash
 kubectl apply -f config/kunpeng-tap-pcore-binding/daemonset.yaml
 kubectl rollout status daemonset/kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --timeout=180s
 ```
 
-Check the plugin status.
+Run the following commands to check the plugin status.
 
 ```bash
 kubectl get pod -n kunpeng-tap-pcore-binding -l app=kunpeng-tap-pcore-binding
@@ -184,22 +201,16 @@ kubectl logs -n kunpeng-tap-pcore-binding -l app=kunpeng-tap-pcore-binding --sin
 The default manifest adopts a least-privilege configuration:
 
 - `privileged` is disabled.
-
 - Privilege escalation is disabled.
-
 - All Linux capabilities are dropped.
-
 - A read-only root file system is used.
-
 - The service account token is not automatically mounted.
-
 - `/var/run/nri` and `/sys/devices/system/cpu` are mounted as read-only.
-
 - Only `/sys/fs/cgroup/cpuset` is mounted as a writable hostPath.
 
-## 7. Setting DaemonSet Parameters
+### Setting DaemonSet Parameters
 
-The main parameters are located in container `args` of `config/kunpeng-tap-pcore-binding/daemonset.yaml`:
+The main parameters are located in container `args` of `config/kunpeng-tap-pcore-binding/daemonset.yaml`.
 
 ```yaml
 args:
@@ -210,7 +221,7 @@ args:
 - --dry-run=true
 ```
 
-Parameter description:
+**Table 4** DaemonSet parameter description
 
 | Parameter | Default Value | Description |
 | --- | --- | --- |
@@ -219,7 +230,7 @@ Parameter description:
 | `--cgroup-root` | Empty | cpuset cgroup root path. If it is left empty, the plugin automatically discovers it from `/proc/self/mountinfo`. |
 | `--namespace-whitelist` | `default` | Only Pods under these namespaces are processed. Multiple values are separated by commas (,). |
 | `--runtimeclass-whitelist` | `kata` | Only Pods with these RuntimeClass/runtime handlers are processed. Multiple values are separated by commas (,). |
-| `--dry-run` | `false` | When this parameter is set to `true`, only the plan is printed and `cpuset.cpus` is not written. This parameter is set to `true` for the repository DaemonSet manifest to facilitate first-time deployment verification. |
+| `--dry-run` | `false` | When this parameter is set to `true`, only the plan is printed and `cpuset.cpus` is not written. This parameter is set to `true` for the repository DaemonSet manifest by default to facilitate first-time deployment verification. |
 
 For first-time deployment, you are advised to keep `--dry-run=true`. Switch to actual writing only after confirming that the plugin can register with NRI properly.
 
@@ -229,16 +240,18 @@ kubectl patch ds kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --type=j
 kubectl rollout status daemonset/kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --timeout=180s
 ```
 
-If only `kata-clh` needs to be processed, you can modify the RuntimeClass trustlist.
+If only `kata-clh` needs to be processed, you can run the following commands to modify the RuntimeClass trustlist.
 
 ```bash
 kubectl patch ds kunpeng-tap-pcore-binding -n kunpeng-tap-pcore-binding --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args/3","value":"--runtimeclass-whitelist=kata-clh"}]'
 ```
 
-## 8. Creating Test Pods
+## Plugin Usage
 
-Create regression test Pods with CPU limits of 1, 2, and 4 cores, respectively.
+### Creating Test Pods
+
+Run the following commands to create regression test Pods with CPU limits of 1, 2, and 4 cores, respectively.
 
 ```bash
 kubectl apply -f config/kunpeng-tap-pcore-binding/test-pods-cpu-limit.yaml
@@ -247,30 +260,30 @@ kubectl wait --for=condition=Ready pod -l app=kata-clh-cpuset-limit-test -n defa
 
 Only the `kata-clh-cpuset-limit-2` Pod should be converged onto an SMT sibling pair. This Pod has a CPU request of 1 core, which is used to confirm that the request does not participate in filtering. The Pods with CPU limits of 1 core and 4 cores should retain their original `cpuset.cpus`.
 
-Create 2 cloud-hypervisor test Pods.
+Run the following commands to create two cloud-hypervisor test Pods.
 
 ```bash
 kubectl apply -f config/kunpeng-tap-pcore-binding/test-pods-cloud-hypervisor.yaml
 kubectl wait --for=condition=Ready pod -l app=kata-clh-cpuset-test -n default --timeout=300s
 ```
 
-Create a scale test with 100 replicas.
+Run the following commands to create a scale test with 100 replicas.
 
 ```bash
 kubectl apply -f config/kunpeng-tap-pcore-binding/test-deployment-cloud-hypervisor-scale.yaml
 kubectl rollout status deployment/kata-clh-cpuset-scale -n default --timeout=900s
 ```
 
-Confirm that no write failures appear in the plugin logs.
+Run the following commands to confirm that no write failures appear in the plugin logs.
 
 ```bash
 kubectl logs -n kunpeng-tap-pcore-binding -l app=kunpeng-tap-pcore-binding --since=10m | \
   grep -E 'Write pod cpuset failed|Resolve pod cgroup path failed|No free sibling|broken pipe|failed sending|panic|Error' || true
 ```
 
-## 9. Checking the Binding Result
+### Checking the Binding Result
 
-### 9.1 Viewing the cpuset Range
+#### Viewing the cpuset Range
 
 Run the following commands on the node to directly view the current `cpuset.cpus` range for each test Pod:
 
@@ -281,7 +294,7 @@ root=/sys/fs/cgroup/cpuset
 
 kubectl get pods -n "$ns" -l "$selector" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort | while read -r pod; do
   uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}' | tr - _)
-  values=$(find "$root" -path "*pod${uid}.slice*/cpuset.cpus" -exec cat {} \; | sort -u | paste -sd, -)
+  values=$(find "$root" -path "*pod${uid}.slice/cpuset.cpus" -exec cat {} \; | sort -u | paste -sd, -)
   printf '%s %s\n' "$pod" "${values:-NONE}"
 done
 ```
@@ -294,12 +307,22 @@ kata-clh-cpuset-scale-56b8466877-262nc 2-3
 kata-clh-cpuset-scale-56b8466877-26kwr 4-5
 ```
 
-View the parent cgroup and sandbox cgroup files of a single Pod.
+Run the following commands to view the parent cgroup and sandbox cgroup files of a single Pod. The script uses the Pod UID to precisely match the corresponding sandbox.
 
 ```bash
-pod=kata-clh-cpuset-scale-56b8466877-254rp
-uid=$(kubectl get pod "$pod" -n default -o jsonpath='{.metadata.uid}' | tr - _)
-find /sys/fs/cgroup/cpuset -path "*pod${uid}.slice*/cpuset.cpus" -print | sort | while read -r file; do
+ns=default
+pod=kata-clh-cpuset-limit-2
+root=/sys/fs/cgroup/cpuset
+
+pod_uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}')
+uid=$(printf '%s' "$pod_uid" | tr - _)
+sid=$(crictl pods -q --label "io.kubernetes.pod.uid=${pod_uid}" --state Ready)
+test -n "$sid" || { printf 'Ready sandbox not found for %s\n' "$pod" >&2; exit 1; }
+
+find "$root" \( \
+  -path "*pod${uid}.slice/cpuset.cpus" -o \
+  -path "*pod${uid}.slice*${sid}*/cpuset.cpus" \
+\) -print | sort | while read -r file; do
   printf '%s = ' "$file"
   cat "$file"
 done
@@ -307,7 +330,7 @@ done
 
 In the output, if both the parent cgroup and sandbox cgroup show the same CPU range (for example, `0-1`), it indicates that the Pod has been converged to the corresponding sibling pair.
 
-### 9.2 Checking for Duplicate Binding Among 100 Pods
+#### Checking Duplicate Binding Among 100 Pods
 
 The following script reads the Pod parent cgroup and the Kata sandbox cgroup of each test Pod, checks whether the two are consistent, and counts duplicate sibling pair bindings across Pods.
 
@@ -319,8 +342,9 @@ out=/tmp/kata-cpuset-scale-results.txt
 : > "$out"
 
 kubectl get pods -n "$ns" -l "$selector" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort | while read -r pod; do
-  uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}' | tr - _)
-  sid=$(crictl pods -q --name "^${pod}$" --namespace "$ns" --state Ready | head -n 1)
+  pod_uid=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.uid}')
+  uid=$(printf '%s' "$pod_uid" | tr - _)
+  sid=$(crictl pods -q --label "io.kubernetes.pod.uid=${pod_uid}" --state Ready)
   sid=${sid:-NONE}
   parent_file=$(find "$root" -path "*pod${uid}.slice/cpuset.cpus" -print | sort | head -n 1)
   sandbox_file=
@@ -367,9 +391,9 @@ duplicate_pairs 0
 bad_records 0
 ```
 
-## 10. Cleanup
+## (Optional) Plugin Uninstallation
 
-Clean up the test workload.
+Run the following commands to clear the test workloads:
 
 ```bash
 kubectl delete -f config/kunpeng-tap-pcore-binding/test-deployment-cloud-hypervisor-scale.yaml --ignore-not-found
@@ -377,7 +401,7 @@ kubectl delete -f config/kunpeng-tap-pcore-binding/test-pods-cloud-hypervisor.ya
 kubectl delete -f config/kunpeng-tap-pcore-binding/test-pods-cpu-limit.yaml --ignore-not-found
 ```
 
-Uninstall the plugin.
+Run the following command to uninstall the plugin:
 
 ```bash
 kubectl delete -f config/kunpeng-tap-pcore-binding/daemonset.yaml
@@ -385,6 +409,6 @@ kubectl delete -f config/kunpeng-tap-pcore-binding/daemonset.yaml
 
 ## Change History
 
-|Document Version|Date|Description|
-|--|--|--|
-|01|2026-09-30|This is the first official release.|
+| Version | Date | Description |
+| --- | --- | --- |
+| 01 | 2026-09-30 | This is the first official release. |
