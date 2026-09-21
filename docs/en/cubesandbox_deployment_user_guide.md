@@ -1,6 +1,7 @@
 # User Guide for CubeSandbox Adaptation and Optimization on Kunpeng
 
 <!-- md-trans-meta sourceCommit=d302e3657d3cacf89c9190d6ac2afd87f0742c43 translatedAt=2026-08-18T02:48:25.880Z pushedAt=2026-08-26T07:19:25.264Z -->
+<!-- English counterpart of docs/zh/cubesandbox_deployment_user_guide.md. -->
 
 ## Introduction
 
@@ -25,12 +26,20 @@ The original KVM irqbypass implementation uses a global linked list to store pro
 | Processor | Kunpeng 950 |
 | CPU architecture | AArch64 |
 | Virtualization | AArch64 KVM enabled on the host, with <code>/dev/kvm</code> available |
-| OS | openEuler or an OS compatible with the openEuler kernel RPM build process |
+| OS | openEuler 24.03 LTS SP3, or a compatible ARM64 OS that meets the requirements in this guide |
 | File system | XFS file system supporting reflink for <code>/data/cubelet</code> |
 | Drive space | At least 50 GB for <code>/data/cubelet</code>; 200 GB recommended if multiple templates are created |
-| Kernel source code | openEuler kernel source matching the target host version |
-| CubeSandbox | Compatible with AArch64 |
-| Verification tools | Python 3, cubesandbox (>= 0.5.0), cube-bench, and perf |
+| Kernel | Linux 6.6 series matching the openEuler 24.03 LTS SP3 host and kernel source |
+| ARM64 support baseline | CubeSandbox v0.5.0 |
+| Verified CubeSandbox version | CubeSandbox v0.5.1 ARM64 release package |
+| Verified Python SDK version | <code>cubesandbox==0.5.0</code> |
+| Verified Docker version | 25.0.3 |
+| Verified Docker Compose version | v2.30.3 |
+| Verification tools | Python 3, cube-bench, perf, and Go 1.25.0 or later for building cube-bench |
+
+The procedure and reference result in this guide were verified with openEuler 24.03 LTS SP3, its matching Linux 6.6 series kernel source and RPM workflow, CubeSandbox v0.5.1 for ARM64, and Python SDK 0.5.0.
+
+Use `uname -r` to identify the exact kernel release on the target host. Check out the matching openEuler kernel source branch before applying the patch. Do not substitute an unrelated 6.6 source tree.
 
 Run the following commands to check the processor architecture, KVM, and file system:
 
@@ -88,16 +97,14 @@ The above services should be `active`, and CubeAPI should listen on port `3000`.
 
 ### Configure the SDK Environment
 
-Install the CubeSandbox Python SDK and set the API addresses and key.
+Install the Python SDK version paired with CubeSandbox v0.5.1 and verify the installed version.
 
 ```bash
-python3 -m pip install 'cubesandbox>=0.2.0'
-export CUBE_API_URL=http://127.0.0.1:3000
-export E2B_API_URL=http://127.0.0.1:3000
-export E2B_API_KEY=e2b_000000
+python3 -m pip install 'cubesandbox==0.5.0'
+python3 -c 'from importlib.metadata import version; print(version("cubesandbox"))'
 ```
 
-In a production environment, replace the example key with the actual one, and do not commit the key to the code repository.
+The version command should output `0.5.0`. Configure the API addresses and key after the kernel reboot in section "Collecting Performance Data" so that the shell variables are not lost during installation.
 
 ## Applying the KVM irqbypass XArray Optimization
 
@@ -129,9 +136,7 @@ Obtain the v2 mbox from the downloadable Patchew archive.
 
 ```bash
 mkdir -p ~/kernel-patches
-curl -fL \
-  'https://patchew.org/linux/20230802051700.52321-1-likexu%40tencent.com/mbox' \
-  -o ~/kernel-patches/irqbypass-xarray-v2.mbox
+curl -fL 'https://patchew.org/linux/20230802051700.52321-1-likexu%40tencent.com/mbox' -o ~/kernel-patches/irqbypass-xarray-v2.mbox
 grep -E '^Subject:' ~/kernel-patches/irqbypass-xarray-v2.mbox
 ```
 
@@ -216,17 +221,17 @@ cubemastercli tpl create-from-image \
   --probe 49999
 ```
 
-Record `job_id` in the command output, and wait for the cold start, snapshot creation, and template publishing to complete.
+The command automatically generates and prints both `job_id` and `template_id`. Record both values, and wait for the cold start, snapshot creation, and template publishing to complete.
 
 ```bash
 cubemastercli tpl watch --job-id <job-id>
-cubemastercli tpl info --template-id <template-id>
+cubemastercli tpl info --template-id <template-id-from-create-output>
 ```
 
-At least one template in the `READY` state exists. Set the template ID for subsequent verification.
+The watch output also includes `template_id` in its completion summary. Confirm that the template is in the `READY` state and at least one replica is ready. Set the recorded template ID for subsequent verification.
 
 ```bash
-export CUBE_TEMPLATE_ID=<template-id>
+export CUBE_TEMPLATE_ID='<template-id-from-create-output>'
 ```
 
 ## Starting an Instance from a Template and Verifying It
@@ -288,17 +293,53 @@ If the script exits without errors and outputs `snapshot-ok`, it indicates that 
 
 ## Verifying High-Concurrency Startup Optimization
 
+### Reference Result
+
+> **Kunpeng server test result:** The test used a single Kunpeng server, 50 concurrent workers, and 500 Sandbox starts.
+>
+> After the KVM irqbypass XArray optimization was enabled, the recorded startup latency decreased from approximately 1100 ms to approximately 200 ms.
+
+This sample is an approximately 82% latency reduction. It is a reference result, not a guaranteed improvement.
+
+Actual results depend on concurrency and on whether irqbypass is the main bottleneck rather than CPU, storage, network, or scheduling.
+
 ### Building the Stress Testing Tool
 
+Use the CubeSandbox v0.5.1 source so that cube-bench matches the verified environment. Clone it from GitHub:
+
 ```bash
-git clone --depth 1 https://github.com/TencentCloud/CubeSandbox.git
+git clone --depth 1 --branch v0.5.1 \
+  https://github.com/TencentCloud/CubeSandbox.git CubeSandbox
+```
+
+If GitHub is unavailable, use the official CNB mirror. The `v0.5.1` tag in both repositories points to the same source revision.
+
+```bash
+git clone --depth 1 --branch v0.5.1 \
+  https://cnb.cool/CubeSandbox/CubeSandbox.git CubeSandbox
+```
+
+Build cube-bench with Go 1.25.0 or later:
+
+```bash
 cd CubeSandbox/examples/cube-bench
 make
 ```
 
 ### Collecting Performance Data
 
+Set the API addresses, key, and template ID in the current shell after the kernel reboot. If CubeAPI is not local, replace the example loopback addresses. Do not commit the actual key to a code repository.
+
+```bash
+export CUBE_API_URL=http://127.0.0.1:3000
+export E2B_API_URL=http://127.0.0.1:3000
+export E2B_API_KEY=e2b_000000
+export CUBE_TEMPLATE_ID='<template-id-from-create-output>'
+```
+
 Use the same template, concurrency level, number of requests, and warm-up count before and after optimization.
+
+The following reference parameters match the preceding result: 50 concurrent workers, 500 requests, three warm-up rounds, and `create-only` mode.
 
 ```bash
 ./bin/cube-bench \
@@ -419,7 +460,13 @@ First unify the template, concurrency level, number of requests, and warm-up cou
 
 - [CubeSandbox Service Management & Logs](https://cubesandbox.com/guide/service-management.html)
 
-- [cube-bench Usage Description](https://github.com/TencentCloud/CubeSandbox/tree/master/examples/cube-bench)
+- [CubeSandbox v0.5.1 Release](https://github.com/TencentCloud/CubeSandbox/releases/tag/v0.5.1)
+
+- [CubeSandbox v0.5.1 Python SDK Version](https://github.com/TencentCloud/CubeSandbox/blob/v0.5.1/sdk/python/pyproject.toml)
+
+- [CubeSandbox Official CNB Mirror](https://cnb.cool/CubeSandbox/CubeSandbox)
+
+- [cube-bench Usage Description](https://github.com/TencentCloud/CubeSandbox/tree/v0.5.1/examples/cube-bench)
 
 - [KVM irqbypass XArray v1 patch archive](https://patchew.org/linux/20230801115646.33990-1-likexu%40tencent.com/)
 

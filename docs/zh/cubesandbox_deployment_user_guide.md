@@ -25,6 +25,7 @@ CubeSandbox从v0.5.0开始提供ARM64全栈支持。本文以已在ARM64环境�
 | CPU架构 | aarch64 |
 | 虚拟化 | 宿主机已启用ARM64 KVM，并存在/dev/kvm |
 | 操作系统 | openEuler 24.03 LTS SP3或满足本文要求的兼容ARM64操作系统 |
+| 内核 | 与openEuler 24.03 LTS SP3宿主机及内核源码匹配的Linux 6.6系列内核 |
 | 文件系统 | /data/cubelet使用支持reflink的XFS文件系统 |
 | 磁盘空间 | /data/cubelet至少预留50 GB；制作多个模板时建议预留200 GB |
 | ARM64支持下限 | CubeSandbox v0.5.0 |
@@ -299,7 +300,9 @@ CubeSandbox默认使用`192.168.0.0/18`分配沙箱IP。该网段不能与宿主
 
 ### 配置SDK环境
 
-按照以下步骤安装与CubeSandbox v0.5.1配套的Python SDK 0.5.0，并设置API地址和密钥。
+按照以下步骤安装与CubeSandbox v0.5.1配套的Python SDK 0.5.0，并检查安装结果。
+
+API地址和密钥在内核安装、重启后的[采集性能数据](#采集性能数据)步骤中设置，避免重启导致环境变量丢失。
 
 1. 安装Python SDK。
 
@@ -314,16 +317,6 @@ CubeSandbox默认使用`192.168.0.0/18`分配沙箱IP。该网段不能与宿主
     ```
 
     期望输出`0.5.0`。
-
-3. 设置SDK连接参数。
-
-    ```bash
-    export CUBE_API_URL=http://127.0.0.1:3000
-    export E2B_API_URL=http://127.0.0.1:3000
-    export E2B_API_KEY=e2b_000000
-    ```
-
-    生产环境应将示例密钥替换为实际密钥，且不得将密钥提交到代码仓库。
 
 ## 制作并验证模板
 
@@ -350,16 +343,16 @@ CubeSandbox默认使用`192.168.0.0/18`分配沙箱IP。该网段不能与宿主
 
     例如，测试代码解释器模板时可以将`CUBE_TEMPLATE_IMAGE`设置为`cube-sandbox-cn.tencentcloudcr.com/cube-sandbox/sandbox-code:latest`。该地址仅用于演示，不是客户环境必须使用的镜像。
 
-3. 记录命令返回的`job_id`，等待冷启动、快照和模板发布完成。
+3. 命令会自动生成并输出`job_id`和`template_id`。记录这两个值，等待冷启动、快照和模板发布完成。
 
     ```bash
     cubemastercli tpl watch --job-id '<job-id>'
     ```
 
-4. 任务完成后检查模板状态。
+4. `watch`命令的完成信息中也会显示`template_id`。任务完成后，使用`create-from-image`或`watch`输出的模板ID检查模板状态。
 
     ```bash
-    cubemastercli tpl info --template-id '<template-id>'
+    cubemastercli tpl info --template-id '<create-from-image输出的template-id>'
     ```
 
     模板状态应为`READY`，并至少存在一个状态为`READY`的副本。
@@ -367,7 +360,7 @@ CubeSandbox默认使用`192.168.0.0/18`分配沙箱IP。该网段不能与宿主
 5. 设置后续验证使用的模板ID。
 
     ```bash
-    export CUBE_TEMPLATE_ID='<template-id>'
+    export CUBE_TEMPLATE_ID='<create-from-image输出的template-id>'
     ```
 
 ### 验证模板启动
@@ -435,11 +428,66 @@ PY
 
 > **鲲鹏服务器测试结果：** 在鲲鹏服务器单节点、并发数为50、累计启动500个Sandbox的测试中，使用KVM irqbypass XArray优化后，测试记录的Sandbox启动时延从约1100 ms降低至约200 ms。
 
+该结果对应的时延降幅约为82%，仅作为同参数测试的参考，不代表所有环境都能获得固定收益。
+
 KVM irqbypass XArray优化可能减少大量Sandbox并发创建或恢复时的宿主机锁等待，从而改善创建或恢复延迟及吞吐量。该优化不改变CubeSandbox API、模板格式或日常操作方式。
 
 实际收益取决于并发规模以及CPU、存储、网络和调度等瓶颈。低并发场景或irqbypass不是主要热点时，性能可能没有明显变化。
 
 因此，不能将该优化视为固定收益或CubeSandbox部署的前置条件。
+
+#### 构建压测工具
+
+使用与验证环境一致的CubeSandbox v0.5.1源码构建cube-bench。优先从GitHub下载。
+
+```bash
+git clone --depth 1 --branch v0.5.1 \
+  https://github.com/TencentCloud/CubeSandbox.git CubeSandbox
+```
+
+如果无法访问GitHub，使用CubeSandbox官方CNB镜像。两个仓库的`v0.5.1`标签指向同一个源码提交。
+
+```bash
+git clone --depth 1 --branch v0.5.1 \
+  https://cnb.cool/CubeSandbox/CubeSandbox.git CubeSandbox
+```
+
+使用Go 1.25.0或以上版本构建。
+
+```bash
+cd CubeSandbox/examples/cube-bench
+make
+```
+
+#### 采集性能数据
+
+内核安装并重启后，在当前Shell中设置API地址、密钥和前文记录的模板ID。CubeAPI不在本机时，应将回环地址替换为实际地址。
+
+```bash
+export CUBE_API_URL=http://127.0.0.1:3000
+export E2B_API_URL=http://127.0.0.1:3000
+export E2B_API_KEY=e2b_000000
+export CUBE_TEMPLATE_ID='<create-from-image输出的template-id>'
+```
+
+生产环境应将示例密钥替换为实际密钥，且不得将密钥提交到代码仓库。
+
+优化前后应使用相同的模板、并发数、请求总数和预热次数。以下参考参数与前述结果一致：并发数50、请求总数500、预热3轮，并采用`create-only`模式。
+
+```bash
+./bin/cube-bench \
+  --api-url "$E2B_API_URL" \
+  --api-key "$E2B_API_KEY" \
+  --template "$CUBE_TEMPLATE_ID" \
+  --concurrency 50 \
+  --total 500 \
+  --warmup 3 \
+  --mode create-only \
+  --no-tui \
+  --output result.json
+```
+
+分别记录优化前后的成功率、平均时延、P95、P99和吞吐量。只有测试参数及服务器负载条件一致时，结果才可用于评估优化收益。
 
 #### 基本原理
 
@@ -515,6 +563,7 @@ CubeSandbox v0.5.1在ARM64 vGIC快照中以32位数据保存和恢复`ICC_AP1Rn_
 - [CubeSandbox v0.5.0 Release](https://github.com/TencentCloud/CubeSandbox/releases/tag/v0.5.0)
 - [CubeSandbox v0.5.1 Release](https://github.com/TencentCloud/CubeSandbox/releases/tag/v0.5.1)
 - [CubeSandbox v0.5.1 Python SDK版本信息](https://github.com/TencentCloud/CubeSandbox/blob/v0.5.1/sdk/python/pyproject.toml)
+- [CubeSandbox官方CNB镜像](https://cnb.cool/CubeSandbox/CubeSandbox)
 - [CubeSandbox 模板概览](https://cubesandbox.com/zh/guide/templates.html)
 - [CubeSandbox 快照、回滚与克隆](https://cubesandbox.com/zh/guide/snapshot-rollback-clone.html)
 - [CubeSandbox 服务管理与日志](https://cubesandbox.com/zh/guide/service-management.html)
