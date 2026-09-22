@@ -517,7 +517,7 @@ topdown:
       daemonset/kunpeng-perf-monitor-devkit --timeout=5m
     ```
 
-2. 如需持久化配置，在实际使用的部署清单（如`config/kunpeng-perf-monitor/k8s/deployment-devkit.yaml`和`onfig/kunpeng-perf-monitor/k8s/devkit-prometheus/deployment.yaml`）中为容器增加以下环境变量，然后重新应用清单。
+2. 如需持久化配置，在实际使用的部署清单（如`config/kunpeng-perf-monitor/k8s/deployment-devkit.yaml`和`config/kunpeng-perf-monitor/k8s/devkit-prometheus/deployment.yaml`）中为容器增加以下环境变量，然后重新应用清单。
 
     ```yaml
     env:

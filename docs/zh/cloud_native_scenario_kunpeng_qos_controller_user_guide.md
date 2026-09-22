@@ -2,11 +2,11 @@
 
 ## 简介
 
-`kunpeng-qos-controller`是一个以DaemonSet方式运行的节点本地Operator，用于把Kubernetes配置映射到节点的`resctrl`/`cgroup`控制能力，实现节点级QoS资源管控。
+`kunpeng-qos-controller`是一个以DaemonSet方式运行的节点本地Operator。用户通过`QoSPolicy`声明资源控制策略，控制器在匹配的节点上创建并配置`resctrl`控制组，将Pod进程绑定到对应控制组，并按需设置容器cgroup参数，从而实现节点级QoS资源管控。
 
 当前主要能力：
 
-- 监听`QoSPolicy` CR，并在本节点创建、更新、删除对应`resctrl`控制组。
+- 侦听`QoSPolicy` CR，并在本节点创建、更新、删除对应`resctrl`控制组。
 - 将Pod绑定到目标控制组（通过Pod标签`qos.kunpeng.huawei.com/group`）。
 - 根据干扰检测结果调整离线负载（`qos.kunpeng.huawei.com/workload-class=offline`）的资源配置。
 - 可通过`QoSPolicy`的`cpu.qosLevel`字段控制组内Pod的`cpu.qos_level`。
@@ -50,12 +50,12 @@
 系统由两个主要Reconciler组成：
 
 - `QoSPolicyReconciler`：
-  - 监听`QoSPolicy`。
+  - 侦听`QoSPolicy`。
   - 依据`nodeSelector`判断当前节点是否需要生效。
   - 对匹配节点创建/更新`resctrl`控制组并写入`schemata`。
   - 删除策略时执行本地控制组清理。
 - `PodBindingReconciler`：
-  - 监听Pod。
+  - 侦听Pod。
   - 根据Pod标签`qos.kunpeng.huawei.com/group`把Pod进程加入指定控制组。
   - 根据目标`QoSPolicy`的`cpu.qosLevel`对Pod容器写入`cpu.qos_level`。
 
