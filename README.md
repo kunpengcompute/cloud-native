@@ -36,8 +36,6 @@
 
 # 环境部署<a name="ZH-CN_TOPIC_0000002441616318"></a>
 
-
-
 ## Kunpeng TAP（Topology Aware Plugin）<a name="ZH-CN_TOPIC_0000002441675240"></a>
 
 **硬件要求<a name="section8119658132416"></a>**
@@ -116,15 +114,15 @@
 
 编译Kunpeng TAP源代码并生成插件可执行文件。
 
-1.  获取Kunpeng TAP源代码，在标签中获取最新发布的release-0.2版本。
+1. 获取Kunpeng TAP源代码，在标签中获取最新发布的release-0.2版本。
 
-    ```
+    ```bash
     git clone --branch release-0.2 https://gitee.com/kunpeng_compute/topo-affinity-plugin.git
     ```
 
-2.  进入“topo-affinity-plugin“目录，并执行构建插件的脚本。
+2. 进入“topo-affinity-plugin“目录，并执行构建插件的脚本。
 
-    ```
+    ```bash
     cd /path/to/topo-affinity-plugin
     go mod tidy
     make build
@@ -138,26 +136,24 @@
 
 **环境依赖<a name="section94010535258"></a>**
 
--   Go 1.23.6或更高版本
--   Linux环境（推荐openEuler 22.03）
--   支持MPAM的硬件平台（推荐鲲鹏处理器）
+- Go 1.23.6或更高版本
+- Linux环境（推荐openEuler 22.03）
+- 支持MPAM的硬件平台（推荐鲲鹏处理器）
 
 **编译Docker镜像<a name="section34166302913"></a>**
 
-```
+```bash
 make mpam-docker
 ```
 
 如果K8s集群使用的是containerd作为容器运行时，需要把镜像手动导入到containerd的镜像仓库。
 
-```
+```bash
 docker save k8s-mpam-controller:0.1.0 -o k8s-mpam-controller.tar
 ctr -n k8s.io images import k8s-mpam-controller.tar
 ```
 
 # 快速上手<a name="ZH-CN_TOPIC_0000002474856269"></a>
-
-
 
 ## Kunpeng TAP（Topology Aware Plugin）<a name="ZH-CN_TOPIC_0000002475098685"></a>
 
@@ -167,34 +163,34 @@ ctr -n k8s.io images import k8s-mpam-controller.tar
 
 Kunpeng TAP的运行依赖于K8s集群，当前支持使用Dockershim通信方式的Docker和Containerd。在部署该插件之前，需确保K8s集群已完成正确的网络配置，并且能够顺利部署和运行容器实例。
 
-1.  在目标计算节点导入Kunpeng TAP的可执行文件。
-2.  <a name="li1795401917439"></a>启动Kunpeng TAP。
+1. 在目标计算节点导入Kunpeng TAP的可执行文件。
+2. <a name="li1795401917439"></a>启动Kunpeng TAP。
 
     **启动方式一：**systemd启动。可直接进入源代码目录下，通过**make**命令安装和启动。
 
-    1.  进入源代码目录。
+    1. 进入源代码目录。
 
-        ```
+        ```bash
         cd /path/to/topology-affinity-plugin
         ```
 
         其中“/path/to/topology-affinity-plugin“为Kunpeng TAP源码的实际路径，请根据实际情况修改。
 
-    2.  安装插件，默认以Docker模式启动。
+    2. 安装插件，默认以Docker模式启动。
 
-        ```
+        ```bash
         make install-service
         ```
 
-    3.  指定运行时为Docker，运行如下安装命令。
+    3. 指定运行时为Docker，运行如下安装命令。
 
-        ```
+        ```bash
         make install-service-docker
         ```
 
         如果需要修改启动参数，则在源代码目录下的“hack/kunpeng-tap.service.docker“文件的“ExecStart=“下进行修改：
 
-        ```
+        ```txt
         [Unit]
         Description=Kunpeng Topology-Affinity Plugin Service
         After=network.target
@@ -212,35 +208,36 @@ Kunpeng TAP的运行依赖于K8s集群，当前支持使用Dockershim通信方�
 
         >**说明：**
         >指定运行时为Containerd，运行如下安装命令，参数配置可在源代码目录下的“hack/kunpeng-tap.service.containerd“文件中修改。
-        >```
+>
+        >```bash
         >make install-service-containerd
         >```
 
-    4.  安装完毕后，借助如下命令启动插件，并且自动查看启动后的服务状态。
+    4. 安装完毕后，借助如下命令启动插件，并且自动查看启动后的服务状态。
 
-        ```
+        ```bash
         make start-service
         ```
 
-    5.  查看日志信息。
+    5. 查看日志信息。
 
-        ```
+        ```bash
         journalctl -u kunpeng-tap
         ```
 
     **启动方式二：**直接启动。
 
-    -   Docker运行时下的启动命令，示例如下：
+    - Docker运行时下的启动命令，示例如下：
 
-        ```
+        ```bash
         kunpeng-tap --runtime-proxy-endpoint="/var/run/kunpeng/tap-runtime-proxy.sock" \
             --container-runtime-service-endpoint="/var/run/docker.sock" --container-runtime-mode="Docker" \
             --resource-policy="numa-aware"
         ```
 
-    -   Containerd运行时下的启动命令，示例如下：
+    - Containerd运行时下的启动命令，示例如下：
 
-        ```
+        ```bash
         kunpeng-tap --runtime-proxy-endpoint="/var/run/kunpeng/tap-runtime-proxy.sock" \
             --container-runtime-service-endpoint="/var/run/containerd/containerd.sock" --container-runtime-mode="Containerd" \
             --resource-policy="numa-aware"
@@ -302,44 +299,44 @@ Kunpeng TAP的运行依赖于K8s集群，当前支持使用Dockershim通信方�
     </tbody>
     </table>
 
-3.  在计算节点配置Kubelet参数。
+3. 在计算节点配置Kubelet参数。
 
     为了让Kunpeng TAP成功代理Kubelet的请求，需要在Kubelet的命令行配置中增加如下参数。
 
-    -   在Docker场景下，在Kubelet启动参数中添加或修改对应参数项如下所示。
+    - 在Docker场景下，在Kubelet启动参数中添加或修改对应参数项如下所示。
 
-        ```
+        ```bash
         --docker-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock
         ```
 
         以使用kubeadm安装集群为例，可以在“/var/lib/kubelet/kubeadm-flags.env“添加参数。
 
-        ```
+        ```txt
         KUBELET_KUBEADM_ARGS="--network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.6 --docker-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock"
         ```
 
         注意，修改Kubelet参数后，须运行如下命令重新启动Kubelet。
 
-        ```
+        ```bash
         systemctl daemon-reload
         systemctl restart kubelet
         ```
 
-    -   在Containerd场景下，修改Kubelet的启动参数。
+    - 在Containerd场景下，修改Kubelet的启动参数。
 
-        ```
+        ```txt
         --container-runtime=remote --container-runtime-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock
         ```
 
         此时，“/var/lib/kubelet/kubeadm-flags.env“的参数示例可能是：
 
-        ```
+        ```yaml
         KUBELET_KUBEADM_ARGS="--network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.6 --container-runtime=remote --container-runtime-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock"
         ```
 
         注意，修改Kubelet参数后，须运行如下命令重新启动Kubelet。
 
-        ```
+        ```bash
         systemctl daemon-reload
         systemctl restart kubelet
         ```
@@ -350,9 +347,9 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 以下为部署一个单容器Pod的YAML文件示例，供用户参考。该Pod请求的CPU资源最小值为4核，最大值为8核，内存固定为4Gi，容器使用busybox作为镜像。
 
-1.  创建YAML文件，例如example.yaml，并在YAML文件中写入以下配置。
+1. 创建YAML文件，例如example.yaml，并在YAML文件中写入以下配置。
 
-    ```
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -374,41 +371,41 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
             memory: "4Gi"
     ```
 
-2.  以指定Pod在**compute01**节点上运行为例，需要在YAML文件中的**spec**部分加入以下内容。
+2. 以指定Pod在**compute01**节点上运行为例，需要在YAML文件中的**spec**部分加入以下内容。
 
     >**说明：**
     >在多个工作节点的K8s集群中，Pod可能会被调度到不同节点的NUMA内。如果希望Pod在指定的节点上运行，只需在YAML文件的**spec**部分加入**nodeSelector**字段，并指定**kubernetes.io/hostname**为目标节点的名称。
 
-    ```
+    ```bash
       nodeSelector:
         kubernetes.io/hostname: compute01
     ```
 
-3.  在管理节点应用YAML文件，完成Pod部署。
+3. 在管理节点应用YAML文件，完成Pod部署。
 
-    ```
+    ```bash
     kubectl apply -f example.yaml
     ```
 
-4.  判断Kunpeng TAP是否生效。
-    1.  以Docker运行时为例，进入步骤[2](#li1795401917439)中**nodeSelector**所指定的集群节点_compute01_后，通过**docker**命令查询容器的CpusetCpus参数，判断容器是否与NUMA成功亲和。
-    2.  通过**docker ps**查询集群节点运行的容器任务，在**NAMES**列中找到步骤一中“spec.containers.name“指定的_nri-1_容器。
+4. 判断Kunpeng TAP是否生效。
+    1. 以Docker运行时为例，进入步骤[2](#li1795401917439)中**nodeSelector**所指定的集群节点_compute01_后，通过**docker**命令查询容器的CpusetCpus参数，判断容器是否与NUMA成功亲和。
+    2. 通过**docker ps**查询集群节点运行的容器任务，在**NAMES**列中找到步骤一中“spec.containers.name“指定的_nri-1_容器。
 
-        ```
+        ```bash
         # docker ps | grep nri-1
         CONTAINER ID   IMAGE                  COMMAND                  CREATED       STATUS       PORTS     NAMES
         ```
 
-    3.  依据_CONTAINER ID_查询目标容器的部署参数_CpusetCpus_，该参数表示容器的可调度CPU范围。
+    3. 依据_CONTAINER ID_查询目标容器的部署参数_CpusetCpus_，该参数表示容器的可调度CPU范围。
 
-        ```
+        ```bash
         # docker inspect bf32de0d09fe | grep "CpusetCpus"
                     "CpusetCpus": "0-23",
         ```
 
         如果启用了内存绑定功能，可以通过如下命令查看，注意其取值表示节点的编号。
 
-        ```
+        ```bash
         # docker inspect bf32de0d09fe | grep "CpusetMems"
                     "CpusetMems": "0",
         ```
@@ -418,16 +415,16 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
         Containerd运行时可以运行如下命令查看容器的可调度CPU范围。
 
-        ```
+        ```bash
         # crictl inspect bf32de0d09fe | grep "cpuset_cpus"
                     "cpuset_cpus": "0-23",
         ```
 
         如果NUMA节点亲和失败，则可能无法查找到cpuset\_cpus输出。
 
-    4.  查询系统的NUMA信息，与上述的容器可调度CPU范围进行对比，一致则表示亲和于对应NUMA节点。
+    4. 查询系统的NUMA信息，与上述的容器可调度CPU范围进行对比，一致则表示亲和于对应NUMA节点。
 
-        ```
+        ```output
         # lscpu
         ...
         NUMA node0 CPU(s):               0-23
@@ -439,15 +436,15 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
         “node0“表示编号为“0“的NUMA节点，“0-23“表示NUMA节点内的CPU编号。
 
-5.  此外，对于系统中GPU的NUMA分布，可以运行如下命令查看，其中“0200“为网卡设备号。
+5. 此外，对于系统中GPU的NUMA分布，可以运行如下命令查看，其中“0200“为网卡设备号。
 
-    ```
+    ```bash
     lspci -vvv -d :0200 | grep NUMA
     ```
 
     回显如下所示：
 
-    ```
+    ```output
     NUMA node: 0
     NUMA node: 0
     NUMA node: 0
@@ -464,28 +461,28 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 **部署插件<a name="section24721531114518"></a>**
 
-1.  在部署插件之前要先确保MPAM的resctrl文件系统已经挂载，在**worker节点**使用如下命令可以挂载。
+1. 在部署插件之前要先确保MPAM的resctrl文件系统已经挂载，在**worker节点**使用如下命令可以挂载。
 
-    ```
+    ```bash
     mount -t resctrl resctrl /sys/fs/resctrl
     ```
 
-2.  在**master节点**上执行如下命令部署插件。
+2. 在**master节点**上执行如下命令部署插件。
 
-    ```
+    ```bash
     cd config/k8s-mpam-controller-config/samples
     kubectl apply -f k8s-mpam-controller.yaml
     ```
 
-3.  查看MPAM插件对应的Pod是否正常运行。
+3. 查看MPAM插件对应的Pod是否正常运行。
 
-    ```
+    ```bash
     kubectl get pods
     ```
 
     正常运行可能的回显如下。
 
-    ```
+    ```output
     NAME                                    READY   STATUS    RESTARTS   AGE
     mpam-controller-daemonset-agent-bj2gv   1/1     Running   0          143m
     ```
@@ -494,7 +491,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 当需要对Pod进行资源限制时，需要创建MPAM资源组。
 
-1.  进入“samples“目录，修改MPAM资源组的配置文件（.yaml格式），以example-config.yaml为例。
+1. 进入“samples“目录，修改MPAM资源组的配置文件（.yaml格式），以example-config.yaml为例。
 
     在example-config.yaml文件中，Node资源组包括如[表1](#table8171211407)所示3种不同级别的配置，用户可以通过ConfigMap为Node节点或一组节点创建配置。创建配置后，MPAM插件将管理Kubernetes集群中的ConfigMap，并在添加或更新ConfigMap后将配置自动应用到相应的节点。
 
@@ -533,16 +530,16 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
     </tbody>
     </table>
 
-    1.  打开文件。
+    1. 打开文件。
 
-        ```
+        ```bash
         cd samples
         vi example-config.yaml
         ```
 
-    2.  按“i“进入编辑模式，在文件中修改name字段指定为[表1](#table8171211407)中的实际配置名称，将mpam字段下添加对应的资源组信息。
+    2. 按“i“进入编辑模式，在文件中修改name字段指定为[表1](#table8171211407)中的实际配置名称，将mpam字段下添加对应的资源组信息。
 
-        ```
+        ```yaml
         apiVersion: v1
         kind: ConfigMap
         metadata:
@@ -563,27 +560,28 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
         ```
 
         >**说明：**
-        >-   最多可以设置32个资源组（根分组默认占一个资源组，根分组下最多实际只能创建出31个资源组），每条<schemata\>必须要满足语法规则。
-        >-   如果某个资源组中没有对某一项进行配置或者已配置的配置项不满足语法规则，该资源组将使用该配置项的默认配置。L3 cache的默认配置为**"L3:0=fffffff;1=fffffff;2=fffffff;3=fffffff"**；带宽的默认配置为**"MB:0=100;1=100;2=100;3=100"**
+        >- 最多可以设置32个资源组（根分组默认占一个资源组，根分组下最多实际只能创建出31个资源组），每条<schemata\>必须要满足语法规则。
+        >- 如果某个资源组中没有对某一项进行配置或者已配置的配置项不满足语法规则，该资源组将使用该配置项的默认配置。L3 cache的默认配置为**"L3:0=fffffff;1=fffffff;2=fffffff;3=fffffff"**；带宽的默认配置为**"MB:0=100;1=100;2=100;3=100"**
 
-    3.  按“Esc“键退出编辑模式，输入**:wq!**，按“Enter“键保存并退出文件。
+    3. 按“Esc“键退出编辑模式，输入**:wq!**，按“Enter“键保存并退出文件。
 
-2.  在“samples“目录下，应用example-config.yaml文件以创建ConfigMap。
+2. 在“samples“目录下，应用example-config.yaml文件以创建ConfigMap。
 
-    ```
+    ```bash
     kubectl apply -f example-config.yaml
     ```
 
-3.  在Node节点上，进入“/sys/fs/resctrl“目录，查看资源组是否已创建，以及对应的资源组配置是否和example-config.yaml中的一致。
+3. 在Node节点上，进入“/sys/fs/resctrl“目录，查看资源组是否已创建，以及对应的资源组配置是否和example-config.yaml中的一致。
 
-    ```
+    ```bash
     cd /sys/fs/resctrl
     ls
     ```
 
     >**说明：**
     >例如，可以通过以下命令查看资源组group1的配置。
-    >```
+    >
+    >```bash
     >cat group1/schemata
     >```
 
@@ -591,33 +589,33 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 当需要将某个Pod加入到某个资源组中时，需要在创建Pod时指定资源组。
 
-1.  修改Pod的配置文件（.yaml格式），以example-pod.yaml为例。
-    1.  进入“samples“目录，打开example-pod.yaml文件。
+1. 修改Pod的配置文件（.yaml格式），以example-pod.yaml为例。
+    1. 进入“samples”目录，打开example-pod.yaml文件。
 
-        ```
+        ```yaml
         cd samples
         vi example-pod.yaml
         ```
 
-    2.  按“i“进入编辑模式，在配置文件中分别添加如下信息。
+    2. 按“i“进入编辑模式，在配置文件中分别添加如下信息。
 
-        ```
+        ```yaml
         labels:
             rcgroup: group2
         ```
 
-        ```
+        ```yaml
         nodeSelector:
             MPAM: enabled
         ```
 
         >**说明：**
-        >-   在**labels**字段中通过rcgroup字段指定对应的资源组，例如将Pod加到**group2**中。
-        >-   在**nodeSelector**字段中增加**MPAM：enabled**，用于调度器将该Pod调度到支持MPAM特性的节点上去。
+        >- 在**labels**字段中通过rcgroup字段指定对应的资源组，例如将Pod加到**group2**中。
+        >- 在**nodeSelector**字段中增加**MPAM：enabled**，用于调度器将该Pod调度到支持MPAM特性的节点上去。
 
         修改后的example-pod.yaml文件如下所示。
 
-        ```
+        ```yaml
         apiVersion: v1
         kind: Pod
         metadata:
@@ -635,35 +633,35 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
             MPAM: enabled
         ```
 
-    3.  按“Esc“键退出编辑模式，输入**:wq!**，按“Enter“键保存并退出文件。
+    3. 按“Esc“键退出编辑模式，输入**:wq!**，按“Enter“键保存并退出文件。
 
-2.  创建Pod。
+2. 创建Pod。
 
-    ```
+    ```bash
     kubectl apply -f example-pod.yaml
     ```
 
-3.  在Node节点上，进入“/sys/fs/resctrl“目录，再进入Pod所属的资源组中（例如Pod属于资源组group1），可以在资源组中查看对应的配置以及监控数据，还可以查看当前资源组下被限制应用的pid。
+3. 在Node节点上，进入“/sys/fs/resctrl“目录，再进入Pod所属的资源组中（例如Pod属于资源组group1），可以在资源组中查看对应的配置以及监控数据，还可以查看当前资源组下被限制应用的pid。
 
-    ```
+    ```bash
     cd /sys/fs/resctrl/group1
     ```
 
-    -   通过以下命令查看资源组的配置。
+    - 通过以下命令查看资源组的配置。
 
-        ```
+        ```bash
         cat schemata
         ```
 
-    -   通过以下命令查看该资源组下的pid。
+    - 通过以下命令查看该资源组下的pid。
 
-        ```
+        ```bash
         cat tasks
         ```
 
-    -   通过以下命令查看资源组下的监控数据。
+    - 通过以下命令查看资源组下的监控数据。
 
-        ```
+        ```bash
         grep . mon_data/*
         ```
 
@@ -675,7 +673,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 插件提供了默认配置，如果不配置configMap同样可以使用动态MPAM隔离功能。MPAM动态隔离参数通过json文件配置，参数含义请参见[表2](#table116484132237)。如果需要手动更改配置参考下面内容进行配置。
 
-```
+```yaml
  {
       "mpamConfig":{
         "adjustInterval": 5000,
@@ -735,7 +733,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 json文件通过configMap的形式进行配置，在k8s-mpam-controller.yaml文件中配置，完整的yaml文件如下。
 
-```
+```yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -872,9 +870,9 @@ spec:
 
 **部署离线业务<a name="section28948105567"></a>**
 
-1.  在Pod的yaml文件中添加注解kunpeng.com/offline: "true"，标记该Pod为离线业务，方便插件对其进行限制，示例bw-mem.yaml文件如下。
+1. 在Pod的yaml文件中添加注解kunpeng.com/offline: "true"，标记该Pod为离线业务，方便插件对其进行限制，示例bw-mem.yaml文件如下。
 
-    ```
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -898,17 +896,17 @@ spec:
             cpu: "9.6"
     ```
 
-2.  部署要进行限制的离线业务。
+2. 部署要进行限制的离线业务。
 
-    ```
+    ```bash
     kubectl apply -f bw-mem.yaml
     ```
 
     部署成功后离线业务的pid会被加入到mpam-controller\_dynamic控制组中的tasks。
 
-3.  通过以下命令查看被限制的离线业务的pid。
+3. 通过以下命令查看被限制的离线业务的pid。
 
-    ```
+    ```bash
     cd /sys/fs/resctrl/mpam-controller_dynamic
     cat tasks
     ```
@@ -917,9 +915,9 @@ spec:
 
 欢迎提交Issue和Pull Request来改进项目。请确保：
 
--   代码符合项目规范。
--   包含适当的测试。
--   更新相关文档。
+- 代码符合项目规范。
+- 包含适当的测试。
+- 更新相关文档。
 
 # 免责声明<a name="ZH-CN_TOPIC_0000002441456466"></a>
 
@@ -928,4 +926,3 @@ spec:
 # 许可证书<a name="ZH-CN_TOPIC_0000002441616326"></a>
 
 本项目采用Apache License 2.0许可证。详见[LICENSE](https://gitcode.com/boostkit/cloud-native/blob/master/LICENSE)文件。
-
