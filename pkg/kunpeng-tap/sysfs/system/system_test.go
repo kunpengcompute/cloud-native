@@ -82,6 +82,17 @@ var _ = Describe("System", func() {
 		helper.Cleanup()
 	})
 
+	Context("discoverCPUs", func() {
+		It("should return malformed glob errors", func() {
+			sys.cpus = nil
+			sys.path = "["
+
+			err := sys.discoverCPUs()
+
+			Expect(err).To(MatchError(ContainSubstring("failed to glob CPU entries")))
+		})
+	})
+
 	Context("discoverCPU", func() {
 		type testCase struct {
 			cpuID    string

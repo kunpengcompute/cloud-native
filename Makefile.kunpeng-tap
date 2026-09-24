@@ -2,6 +2,7 @@
 
 # Image URL to use all building/pushing image targets
 IMG ?= kunpeng-tap:latest
+PCORE_IMG ?= kunpeng-tap-pcore-binding:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.31.0
 
@@ -26,17 +27,20 @@ SHELL = /usr/bin/env bash -o pipefail
 # Binary names
 MANAGER_BINARY=kunpeng-tap-manager
 PROXY_BINARY=kunpeng-tap
+PCORE_BINARY=kunpeng-tap-pcore-binding
 
 # Build directories
 BUILD_DIR=bin
 MANAGER_SRC=./cmd/kunpeng-tap/manager
 PROXY_SRC=./cmd/kunpeng-tap/proxy
+PCORE_SRC=./cmd/kunpeng-tap-pcore-binding
 
 # Build flags
 LDFLAGS=-ldflags "-bindnow -s -w \
 -X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.Version=$(Version) \
 -X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.Built=$(BUILD_TIME) \
 -X kunpeng.huawei.com/kunpeng-cloud-computing/pkg/kunpeng-tap/version.GitCommit=$(GitCommit)"
+PCORE_LDFLAGS=-ldflags "-bindnow -s -w"
 
 .PHONY: all
 all: build
@@ -83,6 +87,12 @@ build-proxy: ## Build proxy binary.
 	@echo "Building kunpeng-tap proxy..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 go build -buildmode=pie $(LDFLAGS) -o $(BUILD_DIR)/$(PROXY_BINARY) $(PROXY_SRC)
+
+.PHONY: build-pcore-binding
+build-pcore-binding: ## Build the hardened ARM64 pcore binding plugin binary.
+	@echo "Building kunpeng-tap pcore binding plugin..."
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildmode=pie $(PCORE_LDFLAGS) -o $(BUILD_DIR)/$(PCORE_BINARY) $(PCORE_SRC)
 
 .PHONY: clean
 clean: ## Clean build artifacts.
@@ -159,6 +169,14 @@ uninstall-service: ## Uninstall kunpeng-tap service.
 .PHONY: docker-build
 docker-build: ## Build docker image with the proxy.
 	$(CONTAINER_TOOL) build -t ${IMG} .
+
+.PHONY: pcore-binding-docker-build
+pcore-binding-docker-build: build-pcore-binding ## Build the hardened ARM64 pcore binding plugin image.
+	$(CONTAINER_TOOL) build \
+		--platform linux/arm64 \
+		-f Dockerfile.kunpeng-tap-pcore-binding \
+		-t $(PCORE_IMG) \
+		.
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the proxy.

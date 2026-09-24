@@ -1,0 +1,12 @@
+# Runtime image for kunpeng-tap-pcore-binding.
+#
+# Build the hardened ARM64 binary and image:
+#   make kunpeng-tap-pcore-binding-docker-build
+FROM busybox:glibc
+
+COPY bin/kunpeng-tap-pcore-binding /usr/local/bin/kunpeng-tap-pcore-binding
+
+ENTRYPOINT ["/usr/local/bin/kunpeng-tap-pcore-binding"]
+
+LABEL maintainer="Kunpeng Boostkit Team"
+LABEL description="NRI plugin for binding kata pod cpuset to physical-core sibling CPUs"

@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kata-clh-cpuset-scale
+  namespace: default
+spec:
+  replicas: 100
+  selector:
+    matchLabels:
+      app: kata-clh-cpuset-scale
+  template:
+    metadata:
+      labels:
+        app: kata-clh-cpuset-scale
+    spec:
+      runtimeClassName: kata-clh
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: pause
+        image: registry.aliyuncs.com/google_containers/pause:3.10.1
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: "2"
+            memory: 32Mi
+          limits:
+            cpu: "2"
+            memory: 32Mi

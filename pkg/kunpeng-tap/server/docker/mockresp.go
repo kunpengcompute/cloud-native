@@ -23,6 +23,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+
+	"k8s.io/klog/v2"
 )
 
 type mockRespWriter struct {
@@ -32,7 +34,9 @@ type mockRespWriter struct {
 }
 
 func (m *mockRespWriter) Write(p []byte) (n int, err error) {
-	_, _ = m.w.Write(p)
+	if _, captureErr := m.w.Write(p); captureErr != nil {
+		klog.ErrorS(captureErr, "Failed to capture response body")
+	}
 	return m.ResponseWriter.Write(p)
 }
 

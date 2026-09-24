@@ -19,7 +19,6 @@ package dispatcher
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -143,9 +142,11 @@ func (d *dispatcher) InsertIntoCacheIfNeed(containerRuntimeResp, hookReq interfa
 		case *v1alpha1.PodSandboxHookRequest:
 			klog.V(5).InfoS("Insert pod into cache", "PodId", containerId)
 			_, err = d.cache.InsertPod(containerId, hookReq, nil)
+		default:
+			klog.V(5).InfoS("InsertIntoCacheIfNeed unknown hook request type", "HookRequestType", fmt.Sprintf("%T", hookReq))
 		}
 	default:
-		klog.V(5).InfoS("InsertIntoCacheIfNeed Unknown response type", "ContainerRuntimeRespType", reflect.TypeOf(containerRuntimeResp).String())
+		klog.V(5).InfoS("InsertIntoCacheIfNeed unknown response type", "ContainerRuntimeRespType", fmt.Sprintf("%T", containerRuntimeResp))
 	}
 
 	if err != nil {
@@ -165,7 +166,7 @@ func (d *dispatcher) DeleteFromCacheIfNeed(request interface{}) {
 		klog.V(5).InfoS("Delete container from cache", "ContainerId", request.ContainerID)
 		d.cache.DeleteContainer(request.ContainerID)
 	default:
-		klog.V(5).InfoS("DeleteFromCacheIfNeed Unknown request type", "RequestType", reflect.TypeOf(request).String())
+		klog.V(5).InfoS("DeleteFromCacheIfNeed unknown request type", "RequestType", fmt.Sprintf("%T", request))
 	}
 }
 
@@ -206,11 +207,19 @@ func (d *dispatcher) BackfillRequest(proxyReq, hookReq, hookResp interface{}) {
 		if response != nil {
 			BackfillContainerRequest(proxyReq, hookReq, response, d.dockerCgroupDriver)
 		}
+	default:
+		klog.V(5).InfoS("BackfillRequest unknown hook response type", "HookResponseType", fmt.Sprintf("%T", hookResp))
 	}
 }
 
 // BackfillPodRequest fill proxy pod request and hook pod request by hook pod response
 func BackfillPodRequest(proxyPodReq interface{}, hookPodReq interface{}, hookPodResponse *v1alpha1.PodSandboxHookResponse, dockerCgroupDriver string) {
+	hookRequest, ok := hookPodReq.(*v1alpha1.PodSandboxHookRequest)
+	if !ok || hookRequest == nil {
+		klog.V(5).InfoS("BackfillPodRequest invalid hook request type", "HookRequestType", fmt.Sprintf("%T", hookPodReq))
+		return
+	}
+
 	switch proxyRequest := proxyPodReq.(type) {
 	case *runtimeapi.RunPodSandboxRequest:
 		if proxyRequest.Config == nil {
@@ -218,40 +227,48 @@ func BackfillPodRequest(proxyPodReq interface{}, hookPodReq interface{}, hookPod
 		}
 		if hookPodResponse.Annotations != nil {
 			proxyRequest.Config.Annotations = hookPodResponse.Annotations
-			hookPodReq.(*v1alpha1.PodSandboxHookRequest).Annotations = hookPodResponse.Annotations
+			hookRequest.Annotations = hookPodResponse.Annotations
 		}
 		if hookPodResponse.Labels != nil {
 			proxyRequest.Config.Labels = hookPodResponse.Labels
-			hookPodReq.(*v1alpha1.PodSandboxHookRequest).Labels = hookPodResponse.Labels
+			hookRequest.Labels = hookPodResponse.Labels
 		}
 		if hookPodResponse.CgroupParent != "" {
 			if proxyRequest.Config.Linux == nil {
 				proxyRequest.Config.Linux = &runtimeapi.LinuxPodSandboxConfig{}
 			}
 			proxyRequest.Config.Linux.CgroupParent = hookPodResponse.CgroupParent
-			hookPodReq.(*v1alpha1.PodSandboxHookRequest).CgroupParent = hookPodResponse.CgroupParent
+			hookRequest.CgroupParent = hookPodResponse.CgroupParent
 		}
 		if hookPodResponse.Resources != nil {
 			if proxyRequest.Config.Linux == nil {
 				proxyRequest.Config.Linux = &runtimeapi.LinuxPodSandboxConfig{}
 			}
 			proxyRequest.Config.Linux.Resources = TransferToCRIResources(hookPodResponse.Resources)
-			hookPodReq.(*v1alpha1.PodSandboxHookRequest).Resources = hookPodResponse.Resources
+			hookRequest.Resources = hookPodResponse.Resources
 		}
 	case *utils.ConfigWrapper:
 		if hookPodResponse.Resources != nil {
 			proxyRequest.HostConfig = utils.UpdateHostConfigByResource(proxyRequest.HostConfig, hookPodResponse.Resources)
-			hookPodReq.(*v1alpha1.PodSandboxHookRequest).Resources = hookPodResponse.Resources
+			hookRequest.Resources = hookPodResponse.Resources
 		}
 		if hookPodResponse.CgroupParent != "" && proxyRequest.HostConfig != nil {
 			proxyRequest.HostConfig.CgroupParent = utils.GenerateExpectedCgroupParent(dockerCgroupDriver, hookPodResponse.CgroupParent)
-			hookPodReq.(*v1alpha1.PodSandboxHookRequest).CgroupParent = hookPodResponse.CgroupParent
+			hookRequest.CgroupParent = hookPodResponse.CgroupParent
 		}
+	default:
+		klog.V(5).InfoS("BackfillPodRequest unknown proxy request type", "ProxyRequestType", fmt.Sprintf("%T", proxyPodReq))
 	}
 }
 
 // BackfillContainerRequest fill proxy container request and hook container request by hook container response
 func BackfillContainerRequest(proxyContainerReq interface{}, hookContainerReq interface{}, hookContainerResponse *v1alpha1.ContainerResourceHookResponse, dockerCgroupDriver string) {
+	hookRequest, ok := hookContainerReq.(*v1alpha1.ContainerResourceHookRequest)
+	if !ok || hookRequest == nil {
+		klog.V(5).InfoS("BackfillContainerRequest invalid hook request type", "HookRequestType", fmt.Sprintf("%T", hookContainerReq))
+		return
+	}
+
 	switch proxyRequest := proxyContainerReq.(type) {
 	case *runtimeapi.CreateContainerRequest:
 		if proxyRequest.Config == nil {
@@ -259,14 +276,14 @@ func BackfillContainerRequest(proxyContainerReq interface{}, hookContainerReq in
 		}
 		if hookContainerResponse.ContainerAnnotations != nil {
 			proxyRequest.Config.Annotations = hookContainerResponse.ContainerAnnotations
-			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).ContainerAnnotations = hookContainerResponse.ContainerAnnotations
+			hookRequest.ContainerAnnotations = hookContainerResponse.ContainerAnnotations
 		}
 		if hookContainerResponse.ContainerResources != nil {
 			if proxyRequest.Config.Linux == nil {
 				proxyRequest.Config.Linux = &runtimeapi.LinuxContainerConfig{}
 			}
 			proxyRequest.Config.Linux.Resources = TransferToCRIResources(hookContainerResponse.ContainerResources)
-			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).ContainerResources = hookContainerResponse.ContainerResources
+			hookRequest.ContainerResources = hookContainerResponse.ContainerResources
 		}
 		if hookContainerResponse.PodCgroupParent != "" {
 			if proxyRequest.SandboxConfig == nil {
@@ -276,23 +293,25 @@ func BackfillContainerRequest(proxyContainerReq interface{}, hookContainerReq in
 				proxyRequest.SandboxConfig.Linux = &runtimeapi.LinuxPodSandboxConfig{}
 			}
 			proxyRequest.SandboxConfig.Linux.CgroupParent = hookContainerResponse.PodCgroupParent
-			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).PodCgroupParent = hookContainerResponse.PodCgroupParent
+			hookRequest.PodCgroupParent = hookContainerResponse.PodCgroupParent
 		}
 		proxyRequest.Config.Envs = TransferToCRIContainerEnvs(hookContainerResponse.GetContainerEnvs())
-		hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).ContainerEnvs = hookContainerResponse.GetContainerEnvs()
+		hookRequest.ContainerEnvs = hookContainerResponse.GetContainerEnvs()
 	case *utils.ConfigWrapper:
 		if hookContainerResponse.ContainerResources != nil {
 			proxyRequest.HostConfig = utils.UpdateHostConfigByResource(proxyRequest.HostConfig, hookContainerResponse.ContainerResources)
-			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).ContainerResources = hookContainerResponse.ContainerResources
+			hookRequest.ContainerResources = hookContainerResponse.ContainerResources
 		}
 		if hookContainerResponse.PodCgroupParent != "" && proxyRequest.HostConfig != nil {
 			proxyRequest.HostConfig.CgroupParent = utils.GenerateExpectedCgroupParent(dockerCgroupDriver, hookContainerResponse.PodCgroupParent)
-			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).PodCgroupParent = hookContainerResponse.PodCgroupParent
+			hookRequest.PodCgroupParent = hookContainerResponse.PodCgroupParent
 		}
 		if hookContainerResponse.ContainerEnvs != nil {
 			proxyRequest.Env = utils.GenerateEnvList(hookContainerResponse.ContainerEnvs)
-			hookContainerReq.(*v1alpha1.ContainerResourceHookRequest).ContainerEnvs = hookContainerResponse.ContainerEnvs
+			hookRequest.ContainerEnvs = hookContainerResponse.ContainerEnvs
 		}
+	default:
+		klog.V(5).InfoS("BackfillContainerRequest unknown proxy request type", "ProxyRequestType", fmt.Sprintf("%T", proxyContainerReq))
 	}
 }
 
@@ -306,8 +325,10 @@ func (d *dispatcher) ParseContainerRequest(req interface{}) interface{} {
 		return d.parseCRIStopContainerRequest(request)
 	case utils.DockerStopRequest:
 		return d.parseDockerStopContainerRequest(request)
+	default:
+		klog.V(5).InfoS("ParseContainerRequest unknown request type", "RequestType", fmt.Sprintf("%T", req))
+		return nil
 	}
-	return nil
 }
 
 // parseCRICreateContainerRequest parses CRI CreateContainerRequest
@@ -430,6 +451,8 @@ func (d *dispatcher) ParsePodRequest(req interface{}) interface{} {
 			Resources:      utils.HostConfigToResource(request.HostConfig),
 			RuntimeHandler: "docker",
 		}
+	default:
+		klog.V(5).InfoS("ParsePodRequest unknown request type", "RequestType", fmt.Sprintf("%T", req))
+		return nil
 	}
-	return nil
 }

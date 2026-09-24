@@ -90,9 +90,9 @@ func readSysfsEntry(dir, file string, target interface{}, seps ...string) (strin
 			return "", err
 		}
 		return buf, nil
+	default:
+		return "", fmt.Errorf("unsupported sysfs entry type %T", target)
 	}
-
-	return "", fmt.Errorf("unsupported sysfs entry type %T", target)
 }
 
 // Determine list separator string, given an optional separator variadic argument.

@@ -28,6 +28,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -52,11 +54,24 @@ type publishOnlinePodsResponse struct {
 }
 
 type getInterferenceResponse struct {
-	Version    string             `json:"version"`
-	NodeName   string             `json:"node_name"`
-	Reason     InterferenceReason `json:"reason"`
-	TTLSeconds int64              `json:"ttl_seconds"`
-	Items      []InterferenceItem `json:"items"`
+	Version     string          `json:"version"`
+	NodeName    string          `json:"node_name"`
+	ReasonCodes json.RawMessage `json:"reason_codes"`
+}
+
+type interferenceReasonCodeMapping struct {
+	name   string
+	reason InterferenceReason
+}
+
+var interferenceReasonCodeMappings = map[int]interferenceReasonCodeMapping{
+	0: {name: "base", reason: InterferenceReasonNone},
+	1: {name: "compute", reason: InterferenceReasonCPU},
+	2: {name: "l2", reason: InterferenceReasonCPU},
+	3: {name: "l3", reason: InterferenceReasonL3},
+	4: {name: "membw", reason: InterferenceReasonMB},
+	5: {name: "tlb", reason: InterferenceReasonCPU},
+	6: {name: "frontend", reason: InterferenceReasonCPU},
 }
 
 // AgentClient encapsulates two-way communication with external agent.
@@ -229,11 +244,60 @@ func (c *HTTPAgentClient) GetInterference(ctx context.Context, nodeName string) 
 		return AgentAnalyzeResult{}, fmt.Errorf("decode interference response failed: %w", err)
 	}
 
-	return AgentAnalyzeResult{
-		Reason:     normalizeInterferenceReason(out.Reason),
-		TTLSeconds: out.TTLSeconds,
-		Items:      out.Items,
-	}, nil
+	if out.NodeName != nodeName {
+		return AgentAnalyzeResult{}, fmt.Errorf(
+			"unexpected interference response node: got %q, want %q",
+			out.NodeName,
+			nodeName,
+		)
+	}
+	if len(out.ReasonCodes) == 0 {
+		return AgentAnalyzeResult{}, fmt.Errorf("interference response reason_codes field is required")
+	}
+	var reasonCodes []int
+	if err := json.Unmarshal(out.ReasonCodes, &reasonCodes); err != nil {
+		return AgentAnalyzeResult{}, fmt.Errorf("decode interference response reason_codes failed: %w", err)
+	}
+
+	reasonNames := make([]string, 0, len(reasonCodes))
+	for _, code := range reasonCodes {
+		name := "unknown"
+		if mapping, ok := interferenceReasonCodeMappings[code]; ok {
+			name = mapping.name
+		}
+		reasonNames = append(reasonNames, name)
+	}
+	klog.Infof(
+		"dynamic-control received interference reasons: node=%s reasons=%v",
+		nodeName,
+		reasonNames,
+	)
+
+	reasons, ignored := mapInterferenceReasonCodes(reasonCodes)
+	for _, code := range ignored {
+		klog.Warningf(
+			"dynamic-control ignored unsupported interference reason code: node=%s reasonCode=%d",
+			nodeName,
+			code,
+		)
+	}
+	return AgentAnalyzeResult{Reasons: reasons}, nil
+}
+
+func mapInterferenceReasonCodes(codes []int) ([]InterferenceReason, []int) {
+	mapped := make([]InterferenceReason, 0, len(codes))
+	ignored := make([]int, 0)
+	for _, code := range codes {
+		mapping, ok := interferenceReasonCodeMappings[code]
+		if !ok {
+			ignored = append(ignored, code)
+			continue
+		}
+		mapped = append(mapped, mapping.reason)
+	}
+
+	reasons, _ := normalizeInterferenceReasons(mapped, true)
+	return reasons, ignored
 }
 
 func decodeAgentHTTPError(resp *http.Response) error {
@@ -245,17 +309,4 @@ func decodeAgentHTTPError(resp *http.Response) error {
 		return fmt.Errorf("agent http error: status=%d", resp.StatusCode)
 	}
 	return fmt.Errorf("agent http error: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(snippet)))
-}
-
-func normalizeInterferenceReason(reason InterferenceReason) InterferenceReason {
-	switch InterferenceReason(strings.ToLower(string(reason))) {
-	case InterferenceReasonL3:
-		return InterferenceReasonL3
-	case InterferenceReasonMB:
-		return InterferenceReasonMB
-	case InterferenceReasonCPU:
-		return InterferenceReasonCPU
-	default:
-		return InterferenceReasonUnknown
-	}
 }

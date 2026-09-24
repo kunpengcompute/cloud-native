@@ -154,6 +154,16 @@ var _ = Describe("Pod", func() {
 			Expect(container).NotTo(BeNil())
 			Expect(container.GetID()).To(Equal("test-container-id"))
 		})
+
+		It("should discover a container when the name cache is empty", func() {
+			podInstance.containers = map[string]string{}
+
+			container, found := podInstance.GetContainer("test-container")
+
+			Expect(found).To(BeTrue())
+			Expect(container.GetID()).To(Equal("test-container-id"))
+			Expect(podInstance.containers).To(HaveKeyWithValue("test-container", "test-container-id"))
+		})
 	})
 
 	Describe("GetQOSClass", func() {

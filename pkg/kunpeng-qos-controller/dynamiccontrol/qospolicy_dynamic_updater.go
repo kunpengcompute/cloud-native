@@ -41,7 +41,8 @@ const (
 // DynamicPolicyUpdater updates per-node dynamic QoSPolicy CR.
 // QoSPolicyDynamicUpdater is the default implementation.
 type DynamicPolicyUpdater interface {
-	ApplyReason(ctx context.Context, nodeName string, reason InterferenceReason) error
+	EnsurePolicy(ctx context.Context, nodeName string) error
+	ApplyReasons(ctx context.Context, nodeName string, reasons []InterferenceReason) error
 }
 
 // QoSPolicyDynamicUpdater upserts one per-node dynamic QoSPolicy CR.
@@ -64,8 +65,8 @@ func NewQoSPolicyDynamicUpdater(c client.Client) *QoSPolicyDynamicUpdater {
 	}
 }
 
-// ApplyReason ensures and updates one dynamic QoSPolicy for given node.
-func (u *QoSPolicyDynamicUpdater) ApplyReason(ctx context.Context, nodeName string, reason InterferenceReason) error {
+// EnsurePolicy creates the node-local dynamic QoSPolicy with default settings if absent.
+func (u *QoSPolicyDynamicUpdater) EnsurePolicy(ctx context.Context, nodeName string) error {
 	if u.Client == nil {
 		return fmt.Errorf("client must not be nil")
 	}
@@ -74,17 +75,51 @@ func (u *QoSPolicyDynamicUpdater) ApplyReason(ctx context.Context, nodeName stri
 	}
 
 	name := dynamicPolicyName(nodeName)
-	reason = normalizeInterferenceReason(reason)
-	if reason == InterferenceReasonUnknown {
-		return fmt.Errorf("unsupported interference reason: %s", reason)
+	var current qosv1alpha1.QoSPolicy
+	err := u.Client.Get(ctx, types.NamespacedName{Name: name}, &current)
+	if err == nil {
+		return nil
 	}
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	return u.Client.Create(ctx, &qosv1alpha1.QoSPolicy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "qos.kunpeng.huawei.com/v1alpha1",
+			Kind:       "QoSPolicy",
+		},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec:       defaultDynamicPolicySpec(nodeName),
+	})
+}
+
+// ApplyReasons ensures and updates one dynamic QoSPolicy for given node.
+func (u *QoSPolicyDynamicUpdater) ApplyReasons(
+	ctx context.Context,
+	nodeName string,
+	reasons []InterferenceReason,
+) error {
+	if u.Client == nil {
+		return fmt.Errorf("client must not be nil")
+	}
+	if strings.TrimSpace(nodeName) == "" {
+		return fmt.Errorf("node name must not be empty")
+	}
+
+	reasons, _ = normalizeInterferenceReasons(reasons, false)
+	if len(reasons) == 0 {
+		return nil
+	}
+
+	name := dynamicPolicyName(nodeName)
 
 	var current qosv1alpha1.QoSPolicy
 	err := u.Client.Get(ctx, types.NamespacedName{Name: name}, &current)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			spec := defaultDynamicPolicySpec(nodeName)
-			u.applyReasonToSpec(&spec, reason, u.MBStep, u.L3WaysStep, u.L3MaxStep)
+			u.applyReasonsToSpec(&spec, reasons, u.MBStep, u.L3WaysStep, u.L3MaxStep)
 			newObj := &qosv1alpha1.QoSPolicy{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "qos.kunpeng.huawei.com/v1alpha1",
@@ -109,7 +144,7 @@ func (u *QoSPolicyDynamicUpdater) ApplyReason(ctx context.Context, nodeName stri
 		// Ensure valid baseline for current CRD validation.
 		desired.L3.Ways = 1
 	}
-	u.applyReasonToSpec(&desired, reason, u.MBStep, u.L3WaysStep, u.L3MaxStep)
+	u.applyReasonsToSpec(&desired, reasons, u.MBStep, u.L3WaysStep, u.L3MaxStep)
 	if reflect.DeepEqual(current.Spec, desired) {
 		return nil
 	}
@@ -150,22 +185,24 @@ func defaultDynamicPolicySpec(nodeName string) qosv1alpha1.QoSPolicySpec {
 	}
 }
 
-func (u *QoSPolicyDynamicUpdater) applyReasonToSpec(
+func (u *QoSPolicyDynamicUpdater) applyReasonsToSpec(
 	spec *qosv1alpha1.QoSPolicySpec,
-	reason InterferenceReason,
+	reasons []InterferenceReason,
 	mbStep int32,
 	l3WaysStep int32,
 	l3MaxStep int32,
 ) {
-	switch reason {
-	case InterferenceReasonMB:
-		spec.MB.MAX = maxInt32(spec.MB.MAX-mbStep, 1)
-	case InterferenceReasonL3:
-		spec.L3.Ways = maxInt32(spec.L3.Ways-l3WaysStep, 1)
-		spec.L3.MAX = maxInt32(spec.L3.MAX-l3MaxStep, 1)
-	case InterferenceReasonCPU:
-		// CPU interference maps to cpu.qos_level control through QoSPolicy.
-		spec.CPU.QoSLevel = -1
+	for _, reason := range reasons {
+		switch reason {
+		case InterferenceReasonMB:
+			spec.MB.MAX = maxInt32(spec.MB.MAX-mbStep, 1)
+		case InterferenceReasonL3:
+			spec.L3.Ways = maxInt32(spec.L3.Ways-l3WaysStep, 1)
+			spec.L3.MAX = maxInt32(spec.L3.MAX-l3MaxStep, 1)
+		case InterferenceReasonCPU:
+			// CPU interference maps to cpu.qos_level control through QoSPolicy.
+			spec.CPU.QoSLevel = -1
+		}
 	}
 }
 

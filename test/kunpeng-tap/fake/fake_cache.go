@@ -241,7 +241,9 @@ type FakeCache struct {
 
 func (fake *FakeCache) CleanupStaleContainers(arg1 []string) int {
 	var arg1Copy []string
-	if arg1 != nil {
+	if len(arg1) == 0 {
+		arg1Copy = arg1
+	} else {
 		arg1Copy = make([]string, len(arg1))
 		copy(arg1Copy, arg1)
 	}
@@ -1326,7 +1328,9 @@ func (fake *FakeCache) UpdateContainerIDReturnsOnCall(i int, result1 cache.Conta
 
 func (fake *FakeCache) ValidateCachedContainers(arg1 []string) []string {
 	var arg1Copy []string
-	if arg1 != nil {
+	if len(arg1) == 0 {
+		arg1Copy = arg1
+	} else {
 		arg1Copy = make([]string, len(arg1))
 		copy(arg1Copy, arg1)
 	}
