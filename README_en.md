@@ -36,8 +36,6 @@ This is a collection of Kunpeng cloud-native projects, including multiple cloud-
 
 # Environment Deployment<a name="EN-US_TOPIC_0000002441616318"></a>
 
-
-
 ## Kunpeng TAP<a name="EN-US_TOPIC_0000002441675240"></a>
 
 **Hardware Requirements<a name="section8119658132416"></a>**
@@ -114,15 +112,15 @@ This is a collection of Kunpeng cloud-native projects, including multiple cloud-
 
 Compile the Kunpeng TAP source code and generate a plugin executable file.
 
-1.  Obtain the Kunpeng TAP source code of the latest version `release-0.2` on the `Tags` tab.
+1. Obtain the Kunpeng TAP source code of the latest version `release-0.2` on the `Tags` tab.
 
-    ```
+    ```bash
     git clone --branch release-0.2 https://gitee.com/kunpeng_compute/topo-affinity-plugin.git
     ```
 
-2.  Go to the `topo-affinity-plugin` directory and run the script for building the plugin.
+2. Go to the `topo-affinity-plugin` directory and run the script for building the plugin.
 
-    ```
+    ```bash
     cd /path/to/topo-affinity-plugin
     go mod tidy
     make build
@@ -136,26 +134,24 @@ Compile the Kunpeng TAP source code and generate a plugin executable file.
 
 **Environment Dependencies<a name="section94010535258"></a>**
 
--   Go 1.23.6 or later
--   Linux environment (openEuler 22.03 is recommended)
--   Hardware platform supporting MPAM (Kunpeng processors are recommended)
+- Go 1.23.6 or later
+- Linux environment (openEuler 22.03 is recommended)
+- Hardware platform supporting MPAM (Kunpeng processors are recommended)
 
 **Docker Image Compilation<a name="section34166302913"></a>**
 
-```
+```bash
 make mpam-docker
 ```
 
 If the Kubernetes cluster uses containerd as the container runtime, you need to manually import the image to the containerd image repository.
 
-```
+```bash
 docker save k8s-mpam-controller:0.1.0 -o k8s-mpam-controller.tar
 ctr -n k8s.io images import k8s-mpam-controller.tar
 ```
 
 # Quick Start<a name="EN-US_TOPIC_0000002474856269"></a>
-
-
 
 ## Kunpeng TAP<a name="EN-US_TOPIC_0000002475098685"></a>
 
@@ -165,34 +161,34 @@ Deploy Kunpeng TAP on the target compute node and verify the running status of t
 
 Kunpeng TAP depends on the Kubernetes cluster. Currently, Docker that adopts Dockershim for communication and containerd are supported. Before deployment, ensure that the network configuration of the Kubernetes cluster is correct and container instances can be deployed and run properly.
 
-1.  Import the executable file of Kunpeng TAP to the target compute node.
-2.  <a name="li1795401917439"></a>Start Kunpeng TAP.
+1. Import the executable file of Kunpeng TAP to the target compute node.
+2. <a name="li1795401917439"></a>Start Kunpeng TAP.
 
     **Method 1**: Use systemd to start Kunpeng TAP. Go to the source code directory and run the `make` commands to install and start Kunpeng TAP.
 
-    1.  Go to the source code directory.
+    1. Go to the source code directory.
 
-        ```
+        ```bash
         cd /path/to/topology-affinity-plugin
         ```
 
         In the preceding command, replace `/path/to/topology-affinity-plugin` with the actual path to the Kunpeng TAP source code.
 
-    2.  Install the plugin. By default, the plugin is started in Docker.
+    2. Install the plugin. By default, the plugin is started in Docker.
 
-        ```
+        ```bash
         make install-service
         ```
 
-    3.  To specify Docker as the runtime, use the following installation command:
+    3. To specify Docker as the runtime, use the following installation command:
 
-        ```
+        ```bash
         make install-service-docker
         ```
 
         If you need to modify startup parameters, modify the parameters under `ExecStart=` in the `hack/kunpeng-tap.service.docker` file in the source code directory.
 
-        ```
+        ```txt
         [Unit]
         Description=Kunpeng Topology-Affinity Plugin Service
         After=network.target
@@ -210,35 +206,36 @@ Kunpeng TAP depends on the Kubernetes cluster. Currently, Docker that adopts Doc
 
         >**NOTE:**
         >To specify containerd as the runtime, use the following installation command. You can modify the parameters in the `hack/kunpeng-tap.service.containerd` file in the source code directory.
-        >```
+>
+        >```bash
         >make install-service-containerd
         >```
 
-    4.  After the installation is complete, run the following command to start the plugin and automatically check the service status after the plugin is started:
+    4. After the installation is complete, run the following command to start the plugin and automatically check the service status after the plugin is started:
 
-        ```
+        ```bash
         make start-service
         ```
 
-    5.  Check log information.
+    5. Check log information.
 
-        ```
+        ```bash
         journalctl -u kunpeng-tap
         ```
 
     **Method 2**: Start the plugin directly.
 
-    -   Example startup commands in Docker:
+    - Example startup commands in Docker:
 
-        ```
+        ```txt
         kunpeng-tap --runtime-proxy-endpoint="/var/run/kunpeng/tap-runtime-proxy.sock" \
             --container-runtime-service-endpoint="/var/run/docker.sock" --container-runtime-mode="Docker" \
             --resource-policy="numa-aware"
         ```
 
-    -   Example startup commands in containerd:
+    - Example startup commands in containerd:
 
-        ```
+        ```txt
         kunpeng-tap --runtime-proxy-endpoint="/var/run/kunpeng/tap-runtime-proxy.sock" \
             --container-runtime-service-endpoint="/var/run/containerd/containerd.sock" --container-runtime-mode="Containerd" \
             --resource-policy="numa-aware"
@@ -299,44 +296,44 @@ Kunpeng TAP depends on the Kubernetes cluster. Currently, Docker that adopts Doc
     </tbody>
     </table>
 
-3.  Configure kubelet parameters on the compute nodes.
+3. Configure kubelet parameters on the compute nodes.
 
     To enable Kunpeng TAP to successfully process requests from kubelet, add a parameter to the kubelet command line configurations.
 
-    -   In the Docker scenario, add or modify the following parameter in the kubelet startup parameters:
+    - In the Docker scenario, add or modify the following parameter in the kubelet startup parameters:
 
-        ```
+        ```bash
         --docker-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock
         ```
 
         For example, when using kubeadm to install a cluster, you can add the parameter to `/var/lib/kubelet/kubeadm-flags.env`.
 
-        ```
+        ```txt
         KUBELET_KUBEADM_ARGS="--network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.6 --docker-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock"
         ```
 
         After the kubelet parameter is modified, run the following commands to restart the kubelet:
 
-        ```
+        ```bash
         systemctl daemon-reload
         systemctl restart kubelet
         ```
 
-    -   In the containerd scenario, modify the following kubelet startup parameters.
+    - In the containerd scenario, modify the following kubelet startup parameters.
 
-        ```
+        ```txt
         --container-runtime=remote --container-runtime-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock
         ```
 
         In this case, parameters in `/var/lib/kubelet/kubeadm-flags.env` can be:
 
-        ```
+        ```txt
         KUBELET_KUBEADM_ARGS="--network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.6 --container-runtime=remote --container-runtime-endpoint=unix:///var/run/kunpeng/tap-runtime-proxy.sock"
         ```
 
         After the kubelet parameters are modified, run the following commands to restart the kubelet:
 
-        ```
+        ```bash
         systemctl daemon-reload
         systemctl restart kubelet
         ```
@@ -347,9 +344,9 @@ Kunpeng TAP allows you to specify CPU resource requirements during Pod deploymen
 
 The following is an example YAML file for deploying a single-container Pod. The CPU resources requested by the Pod are 4 cores at minimum, and 8 cores at maximum. The memory is fixed to 4 GiB. `busybox` is used as the container image.
 
-1.  Create a YAML file `example.yaml`, and write the following configuration into the file:
+1. Create a YAML file `example.yaml`, and write the following configuration into the file:
 
-    ```
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -371,41 +368,41 @@ The following is an example YAML file for deploying a single-container Pod. The 
             memory: "4Gi"
     ```
 
-2.  For example, to make the Pod run on the `compute01` node, add the following content to the `spec` section in the YAML file.
+2. For example, to make the Pod run on the `compute01` node, add the following content to the `spec` section in the YAML file.
 
     >**NOTE:**
     >In a Kubernetes cluster with multiple worker nodes, a Pod can be scheduled to different NUMA nodes. To make the Pod run on a specified node, add the `nodeSelector` field to the `spec` section in the YAML file and set `kubernetes.io/hostname` to the name of the target node.
 
-    ```
+    ```yaml
       nodeSelector:
         kubernetes.io/hostname: compute01
     ```
 
-3.  Apply the YAML file on the management node to deploy the Pod.
+3. Apply the YAML file on the management node to deploy the Pod.
 
-    ```
+    ```bash
     kubectl apply -f example.yaml
     ```
 
-4.  Check whether Kunpeng TAP takes effect.
-    1.  Using Docker as an example, access the `compute01` node specified by `nodeSelector` in step 2, run the `docker` command to query the `CpusetCpus` parameter of the container, and determine whether NUMA affinity has been established.
-    2.  Use `docker ps` to query container tasks running on the cluster nodes. In the `NAMES` column, find the `nri-1` container specified by `spec.containers.name` in step 1.
+4. Check whether Kunpeng TAP takes effect.
+    1. Using Docker as an example, access the `compute01` node specified by `nodeSelector` in step 2, run the `docker` command to query the `CpusetCpus` parameter of the container, and determine whether NUMA affinity has been established.
+    2. Use `docker ps` to query container tasks running on the cluster nodes. In the `NAMES` column, find the `nri-1` container specified by `spec.containers.name` in step 1.
 
-        ```
+        ```txt
         # docker ps | grep nri-1
         CONTAINER ID   IMAGE                  COMMAND                  CREATED       STATUS       PORTS     NAMES
         ```
 
-    3.  Query the deployment parameter `CpusetCpus` of the target container based on its container ID. This parameter indicates the schedulable CPU range of the container.
+    3. Query the deployment parameter `CpusetCpus` of the target container based on its container ID. This parameter indicates the schedulable CPU range of the container.
 
-        ```
+        ```txt
         # docker inspect bf32de0d09fe | grep "CpusetCpus"
                     "CpusetCpus": "0-23",
         ```
 
         If memory binding is enabled, you can run the following command to check the corresponding node.
 
-        ```
+        ```txt
         # docker inspect bf32de0d09fe | grep "CpusetMems"
                     "CpusetMems": "0",
         ```
@@ -415,16 +412,16 @@ The following is an example YAML file for deploying a single-container Pod. The 
 
         In the containerd scenario, you can run the following command to check the schedulable CPU range of a container:
 
-        ```
+        ```txt
         # crictl inspect bf32de0d09fe | grep "cpuset_cpus"
                     "cpuset_cpus": "0-23",
         ```
 
         If NUMA node affinity configuration fails, the `cpuset_cpus` output may fail to be queried.
 
-    4.  Query the NUMA information of the system and compare it with the schedulable CPU core range of the container. The NUMA node matching the schedulable CPU core range is the affinity node of the container.
+    4. Query the NUMA information of the system and compare it with the schedulable CPU core range of the container. The NUMA node matching the schedulable CPU core range is the affinity node of the container.
 
-        ```
+        ```txt
         # lscpu
         ...
         NUMA node0 CPU(s):               0-23
@@ -436,15 +433,15 @@ The following is an example YAML file for deploying a single-container Pod. The 
 
         `node0` indicates the NUMA node whose index is `0`, and `0-23` indicates the CPU cores in this NUMA node.
 
-5.  Run the following command to check the NUMA distribution of GPUs in the system. `0200` indicates the NIC device number.
+5. Run the following command to check the NUMA distribution of GPUs in the system. `0200` indicates the NIC device number.
 
-    ```
+    ```bash
     lspci -vvv -d :0200 | grep NUMA
     ```
 
     The command output is similar to the following:
 
-    ```
+    ```output
     NUMA node: 0
     NUMA node: 0
     NUMA node: 0
@@ -461,28 +458,28 @@ The following is an example YAML file for deploying a single-container Pod. The 
 
 **Plugin Deployment<a name="section24721531114518"></a>**
 
-1.  Before deploying the plugin, ensure that the MPAM resctrl file system has been mounted. You can run the following command on the **worker node** to mount the file system:
+1. Before deploying the plugin, ensure that the MPAM resctrl file system has been mounted. You can run the following command on the **worker node** to mount the file system:
 
-    ```
+    ```bash
     mount -t resctrl resctrl /sys/fs/resctrl
     ```
 
-2.  Run the following commands on the **master node** to deploy the plugin:
+2. Run the following commands on the **master node** to deploy the plugin:
 
-    ```
+    ```bash
     cd config/k8s-mpam-controller-config/samples
     kubectl apply -f k8s-mpam-controller.yaml
     ```
 
-3.  Check whether the Pod corresponding to the MPAM plugin is running properly.
+3. Check whether the Pod corresponding to the MPAM plugin is running properly.
 
-    ```
+    ```bash
     kubectl get pods
     ```
 
     The following information may be displayed if the Pod is running properly:
 
-    ```
+    ```output
     NAME                                    READY   STATUS    RESTARTS   AGE
     mpam-controller-daemonset-agent-bj2gv   1/1     Running   0          143m
     ```
@@ -491,7 +488,7 @@ The following is an example YAML file for deploying a single-container Pod. The 
 
 To limit resources for a Pod, you need to create an MPAM resource group.
 
-1.  Go to the `samples` directory and modify the configuration file (in .yaml format) of the MPAM resource group. The following uses `example-config.yaml` as an example.
+1. Go to the `samples` directory and modify the configuration file (in .yaml format) of the MPAM resource group. The following uses `example-config.yaml` as an example.
 
     In the `example-config.yaml` file, a node resource group may have any of the three configurations, as described in [**Table 1**](#table8171211407). You can use ConfigMaps to create a configuration for a node or a group of nodes. After the configuration is created, the MPAM plugin manages the ConfigMaps in the Kubernetes cluster and automatically applies the configuration to the corresponding nodes after a ConfigMap is added or updated.
 
@@ -529,16 +526,16 @@ To limit resources for a Pod, you need to create an MPAM resource group.
     </tbody>
     </table>
 
-    1.  Open the file.
+    1. Open the file.
 
-        ```
+        ```bash
         cd samples
         vi example-config.yaml
         ```
 
-    2.  Press `i` to enter the insert mode. Set the `name` field to the actual configuration name in [**Table 1**](#table8171211407) and add the resource group information to the `mpam` field.
+    2. Press `i` to enter the insert mode. Set the `name` field to the actual configuration name in [**Table 1**](#table8171211407) and add the resource group information to the `mpam` field.
 
-        ```
+        ```yaml
         apiVersion: v1
         kind: ConfigMap
         metadata:
@@ -559,27 +556,28 @@ To limit resources for a Pod, you need to create an MPAM resource group.
         ```
 
         >**NOTE:**
-        >-   A maximum of 32 resource groups can be configured. (The root group occupies one resource group by default, and a maximum of 31 new resource groups can be created under the root group.) Each schemata must comply with the syntax rules.
-        >-   If an item is not configured in a resource group or a configuration item does not meet the syntax rules, the resource group uses the default configuration of the configuration item. The default L3 cache configuration is `"L3:0=fffffff;1=fffffff;2=fffffff;3=fffffff"` and the default bandwidth configuration is `"MB:0=100;1=100;2=100;3=100"`.
+        >- A maximum of 32 resource groups can be configured. (The root group occupies one resource group by default, and a maximum of 31 new resource groups can be created under the root group.) Each schemata must comply with the syntax rules.
+        >- If an item is not configured in a resource group or a configuration item does not meet the syntax rules, the resource group uses the default configuration of the configuration item. The default L3 cache configuration is `"L3:0=fffffff;1=fffffff;2=fffffff;3=fffffff"` and the default bandwidth configuration is `"MB:0=100;1=100;2=100;3=100"`.
 
-    3.  Press `Esc` to exit the insert mode. Type `:wq!` and press `Enter` to save the file and exit.
+    3. Press `Esc` to exit the insert mode. Type `:wq!` and press `Enter` to save the file and exit.
 
-2.  In the `samples` directory, use the `example-config.yaml` file to create a ConfigMap.
+2. In the `samples` directory, use the `example-config.yaml` file to create a ConfigMap.
 
-    ```
+    ```bash
     kubectl apply -f example-config.yaml
     ```
 
-3.  On the node, go to the `/sys/fs/resctrl` directory and check whether a resource group has been created and whether the resource group configuration matches the `example-config.yaml` file.
+3. On the node, go to the `/sys/fs/resctrl` directory and check whether a resource group has been created and whether the resource group configuration matches the `example-config.yaml` file.
 
-    ```
+    ```bash
     cd /sys/fs/resctrl
     ls
     ```
 
     >**NOTE:**
     >For example, you can run the following command to view the configuration of the resource group `group1`:
-    >```
+    >
+    >```bash
     >cat group1/schemata
     >```
 
@@ -587,33 +585,33 @@ To limit resources for a Pod, you need to create an MPAM resource group.
 
 To add a Pod to a resource group, specify the resource group when creating the Pod.
 
-1.  Modify the Pod configuration file (in .yaml format). The following uses `example-pod.yaml` as an example.
-    1.  Go to the `samples` directory and open the `example-pod.yaml` file.
+1. Modify the Pod configuration file (in .yaml format). The following uses `example-pod.yaml` as an example.
+    1. Go to the `samples` directory and open the `example-pod.yaml` file.
 
-        ```
+        ```bash
         cd samples
         vi example-pod.yaml
         ```
 
-    2.  Press `i` to enter the insert mode and add the following content to the file:
+    2. Press `i` to enter the insert mode and add the following content to the file:
 
-        ```
+        ```txt
         labels:
             rcgroup: group2
         ```
 
-        ```
+        ```txt
         nodeSelector:
             MPAM: enabled
         ```
 
         >**NOTE:**
-        >-   In the `labels` field, set the `rcgroup` field to specify the associated resource group. For example, add the Pod to `group2`.
-        >-   Add `MPAM: enabled` to the `nodeSelector` field so that the scheduler can schedule the Pod to a node that supports the MPAM feature.
+        >- In the `labels` field, set the `rcgroup` field to specify the associated resource group. For example, add the Pod to `group2`.
+        >- Add `MPAM: enabled` to the `nodeSelector` field so that the scheduler can schedule the Pod to a node that supports the MPAM feature.
 
         The updated `example-pod.yaml` file has the following content:
 
-        ```
+        ```yaml
         apiVersion: v1
         kind: Pod
         metadata:
@@ -631,35 +629,35 @@ To add a Pod to a resource group, specify the resource group when creating the P
             MPAM: enabled
         ```
 
-    3.  Press `Esc` to exit the insert mode. Type `:wq!` and press `Enter` to save the file and exit.
+    3. Press `Esc` to exit the insert mode. Type `:wq!` and press `Enter` to save the file and exit.
 
-2.  Create a Pod.
+2. Create a Pod.
 
-    ```
+    ```bash
     kubectl apply -f example-pod.yaml
     ```
 
-3.  On the node, go to the `/sys/fs/resctrl` directory and then the owning resource group (for example `group1`) of the Pod. You can view the configuration and monitoring data in the resource group and the PIDs of the restricted applications in the current resource group.
+3. On the node, go to the `/sys/fs/resctrl` directory and then the owning resource group (for example `group1`) of the Pod. You can view the configuration and monitoring data in the resource group and the PIDs of the restricted applications in the current resource group.
 
-    ```
+    ```bash
     cd /sys/fs/resctrl/group1
     ```
 
-    -   Run the following command to view the configuration of the resource group:
+    - Run the following command to view the configuration of the resource group:
 
-        ```
+        ```bash
         cat schemata
         ```
 
-    -   Run the following command to view the PIDs of the resource group:
+    - Run the following command to view the PIDs of the resource group:
 
-        ```
+        ```bash
         cat tasks
         ```
 
-    -   Run the following command to view the monitoring data of the resource group:
+    - Run the following command to view the monitoring data of the resource group:
 
-        ```
+        ```bash
         grep . mon_data/*
         ```
 
@@ -671,7 +669,7 @@ You can use the dynamic MPAM isolation function to adjust the resource usage of 
 
 The plugin provides default configurations. Dynamic MPAM isolation can be used without configuring ConfigMaps. Dynamic MPAM isolation parameters are configured in a JSON file. For details about the parameters, see [**Table 2**](#table116484132237). To manually change the configurations, refer to the following content.
 
-```
+```yaml
  {
       "mpamConfig":{
         "adjustInterval": 5000,
@@ -730,7 +728,7 @@ The plugin provides default configurations. Dynamic MPAM isolation can be used w
 
 A JSON file is configured in the form of ConfigMap in the `k8s-mpam-controller.yaml` file. The complete YAML file is as follows:
 
-```
+```yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -867,9 +865,9 @@ After the dynamic MPAM isolation function is enabled, the plugin creates the `mp
 
 **Deploying Offline Services<a name="section28948105567"></a>**
 
-1.  Add the annotation `kunpeng.com/offline: "true"` to the YAML file of the Pod to label the Pod as an offline service so that the plugin can restrict the Pod. The following is a `bw-mem.yaml` file example.
+1. Add the annotation `kunpeng.com/offline: "true"` to the YAML file of the Pod to label the Pod as an offline service so that the plugin can restrict the Pod. The following is a `bw-mem.yaml` file example.
 
-    ```
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -893,17 +891,17 @@ After the dynamic MPAM isolation function is enabled, the plugin creates the `mp
             cpu: "9.6"
     ```
 
-2.  Deploy the offline service to be restricted.
+2. Deploy the offline service to be restricted.
 
-    ```
+    ```bash
     kubectl apply -f bw-mem.yaml
     ```
 
     After the deployment is successful, the PID of the offline service is added to tasks in the `mpam-controller_dynamic` control group.
 
-3.  Run the following commands to check PIDs of restricted offline services:
+3. Run the following commands to check PIDs of restricted offline services:
 
-    ```
+    ```bash
     cd /sys/fs/resctrl/mpam-controller_dynamic
     cat tasks
     ```
@@ -912,9 +910,9 @@ After the dynamic MPAM isolation function is enabled, the plugin creates the `mp
 
 You are welcome to submit issues and pull requests to improve the projects. Ensure that:
 
--   The code complies with the project specifications.
--   Appropriate tests are included.
--   The related documents are updated.
+- The code complies with the project specifications.
+- Appropriate tests are included.
+- The related documents are updated.
 
 # Disclaimer<a name="EN-US_TOPIC_0000002441456466"></a>
 
