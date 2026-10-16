@@ -6,7 +6,7 @@
 
 本文主要介绍如何在使用openEuler操作系统的服务器场景中部署和使用鲲鹏拓扑亲和插件。
 
-目前，在开源Kubernetes（以下简称K8s）集群中，如果希望进行与CPU隔离、内存和NUMA亲和有关的优化，用户需要开启CPU管理器（CPU Manager）的静态（static）策略，并将拓扑管理器（Topology Manager）策略设置为自适应（Best-Effort）或单NUMA节点（Single-numa-node）模式，此时，只有当Pod（K8s的容器管理单元）满足QoS属性为**Guaranteed**类型时（即资源请求值等于限制值且为整数值），策略才能产生优化效果。然而，当前大多数云服务提供商需要在服务器上部署大量容器，甚至超过服务器的物理核心数量。在该场景下，物理资源限制导致无法开启CPU管理器的static策略，进而无法保证容器在运行时具有CPU亲和性。
+目前，在开源Kubernetes（以下简称K8s）集群中，如果希望进行与CPU隔离、内存和NUMANon-Uniform Memory Access，非统一内存访问）亲和有关的优化，用户需要开启CPU管理器（CPU Manager）的静态（static）策略，并将拓扑管理器（Topology Manager）策略设置为自适应（Best-Effort）或单NUMA节点（Single-numa-node）模式，此时，只有当Pod（K8s的容器管理单元）满足QoS属性为**Guaranteed**类型时（即资源请求值等于限制值且为整数值），策略才能产生优化效果。然而，当前大多数云服务提供商需要在服务器上部署大量容器，甚至超过服务器的物理核心数量。在该场景下，物理资源限制导致无法开启CPU管理器的static策略，进而无法保证容器在运行时具有CPU亲和性。
 
 为了解决此问题，鲲鹏BoostKit推出鲲鹏拓扑亲和插件（Kunpeng Topology Affinity Plugin，后续简称Kunpeng TAP），该插件是K8s集群的资源管理插件，帮助计算节点优化系统资源管理，提供对CPU、内存等资源的不同分配策略，以满足多种场景下的高性能需求。当前，Kunpeng TAP已提供NUMA自适应特性，通过插件方式实现了一个K8s NUMA亲和性调度策略。该插件在Pod进行计算节点上的部署创建时生效，根据计算节点的CPU资源分配情况自动调整Pod的CPU调度范围，此时，能够绕过“资源请求值等于限制值且为整数值”的限制，且保持NUMA亲和性与Pod的可超分特性。
 
@@ -16,10 +16,10 @@
 
 Kunpeng TAP由Kunpeng TAP Policy Manager和Kunpeng TAP Proxy两个核心部分组成。Kunpeng TAP在K8s集群的节点层面运行，通过容器请求代理的形式实现动态调整容器的CPU调度范围功能。
 
-根据部署的形式，Kunpeng TAP分为Proxy模式和NRI插件模式，Proxy模式下的架构图如[**图 1** Kunpeng TAP架构图](#Kunpeng-TAP架构图)所示，各模块的功能如[**表 1** Kunpeng TAP插件及相关模块功能](#Kunpeng-TAP插件及相关模块功能)所示。
+根据部署的形式，Kunpeng TAP分为Proxy模式和NRI（Node Resource Interface，节点资源接口）插件模式，Proxy模式下的架构图如[**图 1** Kunpeng TAP架构图](#Kunpeng-TAP架构图)所示，各模块的功能如[**表 1** Kunpeng TAP插件及相关模块功能](#Kunpeng-TAP插件及相关模块功能)所示。
 
 **图 1** Kunpeng TAP架构图<a name="fig11864115615445"></a><a id="Kunpeng-TAP架构图"></a><br>
-![](figures/Kunpeng-TAP架构图.png "Kunpeng-TAP架构图")
+![Kunpeng TAP代理模式架构图：Kubelet的容器创建请求经TAP Proxy转发至容器运行时，Policy Manager按NUMA亲和调整CPU调度范围](figures/Kunpeng-TAP架构图.png "Kunpeng-TAP架构图")
 
 Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet与容器运行时的容器创建请求进行资源参数调整。
 
@@ -41,7 +41,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
 **图 2** NRI模式运行架构<a name="fig19472125713354"></a><a id="NRI模式运行架构"></a>
 
-![](figures/NRI模式架构图.png)
+![NRI模式运行架构图：Kunpeng TAP以NRI插件形式与Containerd通信，容器请求链路不经过代理，稳定性更优](figures/NRI模式架构图.png)
 
 ## 环境要求<a name="ZH-CN_TOPIC_0000002514027348"></a>
 
@@ -57,13 +57,13 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
 |项目|版本|获取方法|
 |--|--|--|
-|OS|openEuler 20.03 LTS SP3<br>openEuler 22.03 LTS SP4<br>openEuler 24.03 LTS SP3|openEuler 20.03 LTS SP3：[获取链接](https://repo.openeuler.org/openEuler-20.03-LTS-SP3/ISO/aarch64/)<br>openEuler 22.03 LTS SP4：[获取链接](https://repo.openeuler.org/openEuler-22.03-LTS-SP4/ISO/aarch64/)<br>openEuler 24.03 LTS SP3：[获取链接](https://repo.openeuler.org/openEuler-24.03-LTS-SP3/ISO/aarch64/)|
+|OS|openEuler 20.03 LTS SP3<br>openEuler 22.03 LTS SP4<br>openEuler 24.03 LTS SP3|[openEuler 20.03 LTS SP3下载页面](https://repo.openeuler.org/openEuler-20.03-LTS-SP3/ISO/aarch64/)<br>[openEuler 22.03 LTS SP4下载页面](https://repo.openeuler.org/openEuler-22.03-LTS-SP4/ISO/aarch64/)<br>[openEuler 24.03 LTS SP3下载页面](https://repo.openeuler.org/openEuler-24.03-LTS-SP3/ISO/aarch64/)|
 |Golang|1.25|获取链接建议Golang环境配置国内源，以便下载二进制依赖包进行安装。|
 |Make|-|通过配置Yum源方式安装。|
 |Kubernetes|1.23.6，1.25.16|通过配置Yum源方式安装。|
 |Docker|20.10.14|通过配置Yum源方式安装。|
-|Containerd|1.6.8或1.7.0（NRI模式下需高于1.7.0）|[获取链接](https://github.com/containerd/containerd/releases/tag/v1.6.8)|
-|Kunpeng TAP源代码|release-0.3|[获取链接](https://gitcode.com/boostkit/cloud-native)|
+|Containerd|1.6.8或1.7.0及以上（NRI模式需v1.7.0及以上版本）|[Containerd v1.6.8发布页面](https://github.com/containerd/containerd/releases/tag/v1.6.8)|
+|Kunpeng TAP源代码|release-0.3|[Kunpeng TAP源代码仓库](https://gitcode.com/boostkit/cloud-native)|
 |Kunpeng TAP|release-0.3|Kunpeng TAP的可执行文件，通过[编译Kunpeng TAP](#编译Kunpeng-TAP)编译获得。|
 
 ## 编译Kunpeng TAP<a id="编译Kunpeng-TAP"></a>
@@ -317,7 +317,7 @@ Kunpeng TAP插件架构采取请求代理的方式实现，插件针对Kubelet�
 
 6. 部署完成后，通过kubectl查看运行状态，进入READY 1/1和Running即表明正常运行。
 
-    ```txt
+    ```output
     # kubectl get pods -n kunpeng-tap -owide
     NAME                           READY   STATUS    RESTARTS      AGE           IP            NODE        NOMINATED NODE   READINESS GATES
     kunpeng-tap-nri-mhjwk   1/1     Running      0                  25h   10.244.2.59   compute01   <none>           <none>
@@ -377,7 +377,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
 4. 判断Kunpeng TAP是否生效。
     1. 以Docker运行时为例，进入步骤二中**nodeSelector**所指定的集群节点 _compute01_ 后，通过**docker**命令查询容器的CpusetCpus参数，判断容器是否与NUMA成功亲和。
-    2. 通过**docker ps**查询集群节点运行的容器任务，在**NAMES**列中找到步骤一中“spec.containers.name”指定的 _tap-example_ 容器。
+    2. 通过**docker ps**查询集群节点运行的容器任务，在`NAMES`（容器名称列，docker ps输出中显示容器名称的字段）列中找到步骤一中“spec.containers.name”指定的 _tap-example_ 容器。
 
         ```shell
         # docker ps | grep tap-example
@@ -431,7 +431,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
     回显如下图所示。
 
-    ![](figures/zh-cn_image_0000002493025082.png)
+    ![lspci命令回显截图：以1002:67c7标识Radeon GPU的vendor:deviceID，供下一步查询GPU的NUMA分布](figures/zh-cn_image_0000002493025082.png)
 
     图中的1002:67c7为<vendor\>:<deviceID\>，用于下一步查询。
 
@@ -441,7 +441,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
     回显如下图所示。
 
-    ![](figures/zh-cn_image_0000002525344729.png)
+    ![lspci查询GPU的NUMA分布回显截图：显示Radeon GPU所属的NUMA节点信息](figures/zh-cn_image_0000002525344729.png)
 
 ## （可选）卸载Kunpeng TAP<a name="ZH-CN_TOPIC_0000002493185048"></a>
 
@@ -476,7 +476,7 @@ Kunpeng TAP允许在部署Pod时指定CPU资源需求，系统将自动按NUMA�
 
     回显如下表示插件已成功删除。
 
-    ```txt
+    ```output
     Unit kunpeng-tap.service could not be found.
     ```
 
