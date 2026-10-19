@@ -6,7 +6,7 @@
 
 本文主要介绍如何在使用openEuler操作系统的服务器场景中部署和使用鲲鹏拓扑亲和插件。
 
-目前，在开源Kubernetes（以下简称K8s）集群中，如果希望进行与CPU隔离、内存和NUMANon-Uniform Memory Access，非统一内存访问）亲和有关的优化，用户需要开启CPU管理器（CPU Manager）的静态（static）策略，并将拓扑管理器（Topology Manager）策略设置为自适应（Best-Effort）或单NUMA节点（Single-numa-node）模式，此时，只有当Pod（K8s的容器管理单元）满足QoS属性为**Guaranteed**类型时（即资源请求值等于限制值且为整数值），策略才能产生优化效果。然而，当前大多数云服务提供商需要在服务器上部署大量容器，甚至超过服务器的物理核心数量。在该场景下，物理资源限制导致无法开启CPU管理器的static策略，进而无法保证容器在运行时具有CPU亲和性。
+目前，在开源Kubernetes（以下简称K8s）集群中，如果希望进行与CPU隔离、内存和NUMA（Non-Uniform Memory Access，非统一内存访问）亲和有关的优化，用户需要开启CPU管理器（CPU Manager）的静态（static）策略，并将拓扑管理器（Topology Manager）策略设置为自适应（Best-Effort）或单NUMA节点（Single-numa-node）模式，此时，只有当Pod（K8s的容器管理单元）满足QoS属性为**Guaranteed**类型时（即资源请求值等于限制值且为整数值），策略才能产生优化效果。然而，当前大多数云服务提供商需要在服务器上部署大量容器，甚至超过服务器的物理核心数量。在该场景下，物理资源限制导致无法开启CPU管理器的static策略，进而无法保证容器在运行时具有CPU亲和性。
 
 为了解决此问题，鲲鹏BoostKit推出鲲鹏拓扑亲和插件（Kunpeng Topology Affinity Plugin，后续简称Kunpeng TAP），该插件是K8s集群的资源管理插件，帮助计算节点优化系统资源管理，提供对CPU、内存等资源的不同分配策略，以满足多种场景下的高性能需求。当前，Kunpeng TAP已提供NUMA自适应特性，通过插件方式实现了一个K8s NUMA亲和性调度策略。该插件在Pod进行计算节点上的部署创建时生效，根据计算节点的CPU资源分配情况自动调整Pod的CPU调度范围，此时，能够绕过“资源请求值等于限制值且为整数值”的限制，且保持NUMA亲和性与Pod的可超分特性。
 
