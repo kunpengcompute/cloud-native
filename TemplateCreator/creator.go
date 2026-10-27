@@ -130,13 +130,18 @@ func newCreatorWithFactory(ctx context.Context, config CreatorConfig, factory cr
 	}
 	config.progressLogger = progressLogger
 	progressLogger.Info(ctx, "Creator runtime 初始化开始", zap.String("stage", "creator_runtime_initialization_started"))
+	storeURL, err := url.Parse(config.Store.URL)
+	if err != nil {
+		// Store URL 非法时在任何 runtime 资源创建之前直接失败，无需回滚。
+		progressLogger.Error(ctx, "Creator Store URL 解析失败", zap.String("stage", "creator_store_url_parse_failed"), zap.Error(err))
+		return nil, fmt.Errorf("parse Store URL %q: %w", config.Store.URL, err)
+	}
 	runtime, err := factory(ctx, config)
 	if err != nil {
 		progressLogger.Error(ctx, "Creator runtime 初始化失败", zap.String("stage", "creator_runtime_initialization_failed"), zap.Error(err))
 		return nil, fmt.Errorf("initialize TemplateCreator runtime: %w", err)
 	}
 	progressLogger.Info(ctx, "Creator runtime 初始化完成", zap.String("stage", "creator_runtime_initialization_completed"))
-	storeURL, _ := url.Parse(config.Store.URL)
 	index, err := idempotency.New(storeURL.Path)
 	if err != nil {
 		// runtime 此时可能已经持有 goroutine 和 device pool；初始化任务结果索引失败时

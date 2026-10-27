@@ -64,7 +64,7 @@ func runContext(ctx context.Context, arguments []string, stdout, stderr io.Write
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(stderr, "[1/2] 校验 completion manifest 和完整对象闭包")
+	_, _ = fmt.Fprintln(stderr, "[1/2] 校验 completion manifest 和完整对象闭包")
 	result, err := templatecreator.ExportTemplateArtifacts(ctx, templatecreator.ExportTemplateArtifactsRequest{
 		Artifacts: templatecreator.ArtifactLocation{
 			StoreURL: "file://" + filepath.Clean(options.StoreRoot), ManifestKey: options.ManifestKey,
@@ -74,7 +74,7 @@ func runContext(ctx context.Context, arguments []string, stdout, stderr io.Write
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(stderr, "[2/2] Template 原始产物目录已发布")
+	_, _ = fmt.Fprintln(stderr, "[2/2] Template 原始产物目录已发布")
 	encoder := json.NewEncoder(stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)

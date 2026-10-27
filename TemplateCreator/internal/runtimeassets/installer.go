@@ -202,7 +202,7 @@ func (installer Installer) download(ctx context.Context, destination string, ass
 	if err != nil {
 		return fmt.Errorf("download %s: %w", asset.URL, err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10))
 		return fmt.Errorf("download %s: HTTP %s", asset.URL, response.Status)
@@ -326,7 +326,7 @@ func fileHasChecksum(path, expected string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
@@ -342,7 +342,7 @@ func syncDirectory(path string) error {
 	if err != nil {
 		return fmt.Errorf("open destination directory for sync: %w", err)
 	}
-	defer directory.Close()
+	defer func() { _ = directory.Close() }()
 	if err := directory.Sync(); err != nil {
 		return fmt.Errorf("sync destination directory: %w", err)
 	}

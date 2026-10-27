@@ -189,7 +189,7 @@ func (s *LocalStore) publishObject(ctx context.Context, object ObjectSource) (Ob
 	if err != nil {
 		return ObjectRecord{}, err
 	}
-	defer source.Close()
+	defer func() { _ = source.Close() }()
 
 	info, err := source.Stat()
 	if err != nil {
@@ -369,7 +369,7 @@ func syncDirectory(path string) error {
 	if err != nil {
 		return err
 	}
-	defer directory.Close()
+	defer func() { _ = directory.Close() }()
 
 	return directory.Sync()
 }

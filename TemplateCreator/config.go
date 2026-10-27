@@ -242,7 +242,7 @@ func validateRuntimeAssetFile(name, assetPath, expectedSHA256 string, executable
 	if err != nil {
 		return fmt.Errorf("open %s runtime asset %s: %w", name, assetPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	info, err := file.Stat()
 	if err != nil {
 		return fmt.Errorf("inspect %s runtime asset %s: %w", name, assetPath, err)

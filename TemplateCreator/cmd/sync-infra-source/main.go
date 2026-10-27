@@ -161,7 +161,7 @@ func syncPackages(config syncConfig) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(temporary)
+	defer func() { _ = os.RemoveAll(temporary) }()
 
 	tracked, err := trackedPackageFiles(config.InfraRoot, config.PackagePaths)
 	if err != nil {

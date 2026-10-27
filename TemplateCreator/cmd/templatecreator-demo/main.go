@@ -495,9 +495,9 @@ func run(ctx context.Context, arguments []string, output io.Writer, deps depende
 	}
 	if result.Registration.LocalPath != "" {
 		writer := progressLoggerWriter(resultNoticeWriter)
-		fmt.Fprintf(writer, "PostgreSQL 注册 SQL：%s\n", result.Registration.LocalPath)
+		_, _ = fmt.Fprintf(writer, "PostgreSQL 注册 SQL：%s\n", result.Registration.LocalPath)
 		for _, warning := range result.Registration.Warnings {
-			fmt.Fprintf(writer, "提示：%s\n", warning)
+			_, _ = fmt.Fprintf(writer, "提示：%s\n", warning)
 		}
 	}
 	exportRoot := options.ExportRoot
@@ -516,7 +516,7 @@ func run(ctx context.Context, arguments []string, output io.Writer, deps depende
 		return fmt.Errorf("export Template artifacts: %w", exportErr)
 	}
 	progressLogger.Info(ctx, "Template 原始产物导出完成", zap.String("stage", "template_artifacts_export_completed"), zap.String("output_path", artifacts.OutputPath))
-	fmt.Fprintf(progressLoggerWriter(resultNoticeWriter), "Template 原始产物目录：%s\n", artifacts.OutputPath)
+	_, _ = fmt.Fprintf(progressLoggerWriter(resultNoticeWriter), "Template 原始产物目录：%s\n", artifacts.OutputPath)
 	return nil
 }
 

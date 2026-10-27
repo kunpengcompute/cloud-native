@@ -212,7 +212,7 @@ func (object *jobLocalObject) WriteTo(_ context.Context, destination io.Writer) 
 		}
 		return 0, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	return io.Copy(destination, file)
 }
@@ -238,7 +238,7 @@ func (object *jobLocalObject) ReadAt(_ context.Context, buffer []byte, offset in
 		}
 		return 0, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	return file.ReadAt(buffer, offset)
 }
@@ -260,7 +260,7 @@ func (object *jobLocalObject) StoreFile(_ context.Context, sourcePath string) er
 	if err != nil {
 		return fmt.Errorf("open source file: %w", err)
 	}
-	defer source.Close()
+	defer func() { _ = source.Close() }()
 
 	return copyJobLocalFile(object.path, source)
 }
