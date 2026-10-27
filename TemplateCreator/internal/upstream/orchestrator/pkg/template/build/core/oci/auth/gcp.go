@@ -1,0 +1,32 @@
+// TemplateCreator modification: upstream import paths rewritten; no behavioral changes.
+
+package auth
+
+import (
+	"context"
+
+	"github.com/google/go-containerregistry/pkg/v1/google"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+
+	templatemanager "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/grpc/template-manager"
+)
+
+// GCPAuthProvider implements authentication for Google Container Registry
+type GCPAuthProvider struct {
+	registry *templatemanager.GCPRegistry
+}
+
+// NewGCPAuthProvider creates a new GCP auth provider
+func NewGCPAuthProvider(registry *templatemanager.GCPRegistry) *GCPAuthProvider {
+	return &GCPAuthProvider{
+		registry: registry,
+	}
+}
+
+// GetAuthOption returns the authentication option for GCP
+func (p *GCPAuthProvider) GetAuthOption(context.Context) (remote.Option, error) {
+	// Create authenticator using the service account JSON
+	authenticator := google.NewJSONKeyAuthenticator(p.registry.GetServiceAccountJson())
+
+	return remote.WithAuth(authenticator), nil
+}

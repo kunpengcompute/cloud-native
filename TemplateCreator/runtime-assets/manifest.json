@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "infra_commit": "4853232b93a8871b4ded73079184e801d84e0e26",
+  "template_version": "v2.1.0",
+  "assets": [
+    {
+      "type": "kernel",
+      "version": "vmlinux-6.1.158",
+      "architecture": "amd64",
+      "url": "https://storage.googleapis.com/e2b-prod-public-builds/kernels/vmlinux-6.1.158/amd64/vmlinux.bin",
+      "reuse_paths": [
+        "/home/fsq/Desktop/fsq/infra/packages/fc-kernels/vmlinux-6.1.158/amd64/vmlinux.bin",
+        "/fc-kernels/vmlinux-6.1.158/amd64/vmlinux.bin",
+        "/fc-kernels/vmlinux-6.1.158/vmlinux.bin"
+      ],
+      "sha256": "1982f8d5f1bc1680a36b0cdf126f605834b1633bba200d3281bccd53b86ff9ee",
+      "destination": "kernels/vmlinux-6.1.158/amd64/vmlinux.bin",
+      "mode": "0644"
+    },
+    {
+      "type": "firecracker",
+      "version": "v1.12.1_a41d3fb",
+      "architecture": "amd64",
+      "url": "https://storage.googleapis.com/e2b-prod-public-builds/firecrackers/v1.12.1_a41d3fb/amd64/firecracker",
+      "reuse_paths": [
+        "/home/fsq/Desktop/fsq/infra/packages/fc-versions/builds/v1.12.1_a41d3fb/amd64/firecracker",
+        "/fc-versions/v1.12.1_a41d3fb/amd64/firecracker",
+        "/fc-versions/v1.12.1_a41d3fb/firecracker"
+      ],
+      "sha256": "3cb9af1b6c3e103cff56be9a0fe2a7aab2233eb0f3afa0fb6549aa476816f44c",
+      "destination": "firecrackers/v1.12.1_a41d3fb/amd64/firecracker",
+      "mode": "0755"
+    },
+    {
+      "type": "envd",
+      "version": "0.5.3",
+      "architecture": "amd64",
+      "url": "",
+      "bundled_path": "bundled/envd/0.5.3/amd64/envd",
+      "reuse_paths": [
+        "/fc-envd/envd"
+      ],
+      "sha256": "d8f65a67276a13f82f192692da5cdd262649e8c232264a7e620cef0880ac7b2c",
+      "destination": "envd/0.5.3/amd64/envd",
+      "mode": "0755"
+    },
+    {
+      "type": "busybox",
+      "version": "1.36.1",
+      "architecture": "amd64",
+      "url": "https://storage.googleapis.com/e2b-prod-public-builds/busybox/1.36.1/amd64/busybox",
+      "reuse_paths": [
+        "/home/fsq/Desktop/fsq/infra/packages/orchestrator/.busybox/1.36.1/amd64/busybox",
+        "/fc-busybox/1.36.1/amd64/busybox"
+      ],
+      "sha256": "d7cce939adb09a41a22a5f846d22ba8d576b38dbb2b46a5c77a3a3e27ec52520",
+      "destination": "busybox/1.36.1/amd64/busybox",
+      "mode": "0755"
+    },
+    {
+      "type": "kernel",
+      "version": "vmlinux-6.1.158",
+      "architecture": "arm64",
+      "url": "",
+      "reuse_paths": [
+        "/opt/e2b-infra/bin/vmlinux.bin",
+        "/fc-kernels/vmlinux-6.1.158/arm64/vmlinux.bin",
+        "/fc-kernels/vmlinux-6.1.158/vmlinux.bin"
+      ],
+      "sha256": "1a741ddc512772c8f582b7f10caa126e71d428bcc6d7ecd868106b48eba159ae",
+      "destination": "kernels/vmlinux-6.1.158/arm64/vmlinux.bin",
+      "mode": "0644"
+    },
+    {
+      "type": "firecracker",
+      "version": "v1.12.1",
+      "architecture": "arm64",
+      "url": "",
+      "reuse_paths": [
+        "/opt/e2b-infra/bin/firecracker",
+        "/fc-versions/v1.13.1/firecracker",
+        "/fc-versions/v1.12.1/arm64/firecracker",
+        "/fc-versions/v1.12.1/firecracker"
+      ],
+      "sha256": "e482378a0ed7c311b58ea29712588e6f0d0e2ec8b95960f039d0474fa8a23f43",
+      "destination": "firecrackers/v1.12.1/arm64/firecracker",
+      "mode": "0755"
+    },
+    {
+      "type": "envd",
+      "version": "0.5.3",
+      "architecture": "arm64",
+      "url": "",
+      "reuse_paths": [
+        "/opt/e2b-infra/bin/envd",
+        "/fc-envd/envd"
+      ],
+      "sha256": "9cbbaf30a79f18c7c8179982747650659e47b74b88f6b7a91be747069e25f930",
+      "destination": "envd/0.5.3/arm64/envd",
+      "mode": "0755"
+    },
+    {
+      "type": "busybox",
+      "version": "1.35.0",
+      "architecture": "arm64",
+      "url": "",
+      "reuse_paths": [
+        "/opt/e2b-infra/bin/busybox",
+        "/fc-busybox/1.35.0/arm64/busybox",
+        "/fc-busybox/1.35.0/busybox"
+      ],
+      "sha256": "80741b04c665ddf31a020d06ee07cdb30e9c8da773f96cea7cec04a18182e10d",
+      "destination": "busybox/1.35.0/arm64/busybox",
+      "mode": "0755"
+    }
+  ]
+}
