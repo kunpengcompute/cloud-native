@@ -21,8 +21,8 @@ SCA 将 `internal/upstream/` 快照文件与开源组件指纹库比对，命中
 
 ### 1. 为 SCA 报错的 13 个 Go 文件恢复文件级版权头
 
-- `internal/upstream/shared/pkg/fc/client/operations/` 下 11 个报错文件（`describe_instance_responses.go`、`patch_balloon_responses.go`、`patch_guest_drive_by_id_parameters.go`、`put_balloon_responses.go`、`put_cpu_configuration_parameters.go`、`put_cpu_configuration_responses.go`、`put_guest_drive_by_id_parameters.go`、`put_guest_network_interface_by_id_parameters.go`、`put_guest_network_interface_by_id_responses.go`、`put_guest_vsock_responses.go`、`put_metrics_parameters.go`）：添加双版权人头 `Copyright (c) 2023-2026 e2b Devs Inc.` + `Copyright (c) Amazon.com, Inc. or its affiliates.`，附 Apache-2.0 声明，覆盖 e2b 与 firecracker-go-sdk 两个匹配源；
-- `internal/upstream/orchestrator/pkg/template/build/commands/copy.go` 与 `internal/upstream/shared/pkg/grpc/envd/process/processconnect/process.connect.go`：添加单版权人头 `Copyright (c) 2023-2026 e2b Devs Inc.`，附 Apache-2.0 声明；
+- `internal/upstream/shared/pkg/fc/client/operations/` 下 11 个报错文件（`describe_instance_responses.go`、`patch_balloon_responses.go`、`patch_guest_drive_by_id_parameters.go`、`put_balloon_responses.go`、`put_cpu_configuration_parameters.go`、`put_cpu_configuration_responses.go`、`put_guest_drive_by_id_parameters.go`、`put_guest_network_interface_by_id_parameters.go`、`put_guest_network_interface_by_id_responses.go`、`put_guest_vsock_responses.go`、`put_metrics_parameters.go`）：统一添加版权人头 `Copyright 2023 FoundryLabs, Inc.`（与上游 e2b-dev/infra LICENSE 声明的版权人一致），附 Apache-2.0 声明；
+- `internal/upstream/orchestrator/pkg/template/build/commands/copy.go` 与 `internal/upstream/shared/pkg/grpc/envd/process/processconnect/process.connect.go`：同上，版权人与上游 LICENSE 一致；
 - `SOURCE_MANIFEST.json` 对应 13 条 SHA-256 已重算，`.secrets.baseline` 同步刷新。
 
 ### 2. 补充 BusyBox 许可副本
