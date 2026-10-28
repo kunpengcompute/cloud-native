@@ -34,6 +34,7 @@ The module pins direct dependencies to the versions resolved by the locked infra
 ## License copy
 
 The upstream license is stored at `LICENSES/e2b-infra-APACHE-2.0.txt`.
+The snapshot also embeds the BusyBox 1.36.1 binary (`orchestrator/pkg/template/build/core/systeminit/busybox_1.36.1-2`, GPL-2.0); its license copy is stored at `LICENSES/busybox-GPL-2.0.txt`.
 
 ```text
 SHA-256: b4ef1bf811cb4095229fb86b574199e467c78f0ac4078cf8be62189e1fbd0818

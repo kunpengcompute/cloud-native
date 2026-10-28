@@ -581,7 +581,7 @@
     {
       "source_path": "orchestrator/internal/template/build/commands/copy.go",
       "path": "orchestrator/pkg/template/build/commands/copy.go",
-      "sha256": "4cfbfad2bcf5b2f26a9097ef96741c795c615ff596126a9a32603f5f88497dd3",
+      "sha256": "f8c9b222ead7d1e65a70f82745dc5d572af798b541f5ce727723cc4f00467888",
       "modified": true
     },
     {
@@ -1115,7 +1115,7 @@
     {
       "source_path": "shared/pkg/fc/client/operations/describe_instance_responses.go",
       "path": "shared/pkg/fc/client/operations/describe_instance_responses.go",
-      "sha256": "5372a522ebd0077983ad7117489fcefe29fd461e5216068a5e933400075d92d4",
+      "sha256": "ba04bdb9e52873de28ec71a2cf42e17ef7ddae2f34d82db07765549711b2216d",
       "modified": true
     },
     {
@@ -1241,7 +1241,7 @@
     {
       "source_path": "shared/pkg/fc/client/operations/patch_balloon_responses.go",
       "path": "shared/pkg/fc/client/operations/patch_balloon_responses.go",
-      "sha256": "1f44392967ea32f4c91c408b0f04b610e9ccbe53ce8b374217626b3f567a92f8",
+      "sha256": "7f7ed74509be7a5a19b32c076bff44b7c015a992fac094b9bc5d5130702dd461",
       "modified": true
     },
     {
@@ -1259,7 +1259,7 @@
     {
       "source_path": "shared/pkg/fc/client/operations/patch_guest_drive_by_id_parameters.go",
       "path": "shared/pkg/fc/client/operations/patch_guest_drive_by_id_parameters.go",
-      "sha256": "186b67e0b9b1b2d67b5fb9bf8ad38b572d96b9ddcbde99730c6d568be45608ee",
+      "sha256": "6bc824470721a065ff8bf13833266e9ef59f1692a2afa5824260ff319bf2400d",
       "modified": true
     },
     {
@@ -1325,19 +1325,19 @@
     {
       "source_path": "shared/pkg/fc/client/operations/put_balloon_responses.go",
       "path": "shared/pkg/fc/client/operations/put_balloon_responses.go",
-      "sha256": "59d7f30df141547052e1f00d9107927cc012edae220a95a54302373e88f2a732",
+      "sha256": "defc671f53df9d7e41ed9839ea6d455babce0e97078ef99360d114fa246e5c15",
       "modified": true
     },
     {
       "source_path": "shared/pkg/fc/client/operations/put_cpu_configuration_parameters.go",
       "path": "shared/pkg/fc/client/operations/put_cpu_configuration_parameters.go",
-      "sha256": "eeafa2e175f36e26d3e7ccf9ac4a449582cd9d56532a9ab1ac6cebad149184ec",
+      "sha256": "902382f98abf913e0474f4d5ce4167c85f309a7b83fdac81270cd947182bb9c4",
       "modified": true
     },
     {
       "source_path": "shared/pkg/fc/client/operations/put_cpu_configuration_responses.go",
       "path": "shared/pkg/fc/client/operations/put_cpu_configuration_responses.go",
-      "sha256": "aa26cdde409a557bb32a5d3f0968c0b555187007416492556303f04a2d23a28a",
+      "sha256": "081b81f3c1f44aed79f19a9488736f68103d23a2420e0ee8d4ca65c35674ab70",
       "modified": true
     },
     {
@@ -1367,7 +1367,7 @@
     {
       "source_path": "shared/pkg/fc/client/operations/put_guest_drive_by_id_parameters.go",
       "path": "shared/pkg/fc/client/operations/put_guest_drive_by_id_parameters.go",
-      "sha256": "7aaa6b96510e39f80ff57408cfdd3080c5025013b2db6829a97e7af622113cbd",
+      "sha256": "f0a1ce7703b3a24683c8f06f4ffe9d91b172460d41aabf8ae22b82ec498cb939",
       "modified": true
     },
     {
@@ -1379,13 +1379,13 @@
     {
       "source_path": "shared/pkg/fc/client/operations/put_guest_network_interface_by_id_parameters.go",
       "path": "shared/pkg/fc/client/operations/put_guest_network_interface_by_id_parameters.go",
-      "sha256": "5d4351428b05b420286d283b66f667ed4392105cf062fac17be0116eb0c48f7d",
+      "sha256": "fba4587c0ff41bfd37794a66e8649ecea232acbda7c00507e0101ed53f7efdbd",
       "modified": true
     },
     {
       "source_path": "shared/pkg/fc/client/operations/put_guest_network_interface_by_id_responses.go",
       "path": "shared/pkg/fc/client/operations/put_guest_network_interface_by_id_responses.go",
-      "sha256": "d0102dd8a37b2017492c9387d9a15c6a79a36017bef8bf94f848ae0569b1741a",
+      "sha256": "7419a77c0e5d7a78c9d3d05beac1760e1091aeaf6002709c50e88c0d690a5ef3",
       "modified": true
     },
     {
@@ -1397,7 +1397,7 @@
     {
       "source_path": "shared/pkg/fc/client/operations/put_guest_vsock_responses.go",
       "path": "shared/pkg/fc/client/operations/put_guest_vsock_responses.go",
-      "sha256": "174b38eb2e28ae8d2a8477b1ab0e330d2f9bea1e7933101ccd17538346286bd7",
+      "sha256": "c27a18e0397745feb1c51b1a5f92e93a87da5753e8397f523ab533d0b43cc520",
       "modified": true
     },
     {
@@ -1427,7 +1427,7 @@
     {
       "source_path": "shared/pkg/fc/client/operations/put_metrics_parameters.go",
       "path": "shared/pkg/fc/client/operations/put_metrics_parameters.go",
-      "sha256": "41fe1ceeb2379d4c398f0a522dc76c7267be6c8eb42f3f18c2ff0ef9859ae3cf",
+      "sha256": "1cb9e68193e47c02bab2d5d29a3513762a6c7c2e06d3f891ca708592eb8b5a0f",
       "modified": true
     },
     {
@@ -1697,7 +1697,7 @@
     {
       "source_path": "shared/pkg/grpc/envd/process/processconnect/process.connect.go",
       "path": "shared/pkg/grpc/envd/process/processconnect/process.connect.go",
-      "sha256": "e3bbbc04d6cb964fa0d0185ac395fd0fb51bd41b03c4aaa105954bc6167e314f",
+      "sha256": "c05f69b68eb79ee196c5d0f1286663746e1666a0c1aea4ad938c46a3ca42f748",
       "modified": true
     },
     {
