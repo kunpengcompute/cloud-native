@@ -382,19 +382,18 @@ func cloneBuildSpec(spec BuildSpec) BuildSpec {
 
 // cloneTemplateSteps 同时复制 step 切片及每个 step 的 Args 切片。
 func cloneTemplateSteps(steps []TemplateStep) []TemplateStep {
-	// 此处判断的是“调用方是否提供 steps”而非“切片是否为空”：
-	// nil 与显式空切片是公开 API 的两种语义（nil 继承默认，空切片清空），
-	// clone 必须保持 nil/非 nil 区分，故不能用 len(steps) == 0 替代。
-	if steps == nil {
-		return nil
+	// 公开 API 的 Steps 具有三态语义：nil 表示未提供（由 format 决定默认步骤），
+	// 非 nil（包括显式空切片）表示调用方显式给出步骤集合，空切片即“清空全部
+	// 请求步骤”。clone 必须原样保持 nil 与非 nil 的区分，不能用 len 判断把
+	// 空切片折叠成 nil，否则“显式清空”会被误判为“未提供”而重新继承默认。
+	if steps != nil {
+		result := make([]TemplateStep, len(steps))
+		for i, step := range steps {
+			// Creator 持有的配置应从调用方视角保持不可变。
+			result[i] = step
+			result[i].Args = append([]string(nil), step.Args...)
+		}
+		return result
 	}
-
-	result := make([]TemplateStep, len(steps))
-	for i, step := range steps {
-		// Creator 持有的配置应从调用方视角保持不可变。
-		result[i] = step
-		result[i].Args = append([]string(nil), step.Args...)
-	}
-
-	return result
+	return nil
 }
