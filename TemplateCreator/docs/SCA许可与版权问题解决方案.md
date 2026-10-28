@@ -44,6 +44,25 @@ SCA 将 `internal/upstream/` 快照文件与开源组件指纹库比对，命中
 - **jrimmer/spoond（BSD-3-Clause）、openeuler/KASandbox 匹配条目**：同上，均为同源第三方副本，非来源；真实来源链以 INFRA_SOURCE.md 为准。
 - **busybox_1.36.1-2**：确认为 e2b-infra 快照携带的 BusyBox 1.36.1 二进制资产（GPL-2.0），许可副本已补 `LICENSES/busybox-GPL-2.0.txt`。
 
+## 第二轮扫描结果分析（加版权头后）
+
+修复推送后 SCA 重扫结果对比第一轮：
+
+- **已消除 2 项**：`copy.go`（copyright）与 `put_cpu_configuration_parameters.go`（license）——证明版权头策略有效：当匹配源为 e2b-dev/infra 本尊时，`Copyright 2023 FoundryLabs, Inc.` + Apache-2.0 头与匹配源 LICENSE 声明一致，确认闭环。
+- **仍余 12 项**（报错行号整体 +13 行，证明扫描的是加头后的新版）：
+  - 9 个 `fc/client/operations` 文件升级为 license&copyright 合并报错，匹配源仍为 `aarani/hpcc`（AGPL-3.0）；
+  - `process.connect.go` 新增 `qiniu/go-sdk`、`abox-dev/sdk` 匹配（87%）；
+  - `patch_guest_drive_by_id_parameters.go` 匹配 `dreadl0ck` 等三个 firecracker-go-sdk fork（78%）；
+  - `busybox_1.36.1-2` 二进制（copyright，100% 匹配 e2b，无法加头）。
+
+**剩余报错的根因**：这些文件在 SCA 指纹库中的最高相似匹配不是 e2b-dev/infra 本尊，而是同源第三方副本——
+
+1. 指纹库收录的 e2b-dev/infra 为 2026.05 等旧版本，而本仓库快照基于 **2026.09**（fc/client 随 firecracker API 更新大幅重生成），与旧版 e2b 的相似度反而低于与 `aarani/hpcc`（同为新版 firecracker client）的相似度，最高分匹配落到 hpcc；本仓库版权头（FoundryLabs/Apache-2.0）与 hpcc 的 AGPL 声明天然不可能一致——这不是声明错误，而是匹配源就不是本仓库的来源；
+2. `process.connect.go` 是 connectrpc 代码生成器产物，`operations` 系列是 go-swagger 生成模板——生成器模板代码在所有使用方仓库中结构相同，`qiniu/go-sdk`、`abox-dev/sdk`、firecracker-go-sdk 各 fork 的相似匹配属模板撞车；
+3. busybox 为二进制资产，无文件级声明载体。
+
+**结论**：文件级版权头已达到其能力边界（对 e2b 本尊匹配源 100% 有效）。剩余 12 项无法通过代码修改消除——指纹相似度与最高分匹配选择不受本仓库控制，**必须在 SCA 平台人工确认**，确认理由补充一条关键论据：本快照真实来源为 e2b-dev/infra tag 2026.09（commit `4853232b93a8871b4ded73079184e801d84e0e26`，见 `third_party/INFRA_SOURCE.md`），SCA 指纹库尚未收录该版本，故匹配到的 hpcc/spoond/qiniu/abox-dev/firecracker-go-sdk forks 均为同源第三方副本或模板撞车，非本仓库引入来源。
+
 ## 验证状态
 
 - 加版权头后 `gofmt` / `go build ./...` 通过（纯注释变更）；
