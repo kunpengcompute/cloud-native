@@ -321,6 +321,8 @@ func resolveBuildOptions(defaults BuildSpec, defaultFormat BuildFormat, defaultP
 	if resolved.DiskSizeMB == 0 {
 		resolved.DiskSizeMB = DefaultDiskSizeMB
 	}
+	// 判断 Steps 是否已配置（nil 即未配置，继承 format 默认步骤）；
+	// 显式空切片属于“已配置”，不进入该分支，语义为清空全部步骤。
 	if resolved.Steps == nil {
 		resolved.Steps = stepsForBuildFormat(format)
 	}
@@ -341,6 +343,8 @@ func resolveBuildOptions(defaults BuildSpec, defaultFormat BuildFormat, defaultP
 		if override.ReadyCommand != "" {
 			resolved.ReadyCommand = override.ReadyCommand
 		}
+		// override 提供了 Steps（nil 表示未提供而继承默认，非 nil 含空切片
+		// 表示显式配置）时整体替换默认步骤。
 		if override.Steps != nil {
 			resolved.Steps = cloneTemplateSteps(override.Steps)
 		}
@@ -382,10 +386,11 @@ func cloneBuildSpec(spec BuildSpec) BuildSpec {
 
 // cloneTemplateSteps 同时复制 step 切片及每个 step 的 Args 切片。
 func cloneTemplateSteps(steps []TemplateStep) []TemplateStep {
-	// 公开 API 的 Steps 具有三态语义：nil 表示未提供（由 format 决定默认步骤），
-	// 非 nil（包括显式空切片）表示调用方显式给出步骤集合，空切片即“清空全部
-	// 请求步骤”。clone 必须原样保持 nil 与非 nil 的区分，不能用 len 判断把
-	// 空切片折叠成 nil，否则“显式清空”会被误判为“未提供”而重新继承默认。
+	// 注意：下面的比较判断的是“调用方是否配置了 Steps”，而不是“切片是否为空”。
+	// Steps 为 nil 与非 nil 是两种不同的配置状态：nil 表示未配置（由 format 决定
+	// 默认步骤）；非 nil（包括显式空切片）表示已配置，其中空切片的语义是“清空
+	// 全部请求步骤”。clone 必须原样保持该区分：若改用 len(steps) == 0 把空切片
+	// 折叠成 nil，“显式清空”会被误判为“未配置”而重新继承默认步骤。
 	if steps != nil {
 		result := make([]TemplateStep, len(steps))
 		for i, step := range steps {
