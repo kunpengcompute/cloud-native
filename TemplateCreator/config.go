@@ -242,7 +242,7 @@ func validateRuntimeAssetFile(name, assetPath, expectedSHA256 string, executable
 	if err != nil {
 		return fmt.Errorf("open %s runtime asset %s: %w", name, assetPath, err)
 	}
-	defer func() { _ = file.Close() }()
+	defer file.Close()
 	info, err := file.Stat()
 	if err != nil {
 		return fmt.Errorf("inspect %s runtime asset %s: %w", name, assetPath, err)
@@ -382,6 +382,9 @@ func cloneBuildSpec(spec BuildSpec) BuildSpec {
 
 // cloneTemplateSteps 同时复制 step 切片及每个 step 的 Args 切片。
 func cloneTemplateSteps(steps []TemplateStep) []TemplateStep {
+	// 此处判断的是“调用方是否提供 steps”而非“切片是否为空”：
+	// nil 与显式空切片是公开 API 的两种语义（nil 继承默认，空切片清空），
+	// clone 必须保持 nil/非 nil 区分，故不能用 len(steps) == 0 替代。
 	if steps == nil {
 		return nil
 	}

@@ -206,7 +206,10 @@ func parseFlagsWithHelp(arguments []string) (options, string, error) {
 	var flagOutput bytes.Buffer
 	flags.SetOutput(&flagOutput)
 	flags.Usage = func() {
-		_, _ = io.WriteString(flags.Output(), commandUsage)
+		if _, writeErr := io.WriteString(flags.Output(), commandUsage); writeErr != nil {
+			// usage 输出失败时 flag 包正走向退出，写标准错误兜底。
+			_, _ = fmt.Fprintln(os.Stderr, writeErr)
+		}
 	}
 	result := options{
 		RuntimeInfoPath: templatecreator.DefaultRuntimeInfoPath,

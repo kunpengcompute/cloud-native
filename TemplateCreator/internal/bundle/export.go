@@ -90,7 +90,9 @@ func Export(ctx context.Context, request Request) (Result, error) {
 	keepTemporary := false
 	defer func() {
 		if !keepTemporary {
-			_ = os.Remove(temporaryPath)
+			if rmErr := os.Remove(temporaryPath); rmErr != nil && !os.IsNotExist(rmErr) {
+				// 临时文件清理失败不影响已产出的结果，此处仅显式检查错误。
+			}
 		}
 	}()
 
@@ -100,17 +102,14 @@ func Export(ctx context.Context, request Request) (Result, error) {
 	writeErr := writeArchive(ctx, tarWriter, archiveRoot, manifestBytes, objects)
 	closeTarErr := tarWriter.Close()
 	closeGzipErr := gzipWriter.Close()
-	if err := errors.Join(writeErr, closeTarErr, closeGzipErr); err != nil {
-		_ = temporary.Close()
-		return Result{}, fmt.Errorf("write bundle: %w", err)
+	if writeErr != nil || closeTarErr != nil || closeGzipErr != nil {
+		return Result{}, closeJoined(fmt.Errorf("write bundle: %w", errors.Join(writeErr, closeTarErr, closeGzipErr)), temporary)
 	}
 	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return Result{}, fmt.Errorf("sync bundle: %w", err)
+		return Result{}, closeJoined(fmt.Errorf("sync bundle: %w", err), temporary)
 	}
 	if err := temporary.Chmod(0o644); err != nil {
-		_ = temporary.Close()
-		return Result{}, fmt.Errorf("chmod bundle: %w", err)
+		return Result{}, closeJoined(fmt.Errorf("chmod bundle: %w", err), temporary)
 	}
 	if err := temporary.Close(); err != nil {
 		return Result{}, fmt.Errorf("close bundle: %w", err)
@@ -256,8 +255,8 @@ func writeArchive(ctx context.Context, writer *tar.Writer, archiveRoot string, m
 		reader := io.TeeReader(&contextReader{ctx: ctx, reader: file}, hash)
 		err = writeEntry(writer, path.Join(archiveRoot, "objects", object.record.Key), object.record.Size, reader)
 		closeErr := file.Close()
-		if err := errors.Join(err, closeErr); err != nil {
-			return fmt.Errorf("archive object %q: %w", object.record.Key, err)
+		if err != nil || closeErr != nil {
+			return fmt.Errorf("archive object %q: %w", object.record.Key, errors.Join(err, closeErr))
 		}
 		digest := hex.EncodeToString(hash.Sum(nil))
 		if digest != object.record.SHA256 {
@@ -332,20 +331,19 @@ func writeAtomic(destination string, data []byte) error {
 	keep := false
 	defer func() {
 		if !keep {
-			_ = os.Remove(temporaryPath)
+			if rmErr := os.Remove(temporaryPath); rmErr != nil && !os.IsNotExist(rmErr) {
+				// 临时文件清理失败不影响已产出的结果，此处仅显式检查错误。
+			}
 		}
 	}()
 	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
+		return closeJoined(err, temporary)
 	}
 	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
+		return closeJoined(err, temporary)
 	}
 	if err := temporary.Chmod(0o644); err != nil {
-		_ = temporary.Close()
-		return err
+		return closeJoined(err, temporary)
 	}
 	if err := temporary.Close(); err != nil {
 		return err
@@ -363,7 +361,7 @@ func syncDirectory(directory string) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = file.Close() }()
+	defer file.Close()
 
 	return file.Sync()
 }

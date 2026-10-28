@@ -202,9 +202,12 @@ func (installer Installer) download(ctx context.Context, destination string, ass
 	if err != nil {
 		return fmt.Errorf("download %s: %w", asset.URL, err)
 	}
-	defer func() { _ = response.Body.Close() }()
+	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10))
+		if _, drainErr := io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10)); drainErr != nil {
+			// 排空响应体仅用于连接复用；失败时直接返回状态码错误。
+			return fmt.Errorf("download %s: HTTP %s", asset.URL, response.Status)
+		}
 		return fmt.Errorf("download %s: HTTP %s", asset.URL, response.Status)
 	}
 	if err := installReader(ctx, destination, asset, response.Body); err != nil {
@@ -326,7 +329,7 @@ func fileHasChecksum(path, expected string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer func() { _ = file.Close() }()
+	defer file.Close()
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
@@ -342,7 +345,7 @@ func syncDirectory(path string) error {
 	if err != nil {
 		return fmt.Errorf("open destination directory for sync: %w", err)
 	}
-	defer func() { _ = directory.Close() }()
+	defer directory.Close()
 	if err := directory.Sync(); err != nil {
 		return fmt.Errorf("sync destination directory: %w", err)
 	}

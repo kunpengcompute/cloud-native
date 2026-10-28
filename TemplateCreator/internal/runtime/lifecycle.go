@@ -54,7 +54,9 @@ func closeResources(ctx context.Context, resources []resource) error {
 	var result error
 	// 逆序能够尊重资源间的初始化依赖；errors.Join 防止一个错误跳过后续 cleanup。
 	for i := len(resources) - 1; i >= 0; i-- {
-		result = errors.Join(result, resources[i].Close(ctx))
+		if closeErr := resources[i].Close(ctx); closeErr != nil {
+			result = errors.Join(result, closeErr)
+		}
 	}
 
 	return result

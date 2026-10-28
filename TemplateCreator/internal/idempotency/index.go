@@ -152,7 +152,10 @@ func writeAtomic(path string, data []byte) (returnErr error) {
 	}
 	temporaryPath := temporary.Name()
 	defer func() {
-		_ = temporary.Close()
+		// 成功路径已显式关闭句柄；此处只报告首次关闭失败（内容未落盘）。
+		if closeErr := temporary.Close(); closeErr != nil && !errors.Is(closeErr, os.ErrClosed) {
+			returnErr = errors.Join(returnErr, closeErr)
+		}
 		if err := os.Remove(temporaryPath); returnErr == nil && err != nil && !os.IsNotExist(err) {
 			returnErr = err
 		}
@@ -176,6 +179,6 @@ func writeAtomic(path string, data []byte) (returnErr error) {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = directory.Close() }()
+	defer directory.Close()
 	return directory.Sync()
 }

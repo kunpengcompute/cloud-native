@@ -96,27 +96,25 @@ func copyAtomic(source, destination string) error {
 	keep := false
 	defer func() {
 		if !keep {
-			_ = os.Remove(temporaryPath)
+			if rmErr := os.Remove(temporaryPath); rmErr != nil && !os.IsNotExist(rmErr) {
+				// 临时文件清理失败不影响已产出的结果，此处仅显式检查错误。
+			}
 		}
 	}()
 	input, err := os.Open(source)
 	if err != nil {
-		_ = temporary.Close()
-		return err
+		return closeJoined(err, temporary)
 	}
 	_, copyErr := io.Copy(temporary, input)
 	closeInputErr := input.Close()
-	if err := errorsJoin(copyErr, closeInputErr); err != nil {
-		_ = temporary.Close()
-		return err
+	if copyErr != nil || closeInputErr != nil {
+		return closeJoined(errorsJoin(copyErr, closeInputErr), temporary)
 	}
 	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
+		return closeJoined(err, temporary)
 	}
 	if err := temporary.Chmod(0o644); err != nil {
-		_ = temporary.Close()
-		return err
+		return closeJoined(err, temporary)
 	}
 	if err := temporary.Close(); err != nil {
 		return err

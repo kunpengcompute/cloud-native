@@ -189,7 +189,7 @@ func (s *LocalStore) publishObject(ctx context.Context, object ObjectSource) (Ob
 	if err != nil {
 		return ObjectRecord{}, err
 	}
-	defer func() { _ = source.Close() }()
+	defer source.Close()
 
 	info, err := source.Stat()
 	if err != nil {
@@ -215,26 +215,22 @@ func (s *LocalStore) publishObject(ctx context.Context, object ObjectSource) (Ob
 	keepTemporary := false
 	defer func() {
 		if !keepTemporary {
-			_ = os.Remove(temporaryPath)
+			if rmErr := os.Remove(temporaryPath); rmErr != nil && !os.IsNotExist(rmErr) {
+				// 临时文件清理失败不影响已产出的结果，此处仅显式检查错误。
+			}
 		}
 	}()
 
 	hash := sha256.New()
 	written, copyErr := io.Copy(io.MultiWriter(temporary, hash), &contextReader{ctx: ctx, reader: source})
 	if copyErr != nil {
-		_ = temporary.Close()
-
-		return ObjectRecord{}, copyErr
+		return ObjectRecord{}, closeJoined(copyErr, temporary)
 	}
 	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-
-		return ObjectRecord{}, err
+		return ObjectRecord{}, closeJoined(err, temporary)
 	}
 	if err := temporary.Chmod(0o644); err != nil {
-		_ = temporary.Close()
-
-		return ObjectRecord{}, err
+		return ObjectRecord{}, closeJoined(err, temporary)
 	}
 	if err := temporary.Close(); err != nil {
 		return ObjectRecord{}, err
@@ -274,24 +270,20 @@ func (s *LocalStore) writeAtomic(ctx context.Context, key string, data []byte, p
 	keepTemporary := false
 	defer func() {
 		if !keepTemporary {
-			_ = os.Remove(temporaryPath)
+			if rmErr := os.Remove(temporaryPath); rmErr != nil && !os.IsNotExist(rmErr) {
+				// 临时文件清理失败不影响已产出的结果，此处仅显式检查错误。
+			}
 		}
 	}()
 
 	if _, err := (&contextWriter{ctx: ctx, writer: temporary}).Write(data); err != nil {
-		_ = temporary.Close()
-
-		return err
+		return closeJoined(err, temporary)
 	}
 	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-
-		return err
+		return closeJoined(err, temporary)
 	}
 	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-
-		return err
+		return closeJoined(err, temporary)
 	}
 	if err := temporary.Close(); err != nil {
 		return err
@@ -369,7 +361,7 @@ func syncDirectory(path string) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = directory.Close() }()
+	defer directory.Close()
 
 	return directory.Sync()
 }

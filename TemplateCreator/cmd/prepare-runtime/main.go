@@ -68,7 +68,10 @@ func parseFlagsWithHelp(arguments []string) (templatecreator.PrepareRuntimeReque
 	var flagOutput bytes.Buffer
 	flags.SetOutput(&flagOutput)
 	flags.Usage = func() {
-		_, _ = io.WriteString(flags.Output(), prepareRuntimeUsage)
+		if _, writeErr := io.WriteString(flags.Output(), prepareRuntimeUsage); writeErr != nil {
+			// usage 输出失败时 flag 包正走向退出，写标准错误兜底。
+			_, _ = fmt.Fprintln(os.Stderr, writeErr)
+		}
 	}
 
 	var request templatecreator.PrepareRuntimeRequest

@@ -75,7 +75,9 @@ func (lease *LockLease) Release() error {
 	lease.releaseOnce.Do(func() {
 		unlockErr := unix.Flock(int(lease.file.Fd()), unix.LOCK_UN)
 		closeErr := lease.file.Close()
-		lease.releaseErr = errors.Join(unlockErr, closeErr)
+		if unlockErr != nil || closeErr != nil {
+			lease.releaseErr = errors.Join(unlockErr, closeErr)
+		}
 	})
 
 	return lease.releaseErr

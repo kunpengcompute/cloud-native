@@ -174,16 +174,13 @@ func createFileWithoutReplace(path string, content []byte) (returnErr error) {
 		returnErr = errors.Join(returnErr, os.Remove(temporaryPath))
 	}()
 	if err := temporary.Chmod(0o644); err != nil {
-		_ = temporary.Close()
-		return err
+		return closeJoined(err, temporary)
 	}
 	if _, err := temporary.Write(content); err != nil {
-		_ = temporary.Close()
-		return err
+		return closeJoined(err, temporary)
 	}
 	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
+		return closeJoined(err, temporary)
 	}
 	if err := temporary.Close(); err != nil {
 		return err

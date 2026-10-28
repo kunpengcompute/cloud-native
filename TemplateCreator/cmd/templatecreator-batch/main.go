@@ -142,7 +142,7 @@ func logCounters(w io.Writer, requestID, stage, templateID, buildID string, wait
 	if w == nil {
 		return
 	}
-	encoded, _ := json.Marshal(struct {
+	encoded, marshalErr := json.Marshal(struct {
 		RequestID        string `json:"request_id"`
 		Stage            string `json:"stage"`
 		TemplateID       string `json:"template_id"`
@@ -151,6 +151,12 @@ func logCounters(w io.Writer, requestID, stage, templateID, buildID string, wait
 		ActiveWorkers    int64  `json:"active_workers"`
 		FinishedRequests int64  `json:"finished_requests"`
 	}{requestID, stage, templateID, buildID, waiting, activeWorkers, finished})
+	if marshalErr != nil {
+		// 静态字段序列化不应失败；退化输出键值计数行保持事件流不中断。
+		_, _ = fmt.Fprintf(w, "request_id=%s stage=%s template_id=%s build_id=%s waiting=%d active_workers=%d finished=%d\n",
+			requestID, stage, templateID, buildID, waiting, activeWorkers, finished)
+		return
+	}
 	_, _ = fmt.Fprintln(w, string(encoded))
 }
 
@@ -411,8 +417,8 @@ func executeBatch(ctx context.Context, creator batchCreator, items []batchItem, 
 			for index := range jobs {
 				item := items[index]
 				waiting.Add(-1)
-				if ctx.Err() != nil {
-					output.Results[index] = itemOutput{RequestID: item.RequestID, Stage: "canceled", Error: ctx.Err().Error()}
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					output.Results[index] = itemOutput{RequestID: item.RequestID, Stage: "canceled", Error: ctxErr.Error()}
 					finished.Add(1)
 					logCounters(eventLogs, item.RequestID, "canceled", "", "", waiting.Load(), occupied.Load(), finished.Load())
 					continue
@@ -474,8 +480,8 @@ dispatch:
 		entry := &output.Results[i]
 		if entry.Stage == "" && entry.Result == nil {
 			entry.Stage = "canceled"
-			if ctx.Err() != nil {
-				entry.Error = ctx.Err().Error()
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				entry.Error = ctxErr.Error()
 			} else {
 				entry.Error = "request was not started"
 			}
