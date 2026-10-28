@@ -28,7 +28,7 @@ const (
 	RootfsBlockSize = 2 << 11
 )
 
-var tracer = otel.Tracer("gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage/header")
+var tracer = otel.Tracer("gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage/header")
 
 var (
 	EmptyHugePage = make([]byte, HugepageSize)

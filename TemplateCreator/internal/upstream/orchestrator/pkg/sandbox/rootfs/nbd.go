@@ -25,13 +25,13 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/nbd"
-	featureflags "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/featureflags"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/logger"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage/header"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/telemetry"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/utils"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/nbd"
+	featureflags "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/featureflags"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage/header"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/telemetry"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/utils"
 )
 
 type NBDProvider struct {

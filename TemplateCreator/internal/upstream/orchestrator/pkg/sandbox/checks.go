@@ -25,10 +25,10 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
-	sbxlogger "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/logger/sandbox"
+	sbxlogger "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger/sandbox"
 )
 
-var tracer = otel.Tracer("gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox")
+var tracer = otel.Tracer("gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox")
 
 const (
 	healthCheckInterval = 20 * time.Second

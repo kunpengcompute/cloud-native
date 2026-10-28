@@ -19,8 +19,8 @@ import (
 	"context"
 	"sync"
 
-	featureflags "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/featureflags"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/utils"
+	featureflags "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/featureflags"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/utils"
 )
 
 type Limiter struct {

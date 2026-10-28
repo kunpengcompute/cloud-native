@@ -25,9 +25,9 @@ import (
 
 	"go.opentelemetry.io/otel"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/ioutils"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/ioutils"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage"
 )
 
 const (
@@ -36,7 +36,7 @@ const (
 	DeprecatedVersion = 1
 )
 
-var tracer = otel.Tracer("gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/template/metadata")
+var tracer = otel.Tracer("gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/metadata")
 
 // AccessType is a compact representation of block access type for JSON serialization.
 type AccessType string

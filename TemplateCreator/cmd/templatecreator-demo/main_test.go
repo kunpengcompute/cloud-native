@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	templatecreator "gitcode.com/cloud-native/cloud-native/TemplateCreator"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/preflight"
+	templatecreator "gitcode.com/boostkit/cloud-native.git/TemplateCreator"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/preflight"
 )
 
 type fakeCreator struct {

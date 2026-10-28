@@ -17,9 +17,9 @@ import (
 
 	"go.uber.org/zap"
 
-	templatecreator "gitcode.com/cloud-native/cloud-native/TemplateCreator"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/preflight"
-	buildruntime "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/runtime"
+	templatecreator "gitcode.com/boostkit/cloud-native.git/TemplateCreator"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/preflight"
+	buildruntime "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/runtime"
 )
 
 const (

@@ -18,7 +18,7 @@ package pool
 import (
 	"net/url"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/logger"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger"
 )
 
 const MaskRequestHostPortPlaceholder = "${PORT}"

@@ -23,7 +23,7 @@ import (
 
 	consulApi "github.com/hashicorp/consul/api"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/utils"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/utils"
 )
 
 type StorageKV struct {

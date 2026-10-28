@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	internalbundle "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/bundle"
+	internalbundle "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/bundle"
 )
 
 // ExportBundleRequest 使用 CreateResult 返回的 ArtifactLocation 定位已完成 Template。

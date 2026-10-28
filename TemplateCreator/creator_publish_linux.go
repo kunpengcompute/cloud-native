@@ -16,8 +16,8 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/publisher"
-	upstreamid "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/id"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/publisher"
+	upstreamid "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/id"
 )
 
 // CreateTemplate 同步构建并发布完整的本地 Template 对象闭包。

@@ -1,4 +1,4 @@
-module gitcode.com/cloud-native/cloud-native/TemplateCreator
+module gitcode.com/boostkit/cloud-native.git/TemplateCreator
 
 go 1.26.5
 

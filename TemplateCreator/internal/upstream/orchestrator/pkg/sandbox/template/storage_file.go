@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage"
 )
 
 type storageFile struct {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/logger"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger"
 )
 
 // LogLevel 控制 TemplateCreator 及其复用 infra Builder 的运行日志级别。

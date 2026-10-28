@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"time"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/runtimeassets"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/runtimeassets"
 )
 
 const defaultPrepareRuntimeTimeout = 5 * time.Minute

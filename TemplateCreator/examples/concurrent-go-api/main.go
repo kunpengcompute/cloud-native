@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	templatecreator "gitcode.com/cloud-native/cloud-native/TemplateCreator"
+	templatecreator "gitcode.com/boostkit/cloud-native.git/TemplateCreator"
 )
 
 // ---------- 基础参数：构建机路径、超时和本地监听端口 ----------

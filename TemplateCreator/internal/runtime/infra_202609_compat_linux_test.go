@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	upstreamstorage "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage"
+	upstreamstorage "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage"
 )
 
 func TestPrepareInfra202609RuntimeViewMapsArchitectureAssets(t *testing.T) {

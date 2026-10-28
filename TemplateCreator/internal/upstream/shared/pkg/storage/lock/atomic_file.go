@@ -26,7 +26,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/utils"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/utils"
 )
 
 type AtomicImmutableFile struct {

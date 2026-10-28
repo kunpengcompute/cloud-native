@@ -26,7 +26,7 @@ import (
 	"github.com/ngrok/firewall_toolkit/pkg/set"
 	"golang.org/x/sys/unix"
 
-	sandbox_network "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/sandbox-network"
+	sandbox_network "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/sandbox-network"
 )
 
 const tableName = "slot-firewall"

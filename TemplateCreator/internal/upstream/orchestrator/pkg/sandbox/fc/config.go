@@ -18,7 +18,7 @@ package fc
 import (
 	"path/filepath"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/cfg"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/cfg"
 )
 
 const (

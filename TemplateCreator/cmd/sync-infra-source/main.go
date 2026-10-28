@@ -26,13 +26,13 @@ const (
 var importRewrites = []struct{ old, new string }{
 	// infra 2026.09 的构建执行面仍位于 orchestrator/internal。同步到本 module 时，
 	// 仅机械提升 namespace，使项目自有 runtime adapter 可以访问；源码行为不变。
-	{"github.com/e2b-dev/infra/packages/orchestrator/internal", "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg"},
+	{"github.com/e2b-dev/infra/packages/orchestrator/internal", "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg"},
 	// 后续 infra 已把 feature-flags 目录改名为 featureflags；保持 TemplateCreator
 	// 私有 import path 稳定，避免项目自有 logger/runtime 代码感知版本差异。
-	{"github.com/e2b-dev/infra/packages/shared/pkg/feature-flags", "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/featureflags"},
-	{"github.com/e2b-dev/infra/packages/orchestrator", "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator"},
-	{"github.com/e2b-dev/infra/packages/shared", "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared"},
-	{"github.com/e2b-dev/infra/packages/clickhouse", "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/clickhouse"},
+	{"github.com/e2b-dev/infra/packages/shared/pkg/feature-flags", "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/featureflags"},
+	{"github.com/e2b-dev/infra/packages/orchestrator", "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator"},
+	{"github.com/e2b-dev/infra/packages/shared", "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared"},
+	{"github.com/e2b-dev/infra/packages/clickhouse", "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/clickhouse"},
 }
 
 type syncConfig struct {

@@ -16,7 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/publisher"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/publisher"
 )
 
 const archiveRootPrefix = "template-bundle-"

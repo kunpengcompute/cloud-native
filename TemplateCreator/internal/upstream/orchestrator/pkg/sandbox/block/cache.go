@@ -34,7 +34,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"golang.org/x/sys/unix"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage/header"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage/header"
 )
 
 const (
@@ -42,7 +42,7 @@ const (
 	oomMaxJitter  = 100 * time.Millisecond
 )
 
-var tracer = otel.Tracer("gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block")
+var tracer = otel.Tracer("gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block")
 
 type CacheClosedError struct {
 	filePath string

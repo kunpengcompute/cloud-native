@@ -10,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	templatecreator "gitcode.com/cloud-native/cloud-native/TemplateCreator"
+	templatecreator "gitcode.com/boostkit/cloud-native.git/TemplateCreator"
 )
 
 // capacityWithDefaults 先按公共 API 的零值继承规则解析资源，再估计同时运行的峰值。

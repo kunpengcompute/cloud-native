@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	upstreamstorage "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage"
+	upstreamstorage "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage"
 )
 
 // infra202609RuntimeView 是旧 Builder 期望的无 architecture 子目录视图。

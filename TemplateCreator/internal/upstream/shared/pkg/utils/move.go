@@ -22,7 +22,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/logger"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger"
 )
 
 // RenameOrDeleteFile tries to rename a file but will not replace the target if it already exists.

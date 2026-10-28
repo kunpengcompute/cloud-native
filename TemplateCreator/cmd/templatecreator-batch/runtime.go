@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	templatecreator "gitcode.com/cloud-native/cloud-native/TemplateCreator"
+	templatecreator "gitcode.com/boostkit/cloud-native.git/TemplateCreator"
 )
 
 type runtimeInfo struct {

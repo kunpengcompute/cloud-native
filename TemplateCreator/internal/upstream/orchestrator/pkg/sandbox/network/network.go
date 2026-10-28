@@ -28,7 +28,7 @@ import (
 	"github.com/vishvananda/netns"
 	"go.uber.org/zap"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/logger"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger"
 )
 
 func (s *Slot) CreateNetwork(ctx context.Context) error {

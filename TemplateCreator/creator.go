@@ -11,11 +11,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/basecache"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/idempotency"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/machineinfo"
-	buildruntime "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/runtime"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/logger"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/basecache"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/idempotency"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/machineinfo"
+	buildruntime "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/runtime"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger"
 )
 
 // ErrIdempotencyConflict 表示某个任务编号已经由另一份安全请求内容完成。

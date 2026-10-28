@@ -1,6 +1,6 @@
 package templatecreator
 
-import "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/publisher"
+import "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/publisher"
 
 // ManifestSchemaVersion 是当前 completion manifest 的 schema 版本。
 const ManifestSchemaVersion = publisher.ManifestSchemaVersion

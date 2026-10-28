@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	templatecreator "gitcode.com/cloud-native/cloud-native/TemplateCreator"
+	templatecreator "gitcode.com/boostkit/cloud-native.git/TemplateCreator"
 )
 
 const commandUsage = `TemplateCreator 原始 Template 产物导出命令

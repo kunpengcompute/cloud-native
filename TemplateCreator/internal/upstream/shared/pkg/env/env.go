@@ -19,7 +19,7 @@ import (
 	"os"
 	"strconv"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/utils"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/utils"
 )
 
 var environment = GetEnv("ENVIRONMENT", "prod")

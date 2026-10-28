@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block"
 )
 
 type LocalDiffFile struct {

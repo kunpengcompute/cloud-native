@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/consts"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/consts"
 )
 
 type Metrics struct {

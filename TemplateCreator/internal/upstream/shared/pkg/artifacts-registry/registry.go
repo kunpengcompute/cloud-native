@@ -23,7 +23,7 @@ import (
 
 	containerregistry "github.com/google/go-containerregistry/pkg/v1"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/env"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/env"
 )
 
 type RegistryProvider string

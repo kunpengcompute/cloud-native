@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage/header"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage/header"
 )
 
 type Local struct {

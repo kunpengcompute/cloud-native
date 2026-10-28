@@ -22,8 +22,8 @@ import (
 	"strings"
 	"text/template"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/buildcontext"
-	sandbox_network "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/sandbox-network"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/buildcontext"
+	sandbox_network "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/sandbox-network"
 )
 
 func generateFile(t *template.Template, model *templateModel) ([]byte, error) {

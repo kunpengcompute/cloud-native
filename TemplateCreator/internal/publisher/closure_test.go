@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
-	upstreamstorage "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage"
-	upstreamheader "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage/header"
+	upstreamstorage "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage"
+	upstreamheader "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage/header"
 )
 
 func TestResolveClosureCollectsInfra202609FinalArtifactsAndAncestors(t *testing.T) {

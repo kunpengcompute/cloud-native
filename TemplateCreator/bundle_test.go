@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/publisher"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/publisher"
 )
 
 func TestExportTemplateBundleUsesArtifactLocation(t *testing.T) {

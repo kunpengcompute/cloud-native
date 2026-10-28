@@ -21,7 +21,7 @@ import (
 
 	"github.com/ngrok/firewall_toolkit/pkg/set"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/utils"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/utils"
 )
 
 const (

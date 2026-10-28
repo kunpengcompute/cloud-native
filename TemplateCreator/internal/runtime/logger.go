@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/zap/zapcore"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/logger"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger"
 )
 
 // NewLogger 通过 infra 既有 LoggerConfig.Cores 扩展点创建 TemplateCreator 日志器。

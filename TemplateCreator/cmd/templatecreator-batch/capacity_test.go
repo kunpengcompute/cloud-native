@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	templatecreator "gitcode.com/cloud-native/cloud-native/TemplateCreator"
+	templatecreator "gitcode.com/boostkit/cloud-native.git/TemplateCreator"
 )
 
 func TestFreeNBDDevicesCountsIdleOnly(t *testing.T) {

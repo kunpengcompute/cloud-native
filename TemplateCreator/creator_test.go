@@ -14,9 +14,9 @@ import (
 
 	"github.com/google/uuid"
 
-	buildruntime "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/runtime"
-	upstreamstorage "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage"
-	upstreamheader "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage/header"
+	buildruntime "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/runtime"
+	upstreamstorage "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage"
+	upstreamheader "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage/header"
 )
 
 type fakeCreatorRuntime struct {

@@ -24,7 +24,7 @@ import (
 
 	"connectrpc.com/connect"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/consts"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/consts"
 )
 
 func StreamToChannel[Res any](ctx context.Context, stream *connect.ServerStreamForClient[Res]) (<-chan *Res, <-chan error) {

@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"time"
 
-	templatecreator "gitcode.com/cloud-native/cloud-native/TemplateCreator"
+	templatecreator "gitcode.com/boostkit/cloud-native.git/TemplateCreator"
 )
 
 // cliDefaultTimeout 限制单个 runtime 资产下载所能占用的最长时间。

@@ -1,4 +1,4 @@
-{{- /*gotype:gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/core/rootfs.templateModel*/ -}}
+{{- /*gotype:gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/core/rootfs.templateModel*/ -}}
 {{ .WriteFile "/etc/inittab" 0o777 }}
 
 # Run system init

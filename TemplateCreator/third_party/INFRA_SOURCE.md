@@ -25,6 +25,8 @@ The sync tool rewrites the three upstream module import prefixes to TemplateCrea
 - `orchestrator/internal/*` becomes `internal/upstream/orchestrator/pkg/*`;
 - `shared/pkg/feature-flags` becomes `internal/upstream/shared/pkg/featureflags`.
 
+The current module prefix is `gitcode.com/boostkit/cloud-native.git/TemplateCreator`; `.git` identifies the parent Git repository for Go module discovery. The source sync tool and snapshot imports use this same prefix, and manifest checksums are refreshed for files changed by the module-path migration.
+
 The manifest records 261 files as mechanically modified, including files whose destination changed only because of a namespace mapping. Modified Go files carry a prominent TemplateCreator modification notice while preserving build tags and embed directives. The namespace mapping is intentionally mechanical: TemplateCreator-specific Builder/runtime adaptation remains outside the snapshot under `internal/runtime`.
 
 There are no behavioral or other non-mechanical upstream source patches in the current snapshot. TemplateCreator-specific runtime assembly is implemented outside the snapshot under `internal/runtime`.

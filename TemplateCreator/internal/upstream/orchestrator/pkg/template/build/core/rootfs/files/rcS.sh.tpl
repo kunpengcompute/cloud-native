@@ -1,4 +1,4 @@
-{{- /*gotype:gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/core/rootfs.templateModel*/ -}}
+{{- /*gotype:gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/core/rootfs.templateModel*/ -}}
 {{ .WriteFile "etc/init.d/rcS" 0o777 }}
 
 #!/usr/bin/busybox ash

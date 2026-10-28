@@ -16,7 +16,7 @@
 package optimize
 
 import (
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block"
 )
 
 // computeCommonPrefetchEntries computes the intersection of multiple prefetch data sets.

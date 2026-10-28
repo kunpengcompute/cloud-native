@@ -10,9 +10,9 @@ import (
 
 	"go.uber.org/zap"
 
-	buildruntime "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/runtime"
-	registryauth "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/core/oci/auth"
-	templatemanager "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/grpc/template-manager"
+	buildruntime "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/runtime"
+	registryauth "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/core/oci/auth"
+	templatemanager "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/grpc/template-manager"
 )
 
 // jobRuntime 是 Creator 对单次真实构建所需的最小 runtime contract。

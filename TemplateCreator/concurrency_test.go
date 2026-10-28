@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	buildruntime "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/runtime"
+	buildruntime "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/runtime"
 )
 
 type deadlineCheckingRuntime struct{}

@@ -20,7 +20,7 @@ import (
 
 	"google.golang.org/grpc/stats"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/grpc/orchestrator"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/grpc/orchestrator"
 )
 
 type noTraceKey struct{}

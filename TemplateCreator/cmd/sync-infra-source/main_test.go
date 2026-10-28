@@ -90,7 +90,7 @@ var _ = storage.Paths{}
 	if !bytes.Contains(got, []byte(templateCreatorModificationNotice)) {
 		t.Fatalf("rewriteGoSource() missing modification notice:\n%s", got)
 	}
-	if !bytes.Contains(got, []byte(`gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage`)) {
+	if !bytes.Contains(got, []byte(`gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage`)) {
 		t.Fatalf("rewriteGoSource() did not rewrite import:\n%s", got)
 	}
 	if !bytes.Contains(got, []byte("//go:embed assets/*.txt")) {
@@ -209,7 +209,7 @@ var _ *featureflags.Client
 	if err != nil {
 		t.Fatalf("read promoted orchestrator package: %v", err)
 	}
-	if !bytes.Contains(content, []byte(`gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/featureflags`)) {
+	if !bytes.Contains(content, []byte(`gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/featureflags`)) {
 		t.Fatalf("2026.09 feature-flags import was not mapped to the stable private namespace:\n%s", content)
 	}
 	if _, err := os.Stat(filepath.Join(targetRoot, "shared", "pkg", "featureflags", "client.go")); err != nil {

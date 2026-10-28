@@ -19,7 +19,7 @@ import (
 	"context"
 	"fmt"
 
-	sbxtemplate "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/template"
+	sbxtemplate "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/template"
 )
 
 var _ SourceTemplateProvider = (*CacheSourceTemplateProvider)(nil)

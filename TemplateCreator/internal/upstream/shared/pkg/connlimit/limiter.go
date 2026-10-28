@@ -18,7 +18,7 @@ package connlimit
 import (
 	"sync/atomic"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/smap"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/smap"
 )
 
 // ConnectionLimiter tracks and limits per-key concurrent connections.

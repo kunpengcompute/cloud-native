@@ -28,8 +28,8 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/zap"
 
-	featureflags "gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/featureflags"
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/logger"
+	featureflags "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/featureflags"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger"
 )
 
 const (
@@ -58,7 +58,7 @@ func WrapInNFSCache(
 
 	createCacheSpans := flags.BoolFlag(ctx, featureflags.CreateStorageCacheSpansFlag)
 	if !createCacheSpans {
-		cacheTracer = noop.NewTracerProvider().Tracer("gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage")
+		cacheTracer = noop.NewTracerProvider().Tracer("gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage")
 	}
 
 	return &cache{

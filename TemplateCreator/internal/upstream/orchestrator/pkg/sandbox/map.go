@@ -20,7 +20,7 @@ import (
 	"net"
 	"sync"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/smap"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/smap"
 )
 
 type MapSubscriber interface {

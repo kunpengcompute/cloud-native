@@ -1,4 +1,4 @@
-{{- /*gotype:gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/core/rootfs.templateModel*/ -}}
+{{- /*gotype:gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/core/rootfs.templateModel*/ -}}
 {{ .WriteFile "/etc/systemd/system/serial-getty@ttyS0.service.d/autologin.conf" 0o644 }}
 
 [Service]

@@ -20,7 +20,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"gitcode.com/cloud-native/cloud-native/TemplateCreator/internal/upstream/shared/pkg/storage/header"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage/header"
 )
 
 // PrefetchData contains block access data for prefetch mapping.
