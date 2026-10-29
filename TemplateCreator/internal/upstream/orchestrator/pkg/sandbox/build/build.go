@@ -1,0 +1,153 @@
+// Copyright 2023 FoundryLabs, Inc.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// TemplateCreator modification: upstream import paths rewritten; no behavioral changes.
+
+package build
+
+import (
+	"context"
+	"fmt"
+	"io"
+
+	"github.com/google/uuid"
+
+	blockmetrics "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block/metrics"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/storage/header"
+)
+
+type File struct {
+	header      *header.Header
+	store       *DiffStore
+	fileType    DiffType
+	persistence storage.StorageProvider
+	metrics     blockmetrics.Metrics
+}
+
+func NewFile(
+	header *header.Header,
+	store *DiffStore,
+	fileType DiffType,
+	persistence storage.StorageProvider,
+	metrics blockmetrics.Metrics,
+) *File {
+	return &File{
+		header:      header,
+		store:       store,
+		fileType:    fileType,
+		persistence: persistence,
+		metrics:     metrics,
+	}
+}
+
+func (b *File) ReadAt(ctx context.Context, p []byte, off int64) (n int, err error) {
+	for n < len(p) {
+		mappedOffset, mappedLength, buildID, err := b.header.GetShiftedMapping(ctx, off+int64(n))
+		if err != nil {
+			return 0, fmt.Errorf("failed to get mapping: %w", err)
+		}
+
+		remainingReadLength := int64(len(p)) - int64(n)
+
+		readLength := min(mappedLength, remainingReadLength)
+
+		if readLength <= 0 {
+			logger.L().Error(ctx, fmt.Sprintf(
+				"(%d bytes left to read, off %d) reading %d bytes from %+v/%+v: [%d:] -> [%d:%d] <> %d (mapped length: %d, remaining read length: %d)\n>>> EOF\n",
+				len(p)-n,
+				off,
+				readLength,
+				buildID,
+				b.fileType,
+				mappedOffset,
+				n,
+				int64(n)+readLength,
+				n,
+				mappedLength,
+				remainingReadLength,
+			))
+
+			return n, io.EOF
+		}
+
+		// Skip reading when the uuid is nil.
+		// We will use this to handle base builds that are already diffs.
+		// The passed slice p must start as empty, otherwise we would need to copy the empty values there.
+		if *buildID == uuid.Nil {
+			n += int(readLength)
+
+			continue
+		}
+
+		mappedBuild, err := b.getBuild(ctx, buildID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get build: %w", err)
+		}
+
+		buildN, err := mappedBuild.ReadAt(ctx,
+			p[n:int64(n)+readLength],
+			mappedOffset,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read from source: %w", err)
+		}
+
+		n += buildN
+	}
+
+	return n, nil
+}
+
+// The slice access must be in the predefined blocksize of the build.
+func (b *File) Slice(ctx context.Context, off, _ int64) ([]byte, error) {
+	mappedOffset, _, buildID, err := b.header.GetShiftedMapping(ctx, off)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mapping: %w", err)
+	}
+
+	// Pass empty huge page when the build id is nil.
+	if *buildID == uuid.Nil {
+		return header.EmptyHugePage, nil
+	}
+
+	build, err := b.getBuild(ctx, buildID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get build: %w", err)
+	}
+
+	return build.Slice(ctx, mappedOffset, int64(b.header.Metadata.BlockSize))
+}
+
+func (b *File) getBuild(ctx context.Context, buildID *uuid.UUID) (Diff, error) {
+	storageDiff, err := newStorageDiff(
+		b.store.cachePath,
+		buildID.String(),
+		b.fileType,
+		int64(b.header.Metadata.BlockSize),
+		b.metrics,
+		b.persistence,
+		b.store.flags,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage diff: %w", err)
+	}
+
+	source, err := b.store.Get(ctx, storageDiff)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get build from store: %w", err)
+	}
+
+	return source, nil
+}

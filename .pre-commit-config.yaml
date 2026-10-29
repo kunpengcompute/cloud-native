@@ -15,6 +15,9 @@ repos:
       - id: check-merge-conflict # 检查未解决的合并冲突标记
       - id: detect-private-key # 检测私钥/敏感信息泄露
       - id: check-added-large-files # 拦截超大文件提交（默认500KB）
+        # 仅允许独立 runtime 交付和 go:embed 必需的三个二进制文件超限。
+        exclude: >-
+          ^TemplateCreator/(runtime-assets/bundled/envd/0\.5\.3/(amd64|arm64)/envd|internal/upstream/orchestrator/pkg/template/build/core/systeminit/busybox_1\.36\.1-2)$
       #  args: ["--maxkb", "500"]  # 支持自定义修改
       - id: no-commit-to-branch # 禁止直接提交到main/master分支
 
@@ -24,6 +27,11 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets
+        # baseline 仅记录已核对误报，新增疑似凭据继续接受检查。
+        args: ["--baseline", ".secrets.baseline"]
+        # 以下upstream快照文件为已人工核实的固定算法常量/标识正则，按文件排除，
+        # 避免其行号随快照调整偏移而需要反复同步baseline。
+        exclude: ^TemplateCreator/internal/upstream/(shared/pkg/id/id|shared/pkg/keys/constants)\.go$
 
   # ===================== Go 语言 ==========
   - repo: https://gitcode.com/gh_mirrors/go/golangci-lint # 使用gitcode镜像加速

@@ -1,0 +1,95 @@
+// Copyright 2023 FoundryLabs, Inc.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// TemplateCreator modification: upstream import paths rewritten; no behavioral changes.
+
+package base
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	containerregistry "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/uuid"
+
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/sandbox/block"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/buildcontext"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/config"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/core/rootfs"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/build/phases"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/orchestrator/pkg/template/constants"
+	artifactsregistry "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/artifacts-registry"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/dockerhub"
+	featureflags "gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/featureflags"
+	"gitcode.com/boostkit/cloud-native.git/TemplateCreator/internal/upstream/shared/pkg/logger"
+)
+
+func constructLayerFilesFromOCI(
+	ctx context.Context,
+	userLogger logger.Logger,
+	buildContext buildcontext.BuildContext,
+	phaseMetadata phases.PhaseMeta,
+	// The base build ID can be different from the final requested template build ID.
+	baseBuildID string,
+	artifactRegistry artifactsregistry.ArtifactsRegistry,
+	dockerhubRepository dockerhub.RemoteRepository,
+	featureFlags *featureflags.Client,
+	rootfsPath string,
+) (r *block.Local, m block.ReadonlyDevice, c containerregistry.Config, e error) {
+	ctx, span := tracer.Start(ctx, "template-build")
+	defer span.End()
+
+	// Create a rootfs file
+	rtfs := rootfs.New(
+		artifactRegistry,
+		dockerhubRepository,
+		buildContext,
+		featureFlags,
+	)
+	provisionScript, err := getProvisionScript(ctx, ProvisionScriptParams{
+		BusyBox:    rootfs.SandboxBusyBoxPath,
+		ResultPath: provisionScriptResultPath,
+	})
+	if err != nil {
+		return nil, nil, containerregistry.Config{}, fmt.Errorf("error getting provision script: %w", err)
+	}
+	imgConfig, err := rtfs.CreateExt4Filesystem(ctx, userLogger, phaseMetadata, rootfsPath, provisionScript, provisionLogPrefix, provisionScriptResultPath)
+	if err != nil {
+		return nil, nil, containerregistry.Config{}, fmt.Errorf("error creating ext4 filesystem: %w", err)
+	}
+
+	buildIDParsed, err := uuid.Parse(baseBuildID)
+	if err != nil {
+		return nil, nil, containerregistry.Config{}, fmt.Errorf("failed to parse build id: %w", err)
+	}
+
+	rootfs, err := block.NewLocal(rootfsPath, buildContext.Config.RootfsBlockSize(), buildIDParsed)
+	if err != nil {
+		return nil, nil, containerregistry.Config{}, fmt.Errorf("error reading rootfs blocks: %w", err)
+	}
+
+	// Create empty memfile
+	memfile, err := block.NewEmpty(
+		buildContext.Config.MemoryMB<<constants.ToMBShift,
+		config.MemfilePageSize(buildContext.Config.HugePages),
+		buildIDParsed,
+	)
+	if err != nil {
+		err := errors.Join(err, rootfs.Close())
+
+		return nil, nil, containerregistry.Config{}, fmt.Errorf("error creating memfile: %w", err)
+	}
+
+	return rootfs, memfile, imgConfig, nil
+}

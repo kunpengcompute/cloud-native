@@ -1,0 +1,23 @@
+# Go build and test output.
+/bin/
+/prepare-runtime
+*.test
+*.out
+coverage*.txt
+
+# Local TemplateCreator runtime and build scratch data.
+/.runtime/
+/.scratch/
+/_artifacts/
+
+# Editors and operating systems.
+.idea/
+.vscode/
+.DS_Store
+*~
+
+*superpowers
+.marscode/deviceInfo.json
+
+# 仓库根目录忽略 env/，但 upstream 的 env 包必须随模块提交。
+!/internal/upstream/shared/pkg/env/
